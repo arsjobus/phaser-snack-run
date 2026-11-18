@@ -1,6 +1,6 @@
 # 4x4 Snack Run: Redux Roadmap
 
-> **Status:** Phase 0 and Phase 1 are complete (see `README.md`). Next up: Phase 2 (fuel, snacks, scoring).
+> **Status:** Phases 0, 1 and 2 are complete (see `README.md`). Next up: Phase 3 (HUD recreation). A first-pass bottom-bar HUD already exists from Phase 2 and Phase 3 builds on it.
 
 An endless-runner redux of a late-90s Flash/Shockwave-era 4x4 racing game. Same spirit (muddy tracks, big trucks, jumps, snack pickups), rebuilt for modern browsers.
 
@@ -104,11 +104,11 @@ An endless-runner redux of a late-90s Flash/Shockwave-era 4x4 racing game. Same 
 
 ### Phase 2: Fuel, Snacks, and Scoring (1 week)
 
-- [ ] Fuel system: continuous drain, drain rate scales slightly with speed and distance
-- [ ] Fuel can pickups (spawn rules guarantee reachability: never farther apart than a full tank allows)
-- [ ] Snack pickups: placed in lines/arcs/over ramps to teach routes
-- [ ] Score: snack points, distance points, air-time bonus, combo multiplier (chain pickups without missing)
-- [ ] Game over on empty fuel; restart in under 2 seconds
+- [x] Fuel system: continuous drain, drain rate scales slightly with speed and distance
+- [x] Fuel can pickups (spawn rules guarantee reachability: the fuel to cover each gap at a slow reference pace is at most 80% of what one can restores; see §6)
+- [x] Snack pickups: placed in lines/arcs/over ramps to teach routes
+- [x] Score: snack points, distance points, air-time bonus, combo multiplier (chain pickups without missing)
+- [x] Game over on empty fuel; restart in under 2 seconds
 - **Exit:** a complete (if plain) endless run with a loss condition
 
 ### Phase 3: HUD Recreation (3-5 days)
@@ -170,10 +170,11 @@ An endless-runner redux of a late-90s Flash/Shockwave-era 4x4 racing game. Same 
 
 | Parameter                 | Start value                 |
 | ------------------------- | --------------------------- |
-| Base fuel drain           | ~1.5% per second            |
+| Base fuel drain           | ~1.5% per second (+50% at top speed, +50% by 3 km) |
 | Fuel can restore          | ~35%                        |
-| Max gap between fuel cans | ~80% of a full tank's range |
-| Snack points              | 100 (x combo, max x8)       |
+| Max gap between fuel cans | fuel to cross it at the reference pace ≤ 80% of what ONE can restores (ramps from 50% over the first 2.5 km). A literal "80% of a full tank" cannot hold with a 35% can: arriving at a can with a near-empty tank you'd never reach the next one. |
+| Snack points              | 100 (x combo, max x8; +1 step per 3 pickups in a row) |
+| Distance points           | 10 per metre (furthest point reached) |
 | Air-time bonus            | +50 per 0.25s airborne      |
 | Wreck damage              | 10-25% per hit              |
 | Checkpoint spacing        | ~1,000 m (increasing)       |

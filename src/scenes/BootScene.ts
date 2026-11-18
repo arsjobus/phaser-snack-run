@@ -15,10 +15,13 @@ export class BootScene extends Phaser.Scene {
     this.makeSky();
     this.makeClouds();
     this.makeHills();
-    this.makeTreeLine('trees_mid', 200, 0x2f5d34, 0x24492a, 26, 70, 7);
+    this.makeTrees('trees_mid', 200, 7);
     this.makeBushes();
     this.makeTruck();
     this.makeWheel();
+    this.makeSnack();
+    this.makeFuelCan();
+    this.makeStartGate();
     this.scene.start('Game');
   }
 
@@ -79,38 +82,33 @@ export class BootScene extends Phaser.Scene {
     g.destroy();
   }
 
-  private makeTreeLine(
-    key: string,
-    h: number,
-    c1: number,
-    c2: number,
-    minW: number,
-    maxH: number,
-    seed: number,
-  ): void {
+  /** Round deciduous tree line, like the reference's painted backdrop. Wraps seamlessly. */
+  private makeTrees(key: string, h: number, seed: number): void {
     const rng = new Rng(seed);
     const g = this.gfx();
-    g.fillStyle(c2, 1);
-    g.fillRect(0, h - 40, VIEW_W, 40); // solid base so parallax movement never shows a gap
+    const base = h - 30;
+    g.fillStyle(0x2c5a2a, 1);
+    g.fillRect(0, base - 6, VIEW_W, 36); // solid base so parallax never shows a gap
+    const greens = [0x3f7d36, 0x377030, 0x4a8a3c, 0x2f6a2c];
     let x = 0;
     while (x < VIEW_W + 60) {
-      const w = minW + rng.range(0, 22);
-      const th = maxH * rng.range(0.6, 1);
-      const base = h - 30;
+      const r = rng.range(22, 38);
+      const top = base - rng.range(26, 62);
+      const color = greens[rng.int(0, greens.length - 1)];
       for (const off of [-VIEW_W, 0, VIEW_W]) {
         const cx = x + off;
-        g.fillStyle(c1, 1);
-        g.fillTriangle(cx - w / 2, base, cx + w / 2, base, cx, base - th);
-        g.fillTriangle(
-          cx - w / 2.6,
-          base - th * 0.35,
-          cx + w / 2.6,
-          base - th * 0.35,
-          cx,
-          base - th * 1.1,
-        );
+        g.fillStyle(0x4a3220, 1); // trunk
+        g.fillRect(cx - 3, top + r * 0.6, 6, base - top);
+        g.fillStyle(0x1f4a20, 1); // shadow side
+        g.fillCircle(cx + 4, top + 5, r);
+        g.fillStyle(color, 1);
+        g.fillCircle(cx, top, r);
+        g.fillCircle(cx - r * 0.6, top + r * 0.45, r * 0.7);
+        g.fillCircle(cx + r * 0.6, top + r * 0.4, r * 0.72);
+        g.fillStyle(0xffffff, 0.08); // sun highlight
+        g.fillCircle(cx - r * 0.3, top - r * 0.35, r * 0.45);
       }
-      x += w * rng.range(0.5, 0.9);
+      x += r * rng.range(0.9, 1.4);
     }
     g.generateTexture(key, VIEW_W, h);
     g.destroy();
@@ -137,26 +135,109 @@ export class BootScene extends Phaser.Scene {
     g.destroy();
   }
 
-  /** Placeholder truck body, drawn facing right with the chassis centre at (65, 38). */
+  /** Placeholder truck body (lifted SUV), drawn facing right with the chassis centre at (65, 38). */
   private makeTruck(): void {
     const g = this.gfx();
     const ox = 65;
     const oy = 38;
     g.fillStyle(0x111111, 1); // outline
-    g.fillRoundedRect(ox - 60, oy - 8, 120, 34, 8);
-    g.fillRoundedRect(ox - 36, oy - 32, 48, 28, 8);
+    g.fillRoundedRect(ox - 60, oy - 10, 120, 36, 7);
+    g.fillRoundedRect(ox - 44, oy - 34, 62, 30, 7);
     g.fillStyle(0xf2c200, 1); // body
-    g.fillRoundedRect(ox - 58, oy - 6, 116, 30, 7);
-    g.fillRoundedRect(ox - 34, oy - 30, 44, 26, 7);
+    g.fillRoundedRect(ox - 58, oy - 8, 116, 32, 6);
+    g.fillRoundedRect(ox - 42, oy - 32, 58, 28, 6);
+    g.fillStyle(0xffe066, 1); // roof / hood highlight
+    g.fillRect(ox - 38, oy - 31, 50, 3);
+    g.fillRect(ox + 20, oy - 8, 36, 3);
     g.fillStyle(0xb83a1a, 1); // stripe
-    g.fillRect(ox - 58, oy + 8, 116, 5);
-    g.fillStyle(0x9fd4f2, 1); // window
-    g.fillRoundedRect(ox - 28, oy - 25, 32, 15, 4);
+    g.fillRect(ox - 58, oy + 10, 116, 5);
+    g.fillStyle(0x1b2b4a, 1); // windows (dark glass, pillar between)
+    g.fillRoundedRect(ox - 36, oy - 27, 24, 15, 3);
+    g.fillRoundedRect(ox - 8, oy - 27, 20, 15, 3);
+    g.fillStyle(0x6fa8d6, 1);
+    g.fillRect(ox - 34, oy - 25, 8, 4);
+    g.fillRect(ox - 6, oy - 25, 8, 4);
+    g.fillStyle(0xffffff, 1); // number roundel on the door
+    g.fillCircle(ox - 20, oy + 4, 8);
+    g.fillStyle(0xb83a1a, 1);
+    g.fillCircle(ox - 20, oy + 4, 5);
     g.fillStyle(0xfff7c2, 1); // headlight
-    g.fillRect(ox + 52, oy - 2, 6, 7);
-    g.fillStyle(0x333333, 1); // roof rack
-    g.fillRect(ox - 30, oy - 34, 36, 3);
+    g.fillRect(ox + 52, oy - 2, 6, 8);
+    g.fillStyle(0x333333, 1); // bumper + roof rack + spotlights
+    g.fillRect(ox + 50, oy + 16, 10, 6);
+    g.fillRect(ox - 60, oy + 16, 8, 6);
+    g.fillRect(ox - 40, oy - 36, 54, 3);
+    g.fillStyle(0xfff7c2, 1);
+    g.fillRect(ox - 34, oy - 40, 6, 4);
+    g.fillRect(ox - 18, oy - 40, 6, 4);
     g.generateTexture('truck_body', 130, 70);
+    g.destroy();
+  }
+
+  /** Snack box (original brand: "Crunch Crackers"): orange box with a cracker window. */
+  private makeSnack(): void {
+    const g = this.gfx();
+    g.fillStyle(0x111111, 1);
+    g.fillRoundedRect(0, 0, 30, 36, 4);
+    g.fillStyle(0xe8742a, 1);
+    g.fillRoundedRect(2, 2, 26, 32, 3);
+    g.fillStyle(0xf9a23c, 1);
+    g.fillRect(2, 2, 26, 6);
+    g.fillStyle(0xfff2c9, 1); // label
+    g.fillRoundedRect(5, 11, 20, 14, 2);
+    g.fillStyle(0xd9a441, 1); // cracker with grid
+    g.fillRect(8, 13, 14, 10);
+    g.lineStyle(1, 0x9a6b1f, 1);
+    for (const o of [11, 15, 19]) {
+      g.lineBetween(o, 13, o, 23);
+      g.lineBetween(8, o - 1, 22, o - 1);
+    }
+    g.fillStyle(0xb83a1a, 1);
+    g.fillRect(5, 28, 20, 4);
+    g.generateTexture('snack', 30, 36);
+    g.destroy();
+  }
+
+  private makeFuelCan(): void {
+    const g = this.gfx();
+    g.fillStyle(0x111111, 1);
+    g.fillRoundedRect(0, 4, 34, 38, 5);
+    g.fillRect(4, 0, 12, 8);
+    g.fillStyle(0xd23a2a, 1);
+    g.fillRoundedRect(2, 6, 30, 34, 4);
+    g.fillStyle(0xf26b55, 1);
+    g.fillRect(4, 8, 6, 30);
+    g.fillStyle(0x8f2318, 1);
+    g.fillRect(5, 1, 10, 6);
+    g.lineStyle(2, 0x8f2318, 1); // cross brace
+    g.lineBetween(8, 12, 28, 34);
+    g.lineBetween(28, 12, 8, 34);
+    g.fillStyle(0xffe066, 1); // label
+    g.fillRoundedRect(11, 18, 14, 10, 2);
+    g.fillStyle(0x111111, 1);
+    g.fillRect(15, 20, 6, 6);
+    g.generateTexture('fuel_can', 34, 42);
+    g.destroy();
+  }
+
+  /** Start gate: pole with a checkered banner, like the reference's. Origin = bottom centre. */
+  private makeStartGate(): void {
+    const g = this.gfx();
+    g.fillStyle(0x222222, 1);
+    g.fillRect(84, 0, 8, 210);
+    g.fillStyle(0xf2c200, 1);
+    g.fillRect(0, 10, 92, 50);
+    g.fillStyle(0x111111, 1);
+    g.fillRect(0, 10, 92, 4);
+    g.fillRect(0, 56, 92, 4);
+    const cell = 10;
+    for (let i = 0; i < 4; i++) {
+      for (let j = 0; j < 5; j++) {
+        g.fillStyle((i + j) % 2 ? 0x111111 : 0xffffff, 1);
+        g.fillRect(52 + i * cell, 14 + j * 8, cell, 8);
+      }
+    }
+    g.generateTexture('start_gate', 96, 212);
     g.destroy();
   }
 

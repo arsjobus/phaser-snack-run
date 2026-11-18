@@ -1,7 +1,20 @@
 import { BASE_Y, GAMEPLAY, PX_PER_METER, TERRAIN_STEP } from '../config';
 import { Rng } from './Rng';
 
-type PieceKind = 'flat' | 'hills' | 'washboard' | 'ramp' | 'table';
+export type PieceKind = 'flat' | 'hills' | 'washboard' | 'ramp' | 'table';
+
+/** Record of one generated chunk, so spawners (snacks, fuel) can lay content on top of it. */
+export interface TerrainPiece {
+  kind: PieceKind;
+  /** World x of the piece's first and one-past-last sample (includes its flat run-out). */
+  x0: number;
+  x1: number;
+  /** World x of the first and last sample at the piece's highest point (ramp: the lip). */
+  liftX: number;
+  lipX: number;
+}
+
+export const JUMP_KINDS: readonly PieceKind[] = ['ramp', 'table'];
 
 /**
  * Infinite heightfield terrain built from "chunks" (pieces) appended on demand.
@@ -13,6 +26,8 @@ export class Terrain {
   private originX = 0;
   private rng: Rng;
   private lastKind: PieceKind = 'flat';
+  /** Chunks in generation order; pruned together with the samples. */
+  readonly pieces: TerrainPiece[] = [];
 
   constructor(seed: number) {
     this.rng = new Rng(seed);
@@ -41,6 +56,7 @@ export class Terrain {
     if (drop > 200) {
       this.heights.splice(0, drop);
       this.originX += drop * TERRAIN_STEP;
+      while (this.pieces.length && this.pieces[0].x1 < this.originX) this.pieces.shift();
     }
   }
 
@@ -70,7 +86,19 @@ export class Terrain {
     const offs = this.build(kind);
     // Flat breathing room after every piece.
     for (let i = 0; i < this.rng.int(3, 6); i++) offs.push(0);
+    const x0 = this.endX;
     for (const o of offs) this.heights.push(BASE_Y + o);
+    let top = 0;
+    for (const o of offs) top = Math.min(top, o);
+    const first = offs.findIndex((o) => o === top);
+    const last = offs.lastIndexOf(top);
+    this.pieces.push({
+      kind,
+      x0,
+      x1: this.endX,
+      liftX: x0 + first * TERRAIN_STEP,
+      lipX: x0 + last * TERRAIN_STEP,
+    });
   }
 
   private pickKind(): PieceKind {

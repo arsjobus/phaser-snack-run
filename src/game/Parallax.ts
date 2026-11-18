@@ -40,6 +40,8 @@ export class Parallax {
     drift: number,
     depth: number,
   ): void {
+    // Nearest filtering stops the opaque bottom row bleeding into the top edge when tiles wrap.
+    scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
     const sprite = scene.add
       .tileSprite(0, bottom, VIEW_W, h, key)
       .setOrigin(0, 1)
@@ -52,7 +54,7 @@ export class Parallax {
     this.t += dt;
     for (const l of this.layers) {
       l.sprite.tilePositionX = scrollX * l.fx + this.t * l.drift;
-      l.sprite.y = l.bottom + (SCROLL_Y0 - scrollY) * l.fy;
+      l.sprite.y = Math.round(l.bottom + (SCROLL_Y0 - scrollY) * l.fy);
     }
   }
 }

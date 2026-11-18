@@ -2,7 +2,7 @@
 
 An endless-runner redux of a classic Flash-era 4x4 racer. Muddy tracks, big trucks, ramps, snacks and fuel.
 
-**Status:** Phase 0 (setup) and Phase 1 (core driving prototype) are done. See [`roadmap.md`](roadmap.md).
+**Status:** Phases 0 to 2 are done: setup, core driving, and now fuel, snacks, scoring and a game-over loop. See [`roadmap.md`](roadmap.md).
 
 ## Quick start
 
@@ -23,9 +23,20 @@ npm run dev        # http://localhost:5173
 
 ## Controls
 
-→/D gas · ←/A brake/reverse · ↑/W lean back · ↓/S lean forward · R reset · T auto-gas · H debug overlay
+←/A brake/reverse · ↑/W lean back · ↓/S lean forward · →/D gas · R reset upright · T toggle auto-gas · H debug overlay · SPACE/ENTER/tap restart after game over
+
+Auto-gas is **on** by default (endless-runner mode: the truck drives itself, you brake and lean). Flip `GAMEPLAY.autoGas` in `src/config.ts` or press T for manual throttle.
 
 Add `?seed=anything` to the URL for a repeatable course (used later for daily challenges).
+
+## What's in Phase 2
+
+- **Fuel:** the tank drains continuously, faster at speed and further into the run (but it costs *less per metre* when you drive fast, so speed is rewarded). Cans restore 35%. The spawner guarantees each gap is crossable at a slow reference pace, so a missed can is the danger, not bad luck.
+- **Snacks:** a starter line, then lines on flats and hills, and arcs over every ramp and table. Ground lines are free; arcs need a real jump.
+- **Score:** snacks x combo (up to x8; the chain breaks when a pickup slips past), distance points, and a separate air-time BONUS tally, like the original's SCORE/BONUS.
+- **Game over:** at an empty tank the engine cuts and the truck coasts (a can in reach can still save it). The run ends once it stops or after 5 s. SPACE/ENTER/tap restarts instantly.
+- **Look:** closer to the reference screenshots: round-tree backdrop, rutted mud, a start gate, a lifted yellow SUV, and the bottom-bar HUD with a logo plate. Still all procedural placeholder art.
+- Tests cover fuel, scoring, pickup placement (determinism, reachability) and a full simulated run with the real physics.
 
 ## What's in Phase 1
 
@@ -42,22 +53,27 @@ src/
   config.ts            all tuning values (gravity, suspension, engine, camera...)
   main.ts              Phaser bootstrap
   game/
-    Terrain.ts         infinite heightfield + chunk generator
+    Terrain.ts         infinite heightfield + chunk generator (records pieces for spawners)
     TruckPhysics.ts    pure-TS rigid body (no Phaser), unit-tested
     TruckView.ts       placeholder visuals
+    Fuel.ts            tank + drain model (pure TS)
+    Score.ts           score, combo, air bonus (pure TS)
+    Pickups.ts         snack and fuel-can placement (pure TS)
+    Run.ts             one run: ties the above together, loss condition (pure TS)
+    Hud.ts             bottom-bar HUD
     Parallax.ts        tiling background layers
     Input.ts, Rng.ts
   scenes/
     BootScene.ts       generates placeholder textures
     GameScene.ts       loop, camera, HUD, input
-tests/                 Vitest: terrain + physics
+tests/                 Vitest: terrain, physics, fuel, score, pickups, run
 docs/GDD.md            one-page design doc
 ASSETS.md              asset and licence register
 ```
 
 ## Tuning the feel
 
-Everything lives in `src/config.ts`. The physics runs at a fixed 240 Hz (4 substeps per frame) so the stiff suspension stays stable. If you change `springK`/`springC`, run `npm test` to catch regressions.
+Everything lives in `src/config.ts` (including `FUEL`, `SCORING` and `PICKUPS`). The physics runs at a fixed 240 Hz (4 substeps per frame) so the stiff suspension stays stable. If you change `springK`/`springC`, run `npm test` to catch regressions.
 
 ## Legal
 
