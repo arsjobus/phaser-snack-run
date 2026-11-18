@@ -54,6 +54,12 @@ export class ScoreKeeper {
     return points;
   }
 
+  /** Flat BONUS points (checkpoints). Returns the points awarded. */
+  addBonus(points: number): number {
+    this.bonus += points;
+    return points;
+  }
+
   /** Distance points follow the furthest point reached, so reversing never costs score. */
   setDistance(meters: number): void {
     this.distanceScore = Math.max(this.distanceScore, Math.floor(meters * SCORING.perMeter));

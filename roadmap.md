@@ -1,6 +1,6 @@
 # 4x4 Snack Run: Redux Roadmap
 
-> **Status:** Phases 0, 1 and 2 are complete (see `README.md`). Next up: Phase 3 (HUD recreation). A first-pass bottom-bar HUD already exists from Phase 2 and Phase 3 builds on it.
+> **Status:** Phases 0 to 3 are complete (see `README.md`). Next up: Phase 4 (rivals and hazards). The HUD's Damage dial and the run's `hurt()`/`repair()` hooks are already wired for it.
 
 An endless-runner redux of a late-90s Flash/Shockwave-era 4x4 racing game. Same spirit (muddy tracks, big trucks, jumps, snack pickups), rebuilt for modern browsers.
 
@@ -113,9 +113,9 @@ An endless-runner redux of a late-90s Flash/Shockwave-era 4x4 racing game. Same 
 
 ### Phase 3: HUD Recreation (3-5 days)
 
-- [ ] Bottom-bar HUD in the spirit of the original: **Fuel**, **Damage**, **Checkpoint/Time**, **Distance**, **Score/Bonus**
-- [ ] Animated gauge needles, low-fuel warning blink and beep
-- [ ] Checkpoints every N meters: reaching one adds time/fuel and triggers a mini-celebration
+- [x] Bottom-bar HUD in the spirit of the original: **Fuel**, **Damage**, **Checkpoint/Time**, **Distance**, **Score/Bonus** (plus the combo)
+- [x] Animated gauge needles, low-fuel warning blink and beep
+- [x] Checkpoints every N meters: reaching one adds time/fuel and triggers a mini-celebration
 - **Exit:** HUD readable at a glance on desktop and mobile
 
 ### Phase 4: Rivals and Hazards (2 weeks)
@@ -177,7 +177,8 @@ An endless-runner redux of a late-90s Flash/Shockwave-era 4x4 racing game. Same 
 | Distance points           | 10 per metre (furthest point reached) |
 | Air-time bonus            | +50 per 0.25s airborne      |
 | Wreck damage              | 10-25% per hit              |
-| Checkpoint spacing        | ~1,000 m (increasing)       |
+| Checkpoint spacing        | 1,000 m, each segment +150 m longer |
+| Checkpoint clock          | segment length / 8 m/s (+20 s on the first); time left carries over; reaching a gate: +15% fuel, +250 BONUS +10 per second left; a dry clock ends the run |
 
 ---
 

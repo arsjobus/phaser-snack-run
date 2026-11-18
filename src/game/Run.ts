@@ -1,4 +1,6 @@
-import { FUEL, PICKUPS, PX_PER_METER } from '../config';
+import { CHECKPOINT, FUEL, PICKUPS, PX_PER_METER } from '../config';
+import { CheckpointTrack } from './Checkpoint';
+import { DamageMeter } from './Damage';
 import { FuelTank } from './Fuel';
 import { PickupField, type Pickup } from './Pickups';
 import { ScoreKeeper } from './Score';
@@ -9,7 +11,12 @@ export type RunEvent =
   | { type: 'fuel'; pickup: Pickup; points: number; added: number }
   | { type: 'miss'; pickup: Pickup }
   | { type: 'empty' }
-  | { type: 'over' };
+  | { type: 'checkpoint'; index: number; timeAdded: number; fuelAdded: number; points: number }
+  | { type: 'timeup' }
+  | { type: 'damage'; amount: number }
+  | { type: 'over'; reason: EndReason };
+
+export type EndReason = 'fuel' | 'time' | 'wreck';
 
 export interface TruckSample {
   x: number;
@@ -25,8 +32,11 @@ export interface TruckSample {
 export class RunModel {
   readonly fuel = new FuelTank();
   readonly score = new ScoreKeeper();
+  readonly checkpoints = new CheckpointTrack();
+  readonly damage = new DamageMeter();
   readonly pickups: PickupField;
   over = false;
+  endReason: EndReason | null = null;
   time = 0;
   meters = 0;
 
@@ -55,6 +65,24 @@ export class RunModel {
     this.fuel.update(dt, truck.speed, Math.max(0, (truck.x - this.startX) / PX_PER_METER));
     if (this.fuel.empty && !wasEmpty) events.push({ type: 'empty' });
 
+    for (const c of this.checkpoints.update(dt, this.meters)) {
+      if (c.type === 'reached') {
+        const fuelAdded = this.fuel.add(CHECKPOINT.fuelBonus);
+        const points = this.score.addBonus(c.points);
+        events.push({
+          type: 'checkpoint',
+          index: c.index,
+          timeAdded: c.timeAdded,
+          fuelAdded,
+          points,
+        });
+      } else if (CHECKPOINT.timeoutEndsRun) {
+        events.push({ type: 'timeup' });
+        this.finish('time', events);
+        return events;
+      }
+    }
+
     this.pickups.ensure(truck.x + PICKUPS.spawnAhead);
 
     for (const p of this.pickups.collect(truck.x, truck.y)) {
@@ -79,10 +107,30 @@ export class RunModel {
       (this.fuel.emptyTime > FUEL.coastMaxTime ||
         (this.fuel.emptyTime > 0.5 && Math.abs(truck.speed) < FUEL.coastStopSpeed))
     ) {
-      this.over = true;
-      events.push({ type: 'over' });
+      this.finish('fuel', events);
     }
     return events;
+  }
+
+  /** Damage hook for Phase 4 (collisions). A wreck ends the run. */
+  hurt(amount: number): RunEvent[] {
+    const events: RunEvent[] = [];
+    if (this.over) return events;
+    const applied = this.damage.add(amount);
+    if (applied > 0) events.push({ type: 'damage', amount: applied });
+    if (this.damage.wrecked) this.finish('wreck', events);
+    return events;
+  }
+
+  /** Wrench hook for Phase 4. */
+  repair(amount: number): number {
+    return this.over ? 0 : this.damage.repair(amount);
+  }
+
+  private finish(reason: EndReason, events: RunEvent[]): void {
+    this.over = true;
+    this.endReason = reason;
+    events.push({ type: 'over', reason });
   }
 
   /** Air-time bonus for a landing. Returns the points. */

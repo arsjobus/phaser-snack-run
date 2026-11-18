@@ -108,6 +108,30 @@ export const FUEL = {
   coastMaxTime: 5,
 } as const;
 
+/**
+ * Checkpoints: a gate every `firstMeters` (each segment `growthMeters` longer than the last).
+ * Reaching one adds time and fuel; running out of time ends the run (like the original's C.P. clock).
+ */
+export const CHECKPOINT = {
+  /** Length of the first segment (m). */
+  firstMeters: 1000,
+  /** Each following segment is this much longer (m). */
+  growthMeters: 150,
+  /** Time allowance per segment = length / pace (m/s). 8 m/s is a slow drive; top speed is ~22 m/s. */
+  paceMps: 8,
+  /** Extra seconds on the very first clock so the opening is forgiving. */
+  startBuffer: 20,
+  /** Tank fraction restored on reaching a checkpoint. */
+  fuelBonus: 0.15,
+  /** BONUS points for reaching one: flat + per second left on the clock. */
+  basePoints: 250,
+  pointsPerSecondLeft: 10,
+  /** False makes the clock cosmetic (no loss on zero). */
+  timeoutEndsRun: true,
+  /** The clock blinks red below this many seconds. */
+  warnSeconds: 10,
+} as const;
+
 export const SCORING = {
   snack: 100,
   fuelCan: 50,

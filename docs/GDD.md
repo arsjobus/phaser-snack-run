@@ -24,7 +24,7 @@ Drive → grab snacks and fuel → dodge or bump rivals → hit ramps for air �
 - Hazards: wrecked vehicles, dirt ramps that launch trucks and rivals.
 - Palette: saturated greens/blues, warm browns, yellow/red/black/blue trucks.
 
-## Controls (Phase 2)
+## Controls (Phase 3)
 
 | Key   | Action                                |
 | ----- | ------------------------------------- |
@@ -35,6 +35,7 @@ Drive → grab snacks and fuel → dodge or bump rivals → hit ramps for air �
 | R     | Reset upright                         |
 | T     | Toggle auto-gas (endless-runner mode) |
 | Space / Enter / tap | Restart after game over |
+| M     | Mute                                  |
 | H     | Debug overlay                         |
 
 ## Out of scope for v1

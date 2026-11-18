@@ -5,13 +5,17 @@ import {
   FUEL,
   GAMEPLAY,
   PHYSICS,
+  PX_PER_METER,
   SCROLL_Y0,
   TERRAIN_STEP,
   TRUCK,
   VIEW_H,
   VIEW_W,
 } from '../config';
+import { Beeper } from '../game/Beeper';
+import { checkpointMeters } from '../game/Checkpoint';
 import { HUD_H, Hud } from '../game/Hud';
+import { warnTick } from '../game/HudModel';
 import { hashSeed } from '../game/Rng';
 import { Parallax } from '../game/Parallax';
 import { RunModel, type RunEvent } from '../game/Run';
@@ -23,6 +27,7 @@ import type { InputState } from '../game/Input';
 const FIXED_DT = 1 / 60 / PHYSICS.substeps;
 const TUFT_SPACING = 72;
 const GATE_X = GAMEPLAY.startX + 420;
+const TITLES = { fuel: 'OUT OF FUEL', time: 'TIME UP', wreck: 'WRECKED' } as const;
 
 export class GameScene extends Phaser.Scene {
   private terrain!: Terrain;
@@ -37,7 +42,10 @@ export class GameScene extends Phaser.Scene {
   private hint!: Phaser.GameObjects.Text;
   private toast!: Phaser.GameObjects.Text;
   private warn!: Phaser.GameObjects.Text;
+  private cpToast!: Phaser.GameObjects.Text;
+  private beeper!: Beeper;
   private sprites = new Map<number, Phaser.GameObjects.Image>();
+  private gates = new Map<number, Phaser.GameObjects.GameObject[]>();
 
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -50,6 +58,7 @@ export class GameScene extends Phaser.Scene {
   private flippedTimer = 0;
   private overAt = 0;
   private startX = GAMEPLAY.startX;
+  private lastBeepTick = -1;
 
   constructor() {
     super('Game');
@@ -64,6 +73,9 @@ export class GameScene extends Phaser.Scene {
     this.flippedTimer = 0;
     this.overAt = 0;
     this.sprites.clear();
+    this.gates.clear();
+    this.lastBeepTick = -1;
+    this.beeper = new Beeper(this.sound);
 
     const param = new URLSearchParams(window.location.search).get('seed');
     this.seed = param ? hashSeed(param) : Math.floor(Math.random() * 2 ** 31);
@@ -90,7 +102,7 @@ export class GameScene extends Phaser.Scene {
       .text(
         VIEW_W / 2,
         VIEW_H - HUD_H - 18,
-        '←/A brake   ↑/W lean back   ↓/S lean forward   →/D gas (auto-gas is on)   R reset   T auto-gas   H debug',
+        '←/A brake   ↑/W lean back   ↓/S lean forward   R reset   T auto-gas   M mute   H debug',
         text(13, '#ffffff'),
       )
       .setOrigin(0.5)
@@ -108,11 +120,17 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(10)
       .setAlpha(0);
+    this.cpToast = this.add
+      .text(VIEW_W / 2, 128, '', { ...text(26, '#9be0ff'), align: 'center' })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(10)
+      .setAlpha(0);
     this.tweens.add({ targets: this.hint, alpha: 0, delay: 9000, duration: 1200 });
 
     const kb = this.input.keyboard!;
     this.cursors = kb.createCursorKeys();
-    this.keys = kb.addKeys('W,A,S,D,R,T,H,SPACE,ENTER') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = kb.addKeys('W,A,S,D,R,T,H,M,SPACE,ENTER') as Record<string, Phaser.Input.Keyboard.Key>;
 
     this.terrain.ensure(this.startX + VIEW_W + 1500);
     const cam = this.cameras.main;
@@ -155,6 +173,7 @@ export class GameScene extends Phaser.Scene {
       if (J(this.keys.T)) this.autoThrottle = !this.autoThrottle;
     }
     if (J(this.keys.H)) this.debug = !this.debug;
+    if (J(this.keys.M)) this.sound.mute = !this.sound.mute;
 
     // Fixed-step physics (substeps keep the stiff suspension stable)
     const input = this.readInput();
@@ -171,6 +190,7 @@ export class GameScene extends Phaser.Scene {
     this.terrain.prune(this.truck.x - 1800);
 
     for (const e of this.run.update(dt, this.truck)) this.onRunEvent(e);
+    this.lowFuelBeep();
 
     // Auto-recover when stuck upside down
     this.flippedTimer =
@@ -181,6 +201,7 @@ export class GameScene extends Phaser.Scene {
     this.view.update(this.truck, this.terrain, dt);
     this.drawGround();
     this.syncPickups(time / 1000);
+    this.syncGates();
     this.parallax.update(this.cameras.main.scrollX, this.cameras.main.scrollY, dt);
     this.drawDebug();
     this.updateHud();
@@ -307,6 +328,9 @@ export class GameScene extends Phaser.Scene {
         }
         break;
       }
+      case 'checkpoint':
+        this.celebrateCheckpoint(e.index, e.timeAdded, e.points, e.fuelAdded);
+        break;
       case 'empty':
         this.tweens.killTweensOf(this.warn);
         this.warn.setText('OUT OF FUEL!').setAlpha(1);
@@ -316,6 +340,8 @@ export class GameScene extends Phaser.Scene {
         this.showGameOver();
         break;
       case 'miss':
+      case 'timeup':
+      case 'damage':
         break;
     }
   }
@@ -331,6 +357,92 @@ export class GameScene extends Phaser.Scene {
     this.tweens.killTweensOf(this.toast);
     this.tweens.add({ targets: this.toast, scale: 1, duration: 150 });
     this.tweens.add({ targets: this.toast, alpha: 0, delay: 900, duration: 500 });
+  }
+
+  /** Beep once per blink of the low-fuel warning (the HUD dial blinks on the same tick). */
+  private lowFuelBeep(): void {
+    const f = this.run.fuel;
+    if (this.run.over || f.empty || !f.low) {
+      this.lastBeepTick = -1;
+      return;
+    }
+    const tick = warnTick(this.run.time);
+    if (tick !== this.lastBeepTick) {
+      this.lastBeepTick = tick;
+      this.beeper.lowFuel();
+    }
+  }
+
+  /** Create gates just ahead of the camera and drop the ones left far behind. */
+  private syncGates(): void {
+    const cam = this.cameras.main;
+    const left = cam.scrollX - 400;
+    const right = cam.scrollX + VIEW_W + 400;
+    const first = Math.max(1, this.run.checkpoints.reached);
+    for (let i = first; i < first + 3; i++) {
+      const x = this.checkpointX(i);
+      if (x > left && x < right && !this.gates.has(i)) this.addCheckpointGate(i, x);
+    }
+    for (const [i, objs] of this.gates) {
+      if (this.checkpointX(i) < left) {
+        objs.forEach((o) => o.destroy());
+        this.gates.delete(i);
+      }
+    }
+  }
+
+  private checkpointX(index: number): number {
+    return this.startX + checkpointMeters(index) * PX_PER_METER;
+  }
+
+  private addCheckpointGate(index: number, x: number): void {
+    this.terrain.ensure(x + 200);
+    const y = this.terrain.heightAt(x) + 4;
+    const img = this.add.image(x, y, 'cp_gate').setOrigin(0.5, 1).setDepth(0.5);
+    const label = this.add
+      .text(x, y - 212 + 35, `CHECKPOINT ${index}`, {
+        fontFamily: 'monospace',
+        fontSize: '18px',
+        fontStyle: 'bold',
+        color: '#ffffff',
+      })
+      .setOrigin(0.5)
+      .setDepth(0.6);
+    this.gates.set(index, [img, label]);
+  }
+
+  /** Mini-celebration: chime, confetti, screen flash, banner and a gold flash on the HUD clock. */
+  private celebrateCheckpoint(index: number, timeAdded: number, points: number, fuelAdded: number): void {
+    const x = this.checkpointX(index);
+    const y = this.terrain.heightAt(x) - 150;
+    this.beeper.chime();
+    this.hudBar.celebrate(this.run.time);
+    this.cameras.main.flash(180, 255, 255, 200, false);
+    const colors = [0xffe066, 0xff5a4a, 0x6fc4ff, 0x7dff8a, 0xffffff];
+    for (let i = 0; i < 28; i++) {
+      const piece = this.add
+        .rectangle(x + Phaser.Math.Between(-90, 90), y, 8, 5, Phaser.Utils.Array.GetRandom(colors))
+        .setDepth(9)
+        .setAngle(Phaser.Math.Between(0, 180));
+      this.tweens.add({
+        targets: piece,
+        x: piece.x + Phaser.Math.Between(-140, 140),
+        y: y + Phaser.Math.Between(120, 260),
+        angle: piece.angle + Phaser.Math.Between(-360, 360),
+        alpha: 0,
+        duration: Phaser.Math.Between(700, 1300),
+        ease: 'Quad.easeOut',
+        onComplete: () => piece.destroy(),
+      });
+    }
+    const mins = Math.floor(timeAdded / 60);
+    const secs = String(Math.round(timeAdded % 60)).padStart(2, '0');
+    const lines = [`CHECKPOINT ${index}!`, `+${mins}:${secs}  +${points} BONUS`];
+    if (fuelAdded > 0) lines.push(`FUEL +${Math.round(fuelAdded * 100)}%`);
+    this.tweens.killTweensOf(this.cpToast);
+    this.cpToast.setText(lines).setAlpha(1).setScale(1.3);
+    this.tweens.add({ targets: this.cpToast, scale: 1, duration: 160 });
+    this.tweens.add({ targets: this.cpToast, alpha: 0, delay: 1600, duration: 500 });
   }
 
   private recover(): void {
@@ -363,18 +475,19 @@ export class GameScene extends Phaser.Scene {
       align: 'center',
     });
     this.add
-      .text(cx, cy - 90, 'OUT OF FUEL', style(34, '#ff5a4a'))
+      .text(cx, cy - 90, TITLES[this.run.endReason ?? 'fuel'], style(34, '#ff5a4a'))
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(31);
     this.add
       .text(
         cx,
-        cy - 10,
+        cy - 20,
         [
           `SCORE ${s.total}`,
           `${Math.floor(this.run.meters)} m   ${s.snacks} snacks   best air ${this.bestAir.toFixed(2)}s`,
           `best combo x${s.bestMultiplier}   (${s.bestChain} in a row)`,
+          `checkpoints ${this.run.checkpoints.reached}`,
         ],
         { ...style(18, '#ffffff'), lineSpacing: 8 },
       )
@@ -422,7 +535,12 @@ export class GameScene extends Phaser.Scene {
     const t = this.truck;
     const r = this.run;
     this.hudBar.update({
+      dt: Math.min(this.game.loop.delta / 1000, 1 / 20),
       fuel: r.fuel.level,
+      damage: r.damage.level,
+      cpNext: r.checkpoints.nextIndex,
+      cpTimeLeft: r.checkpoints.timeLeft,
+      cpProgress: r.checkpoints.progress(r.meters),
       multiplier: r.score.multiplier,
       meters: r.meters,
       speedKmh: Math.max(0, t.speed) / 6,

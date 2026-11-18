@@ -2,7 +2,7 @@
 
 An endless-runner redux of a classic Flash-era 4x4 racer. Muddy tracks, big trucks, ramps, snacks and fuel.
 
-**Status:** Phases 0 to 2 are done: setup, core driving, and now fuel, snacks, scoring and a game-over loop. See [`roadmap.md`](roadmap.md).
+**Status:** Phases 0 to 3 are done: setup, core driving, fuel/snacks/scoring, and now the full HUD with checkpoints. See [`roadmap.md`](roadmap.md).
 
 ## Quick start
 
@@ -23,11 +23,20 @@ npm run dev        # http://localhost:5173
 
 ## Controls
 
-←/A brake/reverse · ↑/W lean back · ↓/S lean forward · →/D gas · R reset upright · T toggle auto-gas · H debug overlay · SPACE/ENTER/tap restart after game over
+←/A brake/reverse · ↑/W lean back · ↓/S lean forward · →/D gas · R reset upright · T toggle auto-gas · M mute · H debug overlay · SPACE/ENTER/tap restart after game over
 
 Auto-gas is **on** by default (endless-runner mode: the truck drives itself, you brake and lean). Flip `GAMEPLAY.autoGas` in `src/config.ts` or press T for manual throttle.
 
 Add `?seed=anything` to the URL for a repeatable course (used later for daily challenges).
+
+## What's in Phase 3
+
+- **HUD:** logo plate, then **Fuel** and **Damage** half-dials with sprung needles (a little lag and overshoot), the **C.P. / Time** readout with a progress bar to the next gate, **Distance** (plus km/h), **Score / Bonus** and the combo.
+- **Low fuel:** below 25% the dial rim and title blink and the game beeps once per blink (synthesized with Web Audio, no files; M mutes). The tank runs dry: the rim stays red.
+- **Checkpoints:** a gate every 1,000 m (each segment 150 m longer). The clock gives each segment `length / 8 m/s`, the time left carries over, and reaching a gate adds the next segment's time, +15% fuel and a BONUS payout. Confetti, a flash, a chime, a banner and a gold-flashing clock panel celebrate it.
+- **Time up:** the clock hitting zero ends the run (`TIME UP`). Set `CHECKPOINT.timeoutEndsRun` to `false` in `src/config.ts` to make the clock cosmetic. The game-over panel now names the reason and counts checkpoints.
+- **Damage:** the dial is live but nothing hurts the truck until Phase 4. `RunModel.hurt()` / `repair()` are the hooks; full damage ends the run (`WRECKED`).
+- Tests cover the gauge maths, needle spring, checkpoint spacing and clock, the carry-over rules, and the run-level payouts and end reasons.
 
 ## What's in Phase 2
 
@@ -60,20 +69,24 @@ src/
     Score.ts           score, combo, air bonus (pure TS)
     Pickups.ts         snack and fuel-can placement (pure TS)
     Run.ts             one run: ties the above together, loss condition (pure TS)
-    Hud.ts             bottom-bar HUD
+    Hud.ts             bottom-bar HUD (dials, clock, score)
+    HudModel.ts        gauge angles, clock format, blink/beep timing, needle spring (pure TS)
+    Checkpoint.ts      checkpoint spacing and countdown clock (pure TS)
+    Damage.ts          damage meter, wired up in Phase 4 (pure TS)
+    Beeper.ts          synthesized warning beeps and chime
     Parallax.ts        tiling background layers
     Input.ts, Rng.ts
   scenes/
     BootScene.ts       generates placeholder textures
     GameScene.ts       loop, camera, HUD, input
-tests/                 Vitest: terrain, physics, fuel, score, pickups, run
+tests/                 Vitest: terrain, physics, fuel, score, pickups, run, HUD, checkpoints
 docs/GDD.md            one-page design doc
 ASSETS.md              asset and licence register
 ```
 
 ## Tuning the feel
 
-Everything lives in `src/config.ts` (including `FUEL`, `SCORING` and `PICKUPS`). The physics runs at a fixed 240 Hz (4 substeps per frame) so the stiff suspension stays stable. If you change `springK`/`springC`, run `npm test` to catch regressions.
+Everything lives in `src/config.ts` (including `FUEL`, `SCORING`, `PICKUPS` and `CHECKPOINT`). The physics runs at a fixed 240 Hz (4 substeps per frame) so the stiff suspension stays stable. If you change `springK`/`springC`, run `npm test` to catch regressions.
 
 ## Legal
 

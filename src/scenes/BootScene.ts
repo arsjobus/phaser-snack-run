@@ -22,6 +22,7 @@ export class BootScene extends Phaser.Scene {
     this.makeSnack();
     this.makeFuelCan();
     this.makeStartGate();
+    this.makeCheckpointGate();
     this.scene.start('Game');
   }
 
@@ -238,6 +239,30 @@ export class BootScene extends Phaser.Scene {
       }
     }
     g.generateTexture('start_gate', 96, 212);
+    g.destroy();
+  }
+
+  /** Checkpoint arch: two poles and a blue banner with checkered ends. Text is added by the scene. */
+  private makeCheckpointGate(): void {
+    const g = this.gfx();
+    g.fillStyle(0x222222, 1);
+    g.fillRect(2, 0, 8, 210);
+    g.fillRect(250, 0, 8, 210);
+    g.fillStyle(0x2f6fd6, 1);
+    g.fillRect(0, 10, 260, 50);
+    g.fillStyle(0x111111, 1);
+    g.fillRect(0, 10, 260, 4);
+    g.fillRect(0, 56, 260, 4);
+    const cell = 10;
+    for (let i = 0; i < 4; i++) {
+      for (let j = 0; j < 5; j++) {
+        const c = (i + j) % 2 ? 0x111111 : 0xffffff;
+        g.fillStyle(c, 1);
+        g.fillRect(4 + i * cell, 14 + j * 8, cell, 8);
+        g.fillRect(216 + i * cell, 14 + j * 8, cell, 8);
+      }
+    }
+    g.generateTexture('cp_gate', 260, 212);
     g.destroy();
   }
 
