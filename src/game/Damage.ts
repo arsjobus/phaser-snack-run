@@ -1,6 +1,6 @@
 /**
- * Truck damage, 0 (pristine) to 1 (wrecked). Nothing hurts the truck yet: Phase 4 (collisions,
- * rivals, wrecks) calls `add`, and the wrench pickup calls `repair`. The HUD already shows it.
+ * Truck damage, 0 (pristine) to 1 (wrecked). Hard bumps with rivals and wrecks call `add`; the
+ * wrench pickup calls `repair`. The HUD dial shows it.
  */
 export class DamageMeter {
   level = 0;

@@ -1,6 +1,38 @@
 import Phaser from 'phaser';
 import { VIEW_H, VIEW_W } from '../config';
+import { RIVAL_STYLES } from '../game/Rival';
 import { Rng } from '../game/Rng';
+
+interface Paint {
+  body: number;
+  light: number;
+  stripe: number;
+  /** Roundel (number plate) background and digit colour. */
+  plate: number;
+}
+
+const PLAYER_PAINT: Paint = { body: 0xf2c200, light: 0xffe066, stripe: 0xb83a1a, plate: 0xffffff };
+/** One livery per rival style: red, blue, black and green, like the reference's cast. */
+const RIVAL_PAINT: Paint[] = [
+  { body: 0xd2392b, light: 0xff7a66, stripe: 0x111111, plate: 0xffffff },
+  { body: 0x2f6fd6, light: 0x7fb0ff, stripe: 0xffe066, plate: 0xffffff },
+  { body: 0x2a2a2e, light: 0x5a5a62, stripe: 0xe8742a, plate: 0xffe066 },
+  { body: 0x2f9e4a, light: 0x7fe08f, stripe: 0xffffff, plate: 0xffffff },
+];
+
+/** 3x5 pixel digits for the number plates (no font loading, no text objects). */
+const DIGITS: Record<string, string[]> = {
+  '0': ['111', '101', '101', '101', '111'],
+  '1': ['010', '110', '010', '010', '111'],
+  '2': ['111', '001', '111', '100', '111'],
+  '3': ['111', '001', '111', '001', '111'],
+  '4': ['101', '101', '111', '001', '001'],
+  '5': ['111', '100', '111', '001', '111'],
+  '6': ['111', '100', '111', '101', '111'],
+  '7': ['111', '001', '010', '010', '010'],
+  '8': ['111', '101', '111', '101', '111'],
+  '9': ['111', '101', '111', '001', '111'],
+};
 
 /**
  * Phase 1 uses procedurally generated placeholder art so the repo has zero binary assets.
@@ -17,10 +49,12 @@ export class BootScene extends Phaser.Scene {
     this.makeHills();
     this.makeTrees('trees_mid', 200, 7);
     this.makeBushes();
-    this.makeTruck();
+    this.makeTruck('truck_body', PLAYER_PAINT, null);
+    RIVAL_STYLES.forEach((st, i) => this.makeTruck(`rival_${i}`, RIVAL_PAINT[i], st.number));
     this.makeWheel();
     this.makeSnack();
     this.makeFuelCan();
+    this.makeWrench();
     this.makeStartGate();
     this.makeCheckpointGate();
     this.scene.start('Game');
@@ -136,21 +170,24 @@ export class BootScene extends Phaser.Scene {
     g.destroy();
   }
 
-  /** Placeholder truck body (lifted SUV), drawn facing right with the chassis centre at (65, 38). */
-  private makeTruck(): void {
+  /**
+   * Placeholder truck body (lifted SUV) in the given paint, facing right with the chassis centre
+   * at (65, 38). Rivals get a numbered roundel on the door; the player's is blank.
+   */
+  private makeTruck(key: string, paint: Paint, number: number | null): void {
     const g = this.gfx();
     const ox = 65;
     const oy = 38;
     g.fillStyle(0x111111, 1); // outline
     g.fillRoundedRect(ox - 60, oy - 10, 120, 36, 7);
     g.fillRoundedRect(ox - 44, oy - 34, 62, 30, 7);
-    g.fillStyle(0xf2c200, 1); // body
+    g.fillStyle(paint.body, 1); // body
     g.fillRoundedRect(ox - 58, oy - 8, 116, 32, 6);
     g.fillRoundedRect(ox - 42, oy - 32, 58, 28, 6);
-    g.fillStyle(0xffe066, 1); // roof / hood highlight
+    g.fillStyle(paint.light, 1); // roof / hood highlight
     g.fillRect(ox - 38, oy - 31, 50, 3);
     g.fillRect(ox + 20, oy - 8, 36, 3);
-    g.fillStyle(0xb83a1a, 1); // stripe
+    g.fillStyle(paint.stripe, 1); // stripe
     g.fillRect(ox - 58, oy + 10, 116, 5);
     g.fillStyle(0x1b2b4a, 1); // windows (dark glass, pillar between)
     g.fillRoundedRect(ox - 36, oy - 27, 24, 15, 3);
@@ -158,10 +195,24 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(0x6fa8d6, 1);
     g.fillRect(ox - 34, oy - 25, 8, 4);
     g.fillRect(ox - 6, oy - 25, 8, 4);
-    g.fillStyle(0xffffff, 1); // number roundel on the door
-    g.fillCircle(ox - 20, oy + 4, 8);
-    g.fillStyle(0xb83a1a, 1);
-    g.fillCircle(ox - 20, oy + 4, 5);
+    // Number roundel on the door.
+    g.fillStyle(number === null ? 0xffffff : paint.plate, 1);
+    g.fillCircle(ox - 20, oy + 4, 9);
+    if (number === null) {
+      g.fillStyle(paint.stripe, 1);
+      g.fillCircle(ox - 20, oy + 4, 5);
+    } else {
+      const text = String(number);
+      const w = text.length * 4 - 1; // glyphs are 3 wide with a 1px gap, drawn at 2x below
+      g.fillStyle(0x111111, 1);
+      text.split('').forEach((ch, n) => {
+        DIGITS[ch].forEach((row, y) => {
+          for (let x = 0; x < 3; x++) {
+            if (row[x] === '1') g.fillRect(ox - 20 - w + n * 8 + x * 2, oy + 4 - 5 + y * 2, 2, 2);
+          }
+        });
+      });
+    }
     g.fillStyle(0xfff7c2, 1); // headlight
     g.fillRect(ox + 52, oy - 2, 6, 8);
     g.fillStyle(0x333333, 1); // bumper + roof rack + spotlights
@@ -171,7 +222,27 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(0xfff7c2, 1);
     g.fillRect(ox - 34, oy - 40, 6, 4);
     g.fillRect(ox - 18, oy - 40, 6, 4);
-    g.generateTexture('truck_body', 130, 70);
+    g.generateTexture(key, 130, 70);
+    g.destroy();
+  }
+
+  /** Wrench lying on the ground, like the reference's: a grey open-end wrench, tilted. */
+  private makeWrench(): void {
+    const g = this.gfx();
+    g.fillStyle(0x111111, 1); // outline
+    g.fillRoundedRect(4, 17, 40, 10, 4);
+    g.fillCircle(8, 22, 10);
+    g.fillCircle(42, 22, 9);
+    g.fillStyle(0xc9ced6, 1); // steel
+    g.fillRoundedRect(6, 19, 36, 6, 3);
+    g.fillCircle(8, 22, 8);
+    g.fillCircle(42, 22, 7);
+    g.fillStyle(0xffffff, 0.7);
+    g.fillRect(12, 19, 24, 2);
+    g.fillStyle(0x111111, 1); // jaw openings
+    g.fillRect(0, 19, 8, 6);
+    g.fillRect(41, 18, 9, 4);
+    g.generateTexture('wrench', 52, 44);
     g.destroy();
   }
 

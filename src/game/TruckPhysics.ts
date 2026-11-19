@@ -1,4 +1,4 @@
-import { PHYSICS, TRUCK } from '../config';
+import { PHYSICS, RIVALS, TRUCK } from '../config';
 import type { InputState } from './Input';
 import type { Terrain } from './Terrain';
 
@@ -33,6 +33,8 @@ export class TruckPhysics {
   grounded = false;
   /** Seconds spent with the body (roof) touching the ground. */
   roofTime = 0;
+  /** Slipstream strength 0..1 (Phase 4): more engine force and a higher top speed. */
+  boost = 0;
 
   private airGrace = 0;
 
@@ -46,6 +48,24 @@ export class TruckPhysics {
     this.y = y;
     this.vx = this.vy = this.angle = this.angVel = 0;
     this.airTime = this.airGrace = this.roofTime = 0;
+    this.boost = 0;
+  }
+
+  /** Apply an impulse (px/s units, mass 1) at world point (px, py): collisions use this. */
+  applyImpulse(px: number, py: number, jx: number, jy: number): void {
+    this.vx += jx / PHYSICS.mass;
+    this.vy += jy / PHYSICS.mass;
+    this.angVel += ((px - this.x) * jy - (py - this.y) * jx) / PHYSICS.inertia;
+    this.angVel = Math.max(
+      -PHYSICS.maxAngularVelocity,
+      Math.min(PHYSICS.maxAngularVelocity, this.angVel),
+    );
+  }
+
+  /** Move the body without touching its velocity (positional push-out after a collision). */
+  translate(dx: number, dy: number): void {
+    this.x += dx;
+    this.y += dy;
   }
 
   /** Advance by dt seconds (call with small, fixed dt). */
@@ -66,6 +86,8 @@ export class TruckPhysics {
 
     let wheelsDown = 0;
     let bodyDown = false;
+    const force = P.engineForce * (1 + RIVALS.draftForce * this.boost);
+    const top = P.topSpeed * (1 + RIVALS.draftTop * this.boost);
 
     const contact = (
       ox: number,
@@ -113,7 +135,7 @@ export class TruckPhysics {
       let Ft = -P.rollingResistance * vt;
       if (drives) {
         if (input.throttle > 0) {
-          Ft += input.throttle * P.engineForce * Math.max(0, 1 - vt / P.topSpeed);
+          Ft += input.throttle * force * Math.max(0, 1 - vt / top);
         }
         if (input.brake > 0) {
           if (vt > 30) Ft -= input.brake * P.brakeForce;

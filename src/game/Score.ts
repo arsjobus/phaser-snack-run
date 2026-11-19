@@ -13,6 +13,8 @@ export class ScoreKeeper {
   chain = 0;
   bestChain = 0;
   bestMultiplier = 1;
+  /** Rivals you rammed to wrecks. */
+  takedowns = 0;
 
   get multiplier(): number {
     return Math.min(SCORING.maxCombo, 1 + Math.floor(this.chain / SCORING.comboStep));
@@ -58,6 +60,12 @@ export class ScoreKeeper {
   addBonus(points: number): number {
     this.bonus += points;
     return points;
+  }
+
+  /** BONUS for a takedown. Returns the points awarded. */
+  addTakedown(): number {
+    this.takedowns++;
+    return this.addBonus(SCORING.takedown);
   }
 
   /** Distance points follow the furthest point reached, so reversing never costs score. */

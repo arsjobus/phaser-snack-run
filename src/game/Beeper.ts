@@ -36,4 +36,24 @@ export class Beeper {
     this.tone(880, 0.12, 0.14, 'triangle', 0.1);
     this.tone(1320, 0.26, 0.14, 'triangle', 0.2);
   }
+
+  /** Crunch for a bump: a low buzz, longer and louder for a harder hit. */
+  thud(hard: boolean): void {
+    this.tone(hard ? 90 : 140, hard ? 0.22 : 0.1, hard ? 0.26 : 0.12, 'sawtooth');
+    if (hard) this.tone(62, 0.3, 0.22, 'square', 0.03);
+  }
+
+  /** Two quick notes for a wrench. */
+  wrench(): void {
+    this.tone(520, 0.08, 0.13, 'triangle');
+    this.tone(780, 0.14, 0.13, 'triangle', 0.08);
+  }
+
+  /** Short fanfare for a takedown. */
+  takedown(): void {
+    this.tone(440, 0.09, 0.15, 'square');
+    this.tone(554, 0.09, 0.15, 'square', 0.08);
+    this.tone(660, 0.09, 0.15, 'square', 0.16);
+    this.tone(880, 0.24, 0.15, 'square', 0.24);
+  }
 }

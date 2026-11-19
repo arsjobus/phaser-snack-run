@@ -1,6 +1,6 @@
 # 4x4 Snack Run: Redux Roadmap
 
-> **Status:** Phases 0 to 3 are complete (see `README.md`). Next up: Phase 4 (rivals and hazards). The HUD's Damage dial and the run's `hurt()`/`repair()` hooks are already wired for it.
+> **Status:** Phases 0 to 4 are complete (see `README.md`): the game is a playable alpha. Next up: Phase 5 (art pass). All art is still procedural placeholder; texture keys (`truck_body`, `rival_0..3`, `wrench`, ...) are stable so real sprites can drop in.
 
 An endless-runner redux of a late-90s Flash/Shockwave-era 4x4 racing game. Same spirit (muddy tracks, big trucks, jumps, snack pickups), rebuilt for modern browsers.
 
@@ -120,12 +120,12 @@ An endless-runner redux of a late-90s Flash/Shockwave-era 4x4 racing game. Same 
 
 ### Phase 4: Rivals and Hazards (2 weeks)
 
-- [ ] Rival trucks (numbered, color-coded) with simple AI: follow lane target speed, jump ramps
-- [ ] Rubber-banding so rivals stay in view without feeling cheated
-- [ ] Collisions: bump physics, damage on hard hits, rivals can flip and become wrecks
-- [ ] Wrecked vehicles as obstacles; wrench pickup restores damage
-- [ ] Rival interactions: draft behind for speed, ram for a "takedown" bonus
-- [ ] Optional "race position" meter for the competitive feel
+- [x] Rival trucks (numbered, color-coded) with simple AI: follow lane target speed, jump ramps (the same rigid body as the player, so they jump and flip for real; they level out in the air)
+- [x] Rubber-banding so rivals stay in view without feeling cheated
+- [x] Collisions: bump physics, damage on hard hits, rivals can flip and become wrecks
+- [x] Wrecked vehicles as obstacles; wrench pickup restores damage
+- [x] Rival interactions: draft behind for speed, ram for a "takedown" bonus
+- [x] Optional "race position" meter for the competitive feel (top right: `POS 2/4`)
 - **Exit:** the run feels like racing, not driving alone
 
 ### Phase 5: Art Pass (2 weeks)
@@ -176,9 +176,19 @@ An endless-runner redux of a late-90s Flash/Shockwave-era 4x4 racing game. Same 
 | Snack points              | 100 (x combo, max x8; +1 step per 3 pickups in a row) |
 | Distance points           | 10 per metre (furthest point reached) |
 | Air-time bonus            | +50 per 0.25s airborne      |
-| Wreck damage              | 10-25% per hit              |
+| Hit damage (rival or wreck) | 10-25% per hit, scaled by closing speed; free below 170 px/s. Rivals take x2.5 so a takedown is two hard hits |
+| Wrench                    | repairs 30% damage; first at 400 m, then every 450-800 m |
+| Takedown                  | +500 BONUS for wrecking a rival you rammed within 3 s |
+| Roadside wrecks           | from 250 m; 10% per flat/hill chunk rising to 30% at 2.5 km; at least 2,400 px apart, never just after a jump |
+| Rivals on course          | 1 at the start, +1 per 800 m, max 3; opening grid of two just past the line |
+| Rival speed               | cruise 520-720 px/s by skill, +/-190 rubber band over 700 px |
+| Draft                     | within 260 px behind a rival in your lane: builds over 1 s to +45% engine force, +12% top speed |
 | Checkpoint spacing        | 1,000 m, each segment +150 m longer |
 | Checkpoint clock          | segment length / 8 m/s (+20 s on the first); time left carries over; reaching a gate: +15% fuel, +250 BONUS +10 per second left; a dry clock ends the run |
+
+---
+
+**Depth lanes (design note).** The original was pseudo-3D, so trucks could pass each other. A single flat lane would make every overtake a collision, so rivals also use a *far lane* (drawn higher, smaller and darker) where nothing touches the player. A rival may drop into your lane only when it is clear of your truck and, if ahead, at least 480 px up the road, so you always see it coming. Brake behind it to draft, ram it for a takedown, or wait for it to swerve out. Wrecks are always in the near lane and are knocked aside when hit (once), so one can never trap you: **braking below 170 px/s makes the hit free.**
 
 ---
 

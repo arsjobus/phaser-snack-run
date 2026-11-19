@@ -24,7 +24,7 @@ Drive → grab snacks and fuel → dodge or bump rivals → hit ramps for air �
 - Hazards: wrecked vehicles, dirt ramps that launch trucks and rivals.
 - Palette: saturated greens/blues, warm browns, yellow/red/black/blue trucks.
 
-## Controls (Phase 3)
+## Controls (Phase 4)
 
 | Key   | Action                                |
 | ----- | ------------------------------------- |

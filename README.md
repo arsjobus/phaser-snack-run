@@ -2,7 +2,7 @@
 
 An endless-runner redux of a classic Flash-era 4x4 racer. Muddy tracks, big trucks, ramps, snacks and fuel.
 
-**Status:** Phases 0 to 3 are done: setup, core driving, fuel/snacks/scoring, and now the full HUD with checkpoints. See [`roadmap.md`](roadmap.md).
+**Status:** Phases 0 to 4 are done: setup, core driving, fuel/snacks/scoring, the HUD with checkpoints, and now rivals, collisions and wrecks. That makes it a playable alpha. See [`roadmap.md`](roadmap.md).
 
 ## Quick start
 
@@ -28,6 +28,19 @@ npm run dev        # http://localhost:5173
 Auto-gas is **on** by default (endless-runner mode: the truck drives itself, you brake and lean). Flip `GAMEPLAY.autoGas` in `src/config.ts` or press T for manual throttle.
 
 Add `?seed=anything` to the URL for a repeatable course (used later for daily challenges).
+
+## What's in Phase 4
+
+- **Rivals:** up to three numbered, colour-coded trucks (#3 red, #8 blue, #5 black, #7 green). They are the same rigid body as your truck, so they bump, jump ramps (and level out in the air) and flip for real. Two wait just past the start line; more arrive every 800 m, some from behind at speed.
+- **Rubber banding:** each rival cruises at a skill-based speed, speeds up when behind you and eases off when far ahead, so the pack stays in view without teleporting.
+- **Depth lanes:** like the original's pseudo-3D track, rivals use a near lane (yours) and a far lane (drawn higher, smaller, darker). Only same-lane trucks collide. A rival drops into your lane only when clear of your truck and, if ahead, at least 480 px up the road so you see it coming.
+- **Collisions:** trucks are three body circles with impulse-based bumps. Below 170 px/s closing speed a bump is free; above it you take 10-25% damage (rivals take 2.5x). Full damage ends the run (`WRECKED`). Hard hits shake the screen; a damaged truck smokes.
+- **Wrecks:** rivals that take too much damage or sit on their roof for 1.4 s become wrecks. Roadside hulks appear from 250 m (never right after a jump). A wreck is hit once, then flung away as debris, so it can never trap you. **Brake and creep into one to clear it for free.**
+- **Wrench:** lies on the ground (first at 400 m, then every 450-800 m) and repairs 30% damage. Missing one does not break your combo.
+- **Takedown:** wreck a rival you rammed within 3 s for +500 BONUS.
+- **Draft:** tuck in within 260 px behind a rival in your lane for up to +45% engine force and +12% top speed (speed streaks and a `DRAFT` tag show it).
+- **Race position:** `POS 2/4` at the top right.
+- Tests cover collision maths and damage, wreck placement and one-hit behaviour, wrench placement and repair, lane rules, drafting, takedown credit, and long simulated runs.
 
 ## What's in Phase 3
 
@@ -72,21 +85,26 @@ src/
     Hud.ts             bottom-bar HUD (dials, clock, score)
     HudModel.ts        gauge angles, clock format, blink/beep timing, needle spring (pure TS)
     Checkpoint.ts      checkpoint spacing and countdown clock (pure TS)
-    Damage.ts          damage meter, wired up in Phase 4 (pure TS)
+    Damage.ts          damage meter (pure TS)
+    Collision.ts       circle contacts, impulses, damage curve (pure TS)
+    Wrecks.ts          roadside and rival wrecks, one-hit debris (pure TS)
+    Rival.ts           rival truck + AI, lanes, liveries (pure TS)
+    Race.ts            rival spawning, bumps, takedowns, draft, position (pure TS)
+    RivalView.ts       rival visuals (far lane is higher/smaller/darker)
     Beeper.ts          synthesized warning beeps and chime
     Parallax.ts        tiling background layers
     Input.ts, Rng.ts
   scenes/
     BootScene.ts       generates placeholder textures
     GameScene.ts       loop, camera, HUD, input
-tests/                 Vitest: terrain, physics, fuel, score, pickups, run, HUD, checkpoints
+tests/                 Vitest: terrain, physics, fuel, score, pickups, run, HUD, checkpoints, race
 docs/GDD.md            one-page design doc
 ASSETS.md              asset and licence register
 ```
 
 ## Tuning the feel
 
-Everything lives in `src/config.ts` (including `FUEL`, `SCORING`, `PICKUPS` and `CHECKPOINT`). The physics runs at a fixed 240 Hz (4 substeps per frame) so the stiff suspension stays stable. If you change `springK`/`springC`, run `npm test` to catch regressions.
+Everything lives in `src/config.ts` (including `FUEL`, `SCORING`, `PICKUPS`, `CHECKPOINT`, `COLLISION`, `WRECKS`, `WRENCH` and `RIVALS`). The physics runs at a fixed 240 Hz (4 substeps per frame) so the stiff suspension stays stable. If you change `springK`/`springC`, run `npm test` to catch regressions.
 
 ## Legal
 

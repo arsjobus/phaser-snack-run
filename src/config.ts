@@ -143,6 +143,8 @@ export const SCORING = {
   /** Bonus awarded per full `airStep` seconds airborne. */
   airStep: 0.25,
   airPoints: 50,
+  /** BONUS for wrecking a rival that you rammed (see `RIVALS.takedownWindow`). */
+  takedown: 500,
 };
 
 export const PICKUPS = {
@@ -164,3 +166,121 @@ export const PICKUPS = {
   /** Keep this much behind the truck (px). */
   keepBehind: 500,
 };
+
+/** Wrench pickups: lie on the ground (like the reference) and repair damage. */
+export const WRENCH = {
+  /** Damage repaired by one wrench (damage runs 0..1). */
+  restore: 0.3,
+  /** Height of the wrench centre above the ground (px). */
+  hover: 16,
+  /** Metres to the first wrench, then the (min, max) metres between wrenches. */
+  firstMeters: 400,
+  gapMeters: [450, 800],
+  /** A wrench never sits this close (px) to a can, a wreck or a jump. */
+  clearance: 160,
+} as const;
+
+/** Truck-to-truck and truck-to-wreck collisions. */
+export const COLLISION = {
+  /** Body circles in chassis-local px, used for truck vs truck/wreck contact. */
+  circles: [
+    { x: -36, y: 4, r: 26 },
+    { x: 0, y: -6, r: 28 },
+    { x: 36, y: 4, r: 26 },
+  ],
+  /** Bounciness of truck-to-truck bumps (0 = dead stop, 1 = perfect bounce). */
+  restitution: 0.3,
+  /** Closing speed (px/s) below which a bump is free: braking and creeping is safe. */
+  softSpeed: 170,
+  /** Closing speed (px/s) below which contact is just rubbing: no event, no sound. */
+  bumpSpeed: 60,
+  /** Closing speed at which damage reaches its maximum. */
+  hardSpeed: 520,
+  /** Damage per hit runs from min to max with closing speed (balance sheet: 10-25%). */
+  minDamage: 0.1,
+  maxDamage: 0.25,
+  /** Rivals are flimsier than the player so a takedown takes two hard hits, not six. */
+  rivalDamageScale: 2.5,
+  /** Seconds before the same pair can hurt each other again. */
+  hitCooldown: 0.45,
+  /** Largest positional push-out per frame (px), so contacts never teleport a truck. */
+  maxPush: 14,
+  /** A solid wreck that is hit takes this share of the truck's closing speed off the truck. */
+  wreckDrag: 0.45,
+  /** Small hop given to a truck that ploughs through a wreck (px/s upward). */
+  wreckHop: 140,
+} as const;
+
+/** Wrecked vehicles lying on the course. */
+export const WRECKS = {
+  /** No static wrecks before this many metres. */
+  startMeters: 250,
+  /** Chance per eligible chunk: from `chanceMin` at the start up to `chanceMax` at `rampMeters`. */
+  chanceMin: 0.1,
+  chanceMax: 0.3,
+  rampMeters: 2500,
+  /** Minimum distance between static wrecks (px) and from a jump's landing (px). */
+  minSpacing: 2400,
+  landingClear: 420,
+  /** Two circles that make up a lying wreck: x offsets and common radius. */
+  halfLength: 24,
+  radius: 24,
+  /** Debris (a wreck that was hit) is flung and fades out over this many seconds. */
+  debrisLife: 1.4,
+} as const;
+
+/** Rival trucks. */
+export const RIVALS = {
+  /** Rivals on the course at once: 1 at the start, +1 every `perMeters`, up to `max`. */
+  max: 3,
+  perMeters: 800,
+  /** Seconds between spawns. */
+  spawnCooldown: 3.5,
+  /** Spawn this far ahead of / behind the player (px, off screen). */
+  aheadMin: 1200,
+  aheadMax: 1600,
+  behind: 900,
+  /** Rivals that fall this far behind / ahead are quietly removed (px). */
+  despawnBehind: 1500,
+  despawnAhead: 2600,
+  /** The opening grid: rivals' x offsets from the start line. */
+  grid: [320, 640],
+  /** Cruise speed range per rival (px/s); skill picks a spot in it. */
+  cruiseMin: 520,
+  cruiseMax: 720,
+  /** Rubber band: up to +/- this many px/s depending on distance to the player. */
+  bandSpeed: 190,
+  bandDistance: 700,
+  /** Never target below this (px/s), or above the truck's top speed. */
+  floorSpeed: 360,
+  /**
+   * Depth lanes, like the original's pseudo-3D track: the near lane is the player's, rivals also
+   * use a far lane (drawn higher and smaller) where nothing collides with the player. Rivals hop
+   * between lanes with `laneSwitchTime`; a rival only drops into the player's lane when it is
+   * clear of the player's truck (`laneGap`) and, if it is ahead, far enough up the road to be seen
+   * coming (`warnGap`). Skilled rivals leave the near lane when a wreck lies within `wreckLook`.
+   */
+  laneSwitchTime: 0.5,
+  laneGap: 170,
+  warnGap: 480,
+  /** Seconds between lane decisions (min, max). */
+  laneRethink: [2.5, 5],
+  wreckLook: 450,
+  /** Far-lane look: pixels higher on screen and scale. */
+  farOffset: 18,
+  farScale: 0.9,
+  /** Flipped (or dead-slow upside down) for this long and the rival becomes a wreck. */
+  flipWreckTime: 1.4,
+  /** Rammed within this many seconds counts as your takedown. */
+  takedownWindow: 3,
+  /** Draft: slipstream zone behind a rival. */
+  draftGap: 260,
+  draftHeight: 60,
+  draftMinSpeed: 300,
+  /** Seconds in the zone to reach full effect, and seconds to fade out. */
+  draftBuild: 1,
+  draftFade: 0.6,
+  /** At full draft: engine force and top speed multipliers (extra). */
+  draftForce: 0.45,
+  draftTop: 0.12,
+} as const;

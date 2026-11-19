@@ -1,9 +1,10 @@
-import { FUEL, PICKUPS, PX_PER_METER } from '../config';
+import { FUEL, PICKUPS, PX_PER_METER, WRENCH } from '../config';
 import { fuelPerPx } from './Fuel';
 import { Rng } from './Rng';
 import { JUMP_KINDS, type PieceKind, type Terrain, type TerrainPiece } from './Terrain';
+import type { WreckField } from './Wrecks';
 
-export type PickupKind = 'snack' | 'fuel';
+export type PickupKind = 'snack' | 'fuel' | 'wrench';
 
 export interface Pickup {
   id: number;
@@ -26,7 +27,7 @@ const SNACK_CHANCE: Record<PieceKind, number> = {
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
 /**
- * Places snacks (lines on the ground, arcs over ramps) and fuel cans ahead of the truck.
+ * Places snacks (lines on the ground, arcs over ramps), fuel cans and wrenches ahead of the truck.
  * Uses its own RNG so adding pickups never changes the terrain for a seed.
  *
  * Fuel guarantee: the fuel needed to cover the gap between two cans at the reference speed is
@@ -39,17 +40,22 @@ export class PickupField {
   fuelXs: number[] = [];
 
   private rng: Rng;
+  private wrenchRng: Rng;
   private nextId = 1;
   private pieceCursor: number;
   private lastFuelX: number;
   private nextFuelX: number;
+  private nextWrenchX: number;
 
+  /** `wrecks` (optional) keeps snacks, cans and wrenches off the roadside hulks. */
   constructor(
     seed: number,
     private terrain: Terrain,
     private startX: number,
+    private wrecks?: WreckField,
   ) {
     this.rng = new Rng((seed ^ 0x9e3779b9) >>> 0);
+    this.wrenchRng = new Rng((seed ^ 0x7f4a7c15) >>> 0);
     this.pieceCursor = terrain.endX;
     this.lastFuelX = startX;
     // Starter line on the opening flat so the first thing the player learns is "grab these".
@@ -58,6 +64,7 @@ export class PickupField {
       this.add('snack', x, terrain.heightAt(x) - PICKUPS.hover);
     }
     this.nextFuelX = this.planFuel(startX);
+    this.nextWrenchX = startX + WRENCH.firstMeters * PX_PER_METER;
   }
 
   /** Generate everything up to world x `toX`. */
@@ -73,6 +80,14 @@ export class PickupField {
       this.fuelXs.push(x);
       this.lastFuelX = x;
       this.nextFuelX = this.planFuel(x);
+    }
+    while (this.nextWrenchX < toX) {
+      this.terrain.ensure(this.nextWrenchX + 1200);
+      this.spawnSnacks();
+      const x = this.safeWrenchX(this.nextWrenchX);
+      this.add('wrench', x, this.terrain.heightAt(x) - WRENCH.hover);
+      const [lo, hi] = WRENCH.gapMeters;
+      this.nextWrenchX = x + this.wrenchRng.range(lo, hi) * PX_PER_METER;
     }
   }
 
@@ -137,10 +152,35 @@ export class PickupField {
       if (!piece) break;
       x = piece.x0 - 140;
     }
+    // Nor on a roadside wreck.
+    for (let i = 0; i < 4; i++) {
+      const w = this.wrecks?.near(x, 110);
+      if (!w) break;
+      x = w.x - 150;
+    }
     return Math.max(x, this.lastFuelX + 200);
   }
 
+  /** Wrenches lie on the ground: not on jumps or their landings, wrecks, or right on a can. */
+  private safeWrenchX(x: number): number {
+    for (let i = 0; i < 8; i++) {
+      const jump = this.terrain.pieces.find(
+        (p) => JUMP_KINDS.includes(p.kind) && x > p.x0 - 60 && x < p.x1 + 60,
+      );
+      const wreck = this.wrecks?.near(x, WRENCH.clearance);
+      const can = this.fuelXs.find((f) => Math.abs(f - x) < WRENCH.clearance);
+      if (jump) x = jump.x1 + 60;
+      else if (wreck) x = wreck.x + WRENCH.clearance;
+      else if (can !== undefined) x = can + WRENCH.clearance;
+      else break;
+      this.terrain.ensure(x + 1200);
+      this.spawnSnacks();
+    }
+    return x;
+  }
+
   private spawnSnacks(): void {
+    this.wrecks?.sync();
     for (const piece of this.terrain.pieces) {
       if (piece.x0 < this.pieceCursor) continue;
       this.snacksFor(piece);
@@ -168,6 +208,7 @@ export class PickupField {
     const start = p.x0 + (len - (count - 1) * PICKUPS.spacing) / 2;
     for (let i = 0; i < count; i++) {
       const x = start + i * PICKUPS.spacing;
+      if (this.wrecks?.near(x, 80)) continue; // a hulk lies there
       this.add('snack', x, t.heightAt(x) - hover);
     }
   }
