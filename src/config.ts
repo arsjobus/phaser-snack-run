@@ -284,3 +284,37 @@ export const RIVALS = {
   draftForce: 0.45,
   draftTop: 0.12,
 } as const;
+
+/** Art pass (Phase 5): pre-rendered trucks, biomes, and particle effects. */
+export const ART = {
+  /**
+   * Frames in each truck's pre-rendered rotation strip (the original used pre-rendered sprites).
+   * The body snaps to the nearest frame while the wheels stay exact, which looks steppy at speed,
+   * so it is off (0) by default: one sprite, rotated smoothly. Try 48+ if you want the retro look.
+   */
+  rotationFrames: 0,
+  /** Un-rotated truck sprite (px) and where the chassis centre sits in it. */
+  truckW: 144,
+  truckH: 92,
+  truckCx: 72,
+  truckCy: 56,
+  /** Side (px) of one square rotation frame; must hold the sprite turned to any angle. */
+  frame: 176,
+} as const;
+
+/** Biomes rotate with the checkpoints: forest, desert, snow, swamp, then round again. */
+export const BIOMES = {
+  /** A new biome starts every this many checkpoints. */
+  checkpointsPer: 2,
+  /** Seconds the backdrop takes to cross-fade once the screen centre passes the border. */
+  fadeSeconds: 1.6,
+} as const;
+
+/** Particles, mud spray and tire tracks. */
+export const FX = {
+  maxParticles: 360,
+  /** Mud and dust thrown by a wheel on the ground: none below `minSpeed`, full rate at `fullSpeed`. */
+  spray: { minSpeed: 160, fullSpeed: 800, perSecond: 46 },
+  /** Tire tracks: a mark every `spacing` px, never joined across a gap larger than `maxGap`. */
+  tracks: { minSpeed: 120, spacing: 12, maxGap: 90, max: 700, alpha: 0.55, width: 3 },
+} as const;

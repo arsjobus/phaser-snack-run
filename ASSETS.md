@@ -4,13 +4,13 @@ Every asset in the game must be listed here with its source and licence.
 
 | Asset                                  | Type    | Source                                        | Licence         | Notes                                          |
 | -------------------------------------- | ------- | --------------------------------------------- | --------------- | ---------------------------------------------- |
-| Sky, clouds, hills, tree lines, bushes | Texture | Generated in code (`src/scenes/BootScene.ts`) | Project licence | Placeholder; replaced in Phase 5               |
-| Truck body, wheel                      | Texture | Generated in code (`src/scenes/BootScene.ts`) | Project licence | Placeholder; replaced in Phase 5               |
-| Snack box ("Crunch Crackers"), fuel can, start gate | Texture | Generated in code (`src/scenes/BootScene.ts`) | Project licence | Original designs; placeholder until Phase 5    |
+| Sky, clouds, hills, tree lines, bushes (x4 biomes: forest, desert, snow, swamp) | Texture | Generated in code (`src/art/backdrops.ts`) | Project licence | Original art |
+| Player truck, wheel, 32-frame rotation strips | Texture | Generated in code (`src/art/trucks.ts`, `src/art/props.ts`) | Project licence | Original art |
+| Snack box ("Crunch Crackers"), fuel can, wrench, start gate | Texture | Generated in code (`src/art/props.ts`) | Project licence | Original designs; lettering from the built-in pixel font (`src/art/pixelFont.ts`) |
 | HUD bar, dials, logo plate ("CRUNCH 4x4") | UI      | Drawn in code (`src/game/Hud.ts`)             | Project licence | Original layout inspired by the reference's four-gauge bar; no brand marks |
-| Rival trucks (4 liveries with number plates), wrecks, wrench | Texture | Generated in code (`src/scenes/BootScene.ts`) | Project licence | Original designs (wrecks reuse the rival bodies upside down); placeholder until Phase 5 |
+| Rival trucks (6 body styles with number plates), wrecks | Texture | Generated in code (`src/art/trucks.ts`) | Project licence | Original designs (wrecks reuse the rival bodies upside down) |
 | Bump, wrench and takedown sounds | Audio | Synthesized at runtime (`src/game/Beeper.ts`) | Project licence | Oscillator tones, no samples; replaced in Phase 6 |
-| Checkpoint gate                        | Texture | Generated in code (`src/scenes/BootScene.ts`) | Project licence | Original design; placeholder until Phase 5     |
+| Checkpoint gates (normal and biome-change) | Texture | Generated in code (`src/art/props.ts`) | Project licence | Original design |
 | Warning beeps, checkpoint chime        | Audio   | Synthesized at runtime (`src/game/Beeper.ts`) | Project licence | Oscillator tones, no samples; replaced in Phase 6 |
 | Music                                  | Audio   | _none yet_                                    | n/a             | Phase 6: recompose or license (see roadmap §3) |
 

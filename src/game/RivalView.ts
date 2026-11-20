@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { PHYSICS, RIVALS, TRUCK } from '../config';
-import type { Rival } from './Rival';
+import { rivalTruckKey } from '../art/trucks';
+import { RIVAL_STYLES, type Rival } from './Rival';
 import type { Terrain } from './Terrain';
+import { bodyOrigin, placeBody } from './TruckView';
 
 /**
  * Visuals for one rival: livery body plus two spinning wheels. In the far lane the truck is drawn
@@ -11,13 +13,18 @@ export class RivalView {
   private body: Phaser.GameObjects.Image;
   private wheels: Phaser.GameObjects.Image[];
   private spin = 0;
+  private readonly key: string;
+  private readonly tire: number;
 
   constructor(
     scene: Phaser.Scene,
     readonly rival: Rival,
   ) {
+    this.key = rivalTruckKey(rival.style);
+    this.tire = RIVAL_STYLES[rival.style % RIVAL_STYLES.length].wheel;
     this.wheels = TRUCK.wheels.map(() => scene.add.image(0, 0, 'wheel'));
-    this.body = scene.add.image(0, 0, `rival_${rival.style}`).setOrigin(65 / 130, 38 / 70);
+    const [ox, oy] = bodyOrigin();
+    this.body = scene.add.image(0, 0, this.key).setOrigin(ox, oy);
   }
 
   update(terrain: Terrain, dt: number): void {
@@ -33,12 +40,20 @@ export class RivalView {
     const tint = Phaser.Display.Color.GetColor(255 - 55 * far, 255 - 55 * far, 255 - 40 * far);
 
     const bp = place(t.x, t.y);
-    this.body.setPosition(bp.x, bp.y).setRotation(t.angle).setScale(scale).setDepth(depth + 0.1).setTint(tint);
+    this.body.setPosition(bp.x, bp.y).setScale(scale).setDepth(depth).setTint(tint);
+    placeBody(this.body, this.key, t.angle);
     this.spin += (t.speed * dt) / PHYSICS.wheelRadius;
+    // Bigger tires stay on the ground: lift their centre by the extra radius.
+    const rise = PHYSICS.wheelRadius * (this.tire - 1);
     t.wheelContacts.forEach((c, i) => {
       const groundY = terrain.heightAt(c.x) - PHYSICS.wheelRadius;
-      const p = place(c.x, Math.min(c.y, groundY));
-      this.wheels[i].setPosition(p.x, p.y).setRotation(this.spin).setScale(scale).setDepth(depth).setTint(tint);
+      const p = place(c.x, Math.min(c.y, groundY) - rise);
+      this.wheels[i]
+        .setPosition(p.x, p.y)
+        .setRotation(this.spin)
+        .setScale(scale * this.tire)
+        .setDepth(depth + 0.1)
+        .setTint(tint);
     });
   }
 

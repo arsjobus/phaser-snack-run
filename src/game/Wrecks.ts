@@ -1,5 +1,6 @@
 import { COLLISION, PX_PER_METER, WRECKS } from '../config';
 import { deepestContact, truckCircles, type Circle } from './Collision';
+import { RIVAL_STYLES } from './Rival';
 import { Rng } from './Rng';
 import { JUMP_KINDS, type PieceKind, type Terrain, type TerrainPiece } from './Terrain';
 import type { TruckPhysics } from './TruckPhysics';
@@ -209,7 +210,7 @@ export class WreckField {
     // Always draw, so the stream of random numbers does not depend on the conditions below.
     const roll = this.rng.next();
     const jitter = this.rng.range(-60, 60);
-    const style = this.rng.int(0, 3);
+    const style = this.rng.int(0, RIVAL_STYLES.length - 1);
     if (roll > this.chance((mid - this.startX) / PX_PER_METER)) return;
 
     let x = mid + jitter;

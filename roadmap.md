@@ -1,6 +1,6 @@
 # 4x4 Snack Run: Redux Roadmap
 
-> **Status:** Phases 0 to 4 are complete (see `README.md`): the game is a playable alpha. Next up: Phase 5 (art pass). All art is still procedural placeholder; texture keys (`truck_body`, `rival_0..3`, `wrench`, ...) are stable so real sprites can drop in.
+> **Status:** Phases 0 to 5 are complete (see `README.md`): the game is a playable alpha with its art pass done. Next up: Phase 6 (audio and remixed music). All art is generated in code (`src/art/`); texture keys (`truck_body`, `rival_0..5`, `wheel`, `snack`, `fuel_can`, `wrench`, `start_gate`, `cp_gate`, and `sky_<biome>`, `trees_<biome>`, ...) are stable so real sprites can drop in.
 
 An endless-runner redux of a late-90s Flash/Shockwave-era 4x4 racing game. Same spirit (muddy tracks, big trucks, jumps, snack pickups), rebuilt for modern browsers.
 
@@ -130,10 +130,10 @@ An endless-runner redux of a late-90s Flash/Shockwave-era 4x4 racing game. Same 
 
 ### Phase 5: Art Pass (2 weeks)
 
-- [ ] Final truck set (4-6 rival styles + player), pre-rendered at multiple rotation frames
-- [ ] Mud splash, tire-track decals, dust, crash particles
-- [ ] Biomes that rotate every few checkpoints: forest dirt, desert, snow, swamp
-- [ ] Original snack and fuel can art; start-gate banner homage
+- [x] Final truck set (6 rival styles + player: SUV, pickup, monster truck, jeep, van, buggy), (rotation-frame strips are built in but off by default: smooth rotation looked better)
+- [x] Mud splash, tire-track decals, dust, crash particles
+- [x] Biomes that rotate every 2 checkpoints: forest dirt, desert, snow, swamp
+- [x] Original snack and fuel can art; start-gate banner homage
 - **Exit:** screenshots look release-worthy
 
 ### Phase 6: Audio and Remixed Music (1-2 weeks)

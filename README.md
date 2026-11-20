@@ -29,9 +29,18 @@ Auto-gas is **on** by default (endless-runner mode: the truck drives itself, you
 
 Add `?seed=anything` to the URL for a repeatable course (used later for daily challenges).
 
+## What's in Phase 5
+
+- **Truck set:** the player's yellow SUV plus six rival styles with their own body shapes, wheel sizes and liveries: #3 red SUV, #8 blue pickup (with cracker crates in the bed), #5 black monster truck, #7 green open jeep, #2 orange "CRUNCH" delivery van and #9 purple dune buggy. Each is drawn once into a texture. Pre-rendered rotation strips are built in (`ART.rotationFrames`, e.g. 48), but they are **off by default**: snapping to the nearest angle looked steppy next to the exact wheels, so bodies rotate smoothly. Wheels stay exact and sit in painted wheel wells; tires are knobby with caked mud and a bright spoke so spin reads.
+- **Particles:** wheels throw **mud** (sand, slush) and dust back from the ground at speed, landings kick up a dust ring and clods (bigger after long jumps), hard bumps and wrecks burst into sparks, paint-coloured metal chunks and smoke. Mud and chunks land on the terrain and bounce.
+- **Tire tracks:** wheels in the near lane leave dark tracks on the crust that stay until they scroll off screen (`FX.tracks`).
+- **Biomes:** forest, desert, snowfield, swamp, then round again, switching every 2 checkpoints (`BIOMES.checkpointsPer`). The ground changes exactly at the gate; the five-layer backdrop (sky, clouds, hills/mesas/peaks, trees/cacti/pines/cypress, bushes/scrub/drifts/reeds) cross-fades as the screen centre passes the border. Biomes are visual only: physics and balance are unchanged. The far lane now rides on a raised dirt shelf so rivals there rest on something. A biome-change gate is orange with the new biome's name, and the checkpoint banner says `ENTERING DESERT`.
+- **Props:** a 3D "Crunch Crackers" carton, a jerry can with a FUEL label and a start gate whose banner reads START (all lettering is drawn with a built-in 3x5 pixel font).
+- Tests cover the biome rotation and segment splitting, rotation-frame lookup, the particle pool, effect rates and colours, and tire-track laying.
+
 ## What's in Phase 4
 
-- **Rivals:** up to three numbered, colour-coded trucks (#3 red, #8 blue, #5 black, #7 green). They are the same rigid body as your truck, so they bump, jump ramps (and level out in the air) and flip for real. Two wait just past the start line; more arrive every 800 m, some from behind at speed.
+- **Rivals:** up to three numbered, colour-coded trucks (#3 red, #8 blue, #5 black, #7 green, #2 orange, #9 purple). They are the same rigid body as your truck, so they bump, jump ramps (and level out in the air) and flip for real. Two wait just past the start line; more arrive every 800 m, some from behind at speed.
 - **Rubber banding:** each rival cruises at a skill-based speed, speeds up when behind you and eases off when far ahead, so the pack stays in view without teleporting.
 - **Depth lanes:** like the original's pseudo-3D track, rivals use a near lane (yours) and a far lane (drawn higher, smaller, darker). Only same-lane trucks collide. A rival drops into your lane only when clear of your truck and, if ahead, at least 480 px up the road so you see it coming.
 - **Collisions:** trucks are three body circles with impulse-based bumps. Below 170 px/s closing speed a bump is free; above it you take 10-25% damage (rivals take 2.5x). Full damage ends the run (`WRECKED`). Hard hits shake the screen; a damaged truck smokes.
@@ -77,7 +86,7 @@ src/
   game/
     Terrain.ts         infinite heightfield + chunk generator (records pieces for spawners)
     TruckPhysics.ts    pure-TS rigid body (no Phaser), unit-tested
-    TruckView.ts       placeholder visuals
+    TruckView.ts       player visuals (pre-rendered body frame + spinning wheels)
     Fuel.ts            tank + drain model (pure TS)
     Score.ts           score, combo, air bonus (pure TS)
     Pickups.ts         snack and fuel-can placement (pure TS)
@@ -92,12 +101,18 @@ src/
     Race.ts            rival spawning, bumps, takedowns, draft, position (pure TS)
     RivalView.ts       rival visuals (far lane is higher/smaller/darker)
     Beeper.ts          synthesized warning beeps and chime
-    Parallax.ts        tiling background layers
+    Parallax.ts        tiling background layers, one set per biome, cross-faded
+    Biomes.ts          biome palettes, rotation by checkpoint, ground segments (pure TS)
+    Particles.ts       capped particle pool (pure TS)
+    Effects.ts         mud, dust, landing and crash emitters (pure TS)
+    TrackMarks.ts      tire-track segments (pure TS)
+    Rotation.ts        nearest pre-rendered rotation frame (pure TS)
     Input.ts, Rng.ts
+  art/                 procedural art: trucks.ts (6 bodies + rotation strips), backdrops.ts (per biome), props.ts, pixelFont.ts
   scenes/
-    BootScene.ts       generates placeholder textures
+    BootScene.ts       builds every texture from src/art
     GameScene.ts       loop, camera, HUD, input
-tests/                 Vitest: terrain, physics, fuel, score, pickups, run, HUD, checkpoints, race
+tests/                 Vitest: terrain, physics, fuel, score, pickups, run, HUD, checkpoints, race, biomes, particles, tracks
 docs/GDD.md            one-page design doc
 ASSETS.md              asset and licence register
 ```

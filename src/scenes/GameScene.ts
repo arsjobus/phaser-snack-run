@@ -1,8 +1,10 @@
 import Phaser from 'phaser';
 import {
   BASE_Y,
+  ART,
   CAMERA,
   FUEL,
+  FX,
   GAMEPLAY,
   PHYSICS,
   PX_PER_METER,
@@ -15,9 +17,15 @@ import {
   WRECKS,
   WRENCH,
 } from '../config';
+import { RIVAL_PAINT, rivalTruckKey, shade } from '../art/trucks';
 import { Beeper } from '../game/Beeper';
+import { biomeAtX, biomeChangesAt, biomeSegments, type Biome } from '../game/Biomes';
 import { checkpointMeters } from '../game/Checkpoint';
 import { truckCircles } from '../game/Collision';
+import { emitCrash, emitDust, emitLanding, emitMud, emitSmoke, sprayRate } from '../game/Effects';
+import { ParticleSystem, particleFade, particleRadius } from '../game/Particles';
+import { TrackMarks } from '../game/TrackMarks';
+import { RIVAL_STYLES } from '../game/Rival';
 import { HUD_H, Hud } from '../game/Hud';
 import { warnTick } from '../game/HudModel';
 import { Race, type RaceEvent } from '../game/Race';
@@ -34,27 +42,12 @@ import type { InputState } from '../game/Input';
 const FIXED_DT = 1 / 60 / PHYSICS.substeps;
 const TUFT_SPACING = 72;
 const GATE_X = GAMEPLAY.startX + 420;
-/** A short-lived smoke/dust/debris circle drawn into the effects layer. */
-interface Puff {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  age: number;
-  life: number;
-  r0: number;
-  r1: number;
-  color: number;
-  alpha: number;
-}
-
 interface WreckSprite {
   body: Phaser.GameObjects.Image;
   wheels: Phaser.GameObjects.Image[];
   smokeClock: number;
 }
 
-const MAX_PUFFS = 220;
 const TITLES = { fuel: 'OUT OF FUEL', time: 'TIME UP', wreck: 'WRECKED' } as const;
 
 export class GameScene extends Phaser.Scene {
@@ -77,7 +70,12 @@ export class GameScene extends Phaser.Scene {
   private posText!: Phaser.GameObjects.Text;
   private rivalViews = new Map<number, RivalView>();
   private wreckSprites = new Map<number, WreckSprite>();
-  private puffs: Puff[] = [];
+  private particles = new ParticleSystem();
+  private tracks = new TrackMarks();
+  private decals!: Phaser.GameObjects.Graphics;
+  /** Fractional particle counts carried between frames, per wheel key. */
+  private sprayAcc = new Map<string, number>();
+  private biome!: Biome;
   private smokeClock = 0;
   private sprites = new Map<number, Phaser.GameObjects.Image>();
   private gates = new Map<number, Phaser.GameObjects.GameObject[]>();
@@ -111,7 +109,9 @@ export class GameScene extends Phaser.Scene {
     this.gates.clear();
     this.rivalViews.clear();
     this.wreckSprites.clear();
-    this.puffs = [];
+    this.particles = new ParticleSystem();
+    this.tracks = new TrackMarks();
+    this.sprayAcc.clear();
     this.smokeClock = 0;
     this.lastBeepTick = -1;
     this.beeper = new Beeper(this.sound);
@@ -122,8 +122,10 @@ export class GameScene extends Phaser.Scene {
     this.terrain = new Terrain(this.seed);
     this.run = new RunModel(this.seed, this.terrain, this.startX);
     this.race = new Race(this.seed, this.terrain, this.run.wrecks, this.startX);
-    this.parallax = new Parallax(this);
+    this.biome = biomeAtX(this.startX, this.startX);
+    this.parallax = new Parallax(this, this.biome.id);
     this.ground = this.add.graphics().setDepth(1);
+    this.decals = this.add.graphics().setDepth(1.2);
     this.addStartGate();
     this.truck = new TruckPhysics(this.startX, BASE_Y - 45);
     this.view = new TruckView(this);
@@ -189,15 +191,6 @@ export class GameScene extends Phaser.Scene {
   private addStartGate(): void {
     const y = this.terrain.heightAt(GATE_X) + 4;
     this.add.image(GATE_X, y, 'start_gate').setOrigin(0.5, 1).setDepth(0.5);
-    this.add
-      .text(GATE_X - 22, y - 212 + 36, 'START', {
-        fontFamily: 'monospace',
-        fontSize: '15px',
-        fontStyle: 'bold',
-        color: '#111111',
-      })
-      .setOrigin(0.5)
-      .setDepth(0.6);
   }
 
   private readInput(): InputState {
@@ -252,11 +245,13 @@ export class GameScene extends Phaser.Scene {
 
     this.updateCamera(dt);
     this.view.update(this.truck, this.terrain, dt);
+    this.syncBiome();
     this.drawGround();
     this.syncPickups(time / 1000);
     this.syncRivals(dt);
     this.syncWrecks(dt);
     this.updateFx(dt);
+    this.drawDecals();
     this.syncGates();
     this.parallax.update(this.cameras.main.scrollX, this.cameras.main.scrollY, dt);
     this.drawDebug();
@@ -271,6 +266,14 @@ export class GameScene extends Phaser.Scene {
     cam.scrollY += (ty - cam.scrollY) * (1 - Math.exp(-CAMERA.yLerp * dt));
   }
 
+  /** The backdrop follows the screen centre, so it has changed by the time the new ground arrives. */
+  private syncBiome(): void {
+    const cam = this.cameras.main;
+    const mid = biomeAtX(cam.scrollX + VIEW_W / 2, this.startX);
+    this.parallax.setBiome(mid.id);
+    this.biome = biomeAtX(this.truck.x, this.startX); // what the wheels are rolling on
+  }
+
   private drawGround(): void {
     const cam = this.cameras.main;
     const g = this.ground;
@@ -279,43 +282,110 @@ export class GameScene extends Phaser.Scene {
     const bottom = cam.scrollY + VIEW_H + 80;
     g.clear();
 
-    const strip = (color: number, topOffset: number, bottomOffset: number | null) => {
+    // Paint one strip of terrain between xa and xb. Segment borders sit on terrain sample steps
+    // (or are clipped to them), so neighbouring biomes meet exactly at the checkpoint gate.
+    const strip = (color: number, topOffset: number, bottomOffset: number | null, xa: number, xb: number) => {
       g.fillStyle(color, 1);
       g.beginPath();
-      for (let x = x0; x <= x1; x += TERRAIN_STEP) {
-        const y = this.terrain.heightAt(x) + topOffset;
-        if (x === x0) g.moveTo(x, y);
-        else g.lineTo(x, y);
+      g.moveTo(xa, this.terrain.heightAt(xa) + topOffset);
+      for (let x = Math.ceil(xa / TERRAIN_STEP) * TERRAIN_STEP; x < xb; x += TERRAIN_STEP) {
+        if (x > xa) g.lineTo(x, this.terrain.heightAt(x) + topOffset);
       }
+      g.lineTo(xb, this.terrain.heightAt(xb) + topOffset);
       if (bottomOffset === null) {
-        g.lineTo(x1, bottom);
-        g.lineTo(x0, bottom);
+        g.lineTo(xb, bottom);
+        g.lineTo(xa, bottom);
       } else {
-        for (let x = x1; x >= x0; x -= TERRAIN_STEP)
-          g.lineTo(x, this.terrain.heightAt(x) + bottomOffset);
+        g.lineTo(xb, this.terrain.heightAt(xb) + bottomOffset);
+        for (let x = Math.floor(xb / TERRAIN_STEP) * TERRAIN_STEP; x > xa; x -= TERRAIN_STEP) {
+          if (x < xb) g.lineTo(x, this.terrain.heightAt(x) + bottomOffset);
+        }
+        g.lineTo(xa, this.terrain.heightAt(xa) + bottomOffset);
       }
       g.closePath();
       g.fillPath();
     };
 
-    strip(0x8a5d33, 0, null); // dirt
-    strip(0x724a29, 44, null); // deeper dirt
-    strip(0xa87a45, 0, 10); // sunlit crust
-    strip(0x5b3a1e, 10, 15); // crust shadow line
-    strip(0x6a4425, 22, 26); // tire ruts, like the reference's rutted mud
-    strip(0x7a5230, 33, 36);
+    for (const seg of biomeSegments(x0, x1, this.startX)) {
+      const c = seg.biome.ground;
+      const { x0: xa, x1: xb } = seg;
+      strip(c.dirt, 0, null, xa, xb);
+      strip(c.deep, 44, null, xa, xb);
+      strip(c.crust, 0, 10, xa, xb); // sunlit crust
+      strip(c.crustShadow, 10, 15, xa, xb);
+      strip(c.rut1, 22, 26, xa, xb); // tire ruts, like the reference's rutted mud
+      strip(c.rut2, 33, 36, xa, xb);
+      // The far lane's road: a raised shelf of dirt, so trucks driving there rest on something.
+      strip(shade(c.crust, 0.78), -RIVALS.farOffset, 0, xa, xb);
+      strip(c.crustShadow, -RIVALS.farOffset, -RIVALS.farOffset + 3, xa, xb);
+      this.drawTufts(seg.biome, xa, xb);
+    }
+  }
 
-    // Scrub-grass tufts along the verge (deterministic by world position).
-    g.fillStyle(0x6a9a3a, 1);
-    for (let k = Math.floor(x0 / TUFT_SPACING); k * TUFT_SPACING < x1; k++) {
+  /** Verge tufts (deterministic by world position): grass, dry scrub, frost or reeds. */
+  private drawTufts(biome: Biome, xa: number, xb: number): void {
+    const g = this.ground;
+    const { color, shape } = biome.tuft;
+    g.fillStyle(color, 1);
+    for (let k = Math.floor(xa / TUFT_SPACING) - 1; k * TUFT_SPACING < xb; k++) {
       const r = ((Math.imul(k, 2654435761) >>> 0) % 1000) / 1000;
       if (r > 0.6) continue;
       const x = k * TUFT_SPACING + r * 90;
+      if (x < xa || x > xb) continue;
       const y = this.terrain.heightAt(x) + 1;
-      g.fillTriangle(x - 5, y, x - 1, y, x - 4, y - 9);
-      g.fillTriangle(x - 2, y, x + 2, y, x, y - 12);
-      g.fillTriangle(x + 1, y, x + 5, y, x + 4, y - 8);
+      switch (shape) {
+        case 'grass':
+          g.fillTriangle(x - 5, y, x - 1, y, x - 4, y - 9);
+          g.fillTriangle(x - 2, y, x + 2, y, x, y - 12);
+          g.fillTriangle(x + 1, y, x + 5, y, x + 4, y - 8);
+          break;
+        case 'scrub': // low, wide dry bush with a woody centre
+          g.fillTriangle(x - 9, y, x - 2, y, x - 7, y - 7);
+          g.fillTriangle(x - 4, y, x + 5, y, x + 1, y - 10);
+          g.fillTriangle(x + 2, y, x + 9, y, x + 7, y - 6);
+          break;
+        case 'frost': // snow clumps with an icy crystal
+          g.fillEllipse(x, y - 2, 16, 6);
+          g.fillTriangle(x - 2, y - 3, x + 2, y - 3, x, y - 11);
+          break;
+        case 'reed': // tall thin blades with a cattail
+          g.fillRect(x - 4, y - 16, 1.5, 16);
+          g.fillRect(x, y - 20, 1.5, 20);
+          g.fillRect(x + 4, y - 14, 1.5, 14);
+          g.fillStyle(0x5b3a1e, 1);
+          g.fillRect(x - 0.5, y - 26, 3, 7);
+          g.fillStyle(color, 1);
+          break;
+      }
     }
+  }
+
+  /** Tire tracks on the crust, in the colour of the biome they were laid in. */
+  private drawDecals(): void {
+    const cam = this.cameras.main;
+    this.tracks.cull(cam.scrollX - 120);
+    const g = this.decals;
+    g.clear();
+    const right = cam.scrollX + VIEW_W + 60;
+    // Join touching segments of one colour into a single stroked path (far fewer draw calls).
+    let open = false;
+    let color = -1;
+    let endX = Number.NaN;
+    const y = (x: number) => this.terrain.heightAt(x) + 3;
+    for (const seg of this.tracks.segments) {
+      if (seg.x0 > right) continue;
+      if (!open || seg.color !== color || seg.x0 !== endX) {
+        if (open) g.strokePath();
+        g.lineStyle(FX.tracks.width, seg.color, FX.tracks.alpha);
+        g.beginPath();
+        g.moveTo(seg.x0, y(seg.x0));
+        open = true;
+        color = seg.color;
+      }
+      g.lineTo(seg.x1, y(seg.x1));
+      endX = seg.x1;
+    }
+    if (open) g.strokePath();
   }
 
   private syncPickups(seconds: number): void {
@@ -417,7 +487,8 @@ export class GameScene extends Phaser.Scene {
       case 'bump': {
         const hard = e.damage > 0;
         this.beeper.thud(hard);
-        this.burst(e.x, e.y, hard ? 14 : 5, hard ? 0xd9c7a0 : 0xb89a6a, hard ? 260 : 120);
+        emitDust(this.particles, Math.random, this.biome, e.x, e.y, 0, hard ? 8 : 4);
+        if (hard) emitCrash(this.particles, Math.random, e.x, e.y - 8, Math.min(1, e.impact / 520), 0xf2c200);
         if (hard) {
           this.cameras.main.shake(140, Math.min(0.012, 0.004 + e.impact / 60000));
           for (const ev of this.run.hurt(e.damage)) this.onRunEvent(ev);
@@ -426,7 +497,7 @@ export class GameScene extends Phaser.Scene {
       }
       case 'wrecked':
         this.beeper.thud(true);
-        this.burst(e.x, e.y - 10, 22, 0x6b6b70, 300);
+        emitCrash(this.particles, Math.random, e.x, e.y - 10, 1, RIVAL_PAINT[Math.max(0, RIVAL_STYLES.findIndex((st) => st.number === e.number))].body);
         break;
       case 'takedown': {
         const points = this.run.takedown();
@@ -453,7 +524,7 @@ export class GameScene extends Phaser.Scene {
       }
       v.update(this.terrain, dt);
       if (r.damage >= 0.5 && this.smokeClock <= 0) {
-        this.smoke(v.drawX + 40, v.drawY - 22, r.damage >= 0.75 ? 0x222222 : 0x777777);
+        this.puffSmoke(v.drawX + 40, v.drawY - 22, r.damage >= 0.75 ? 0x222222 : 0x777777);
       }
     }
     for (const [id, v] of this.rivalViews) {
@@ -476,7 +547,10 @@ export class GameScene extends Phaser.Scene {
       let sp = this.wreckSprites.get(w.id);
       if (!sp) {
         sp = {
-          body: this.add.image(0, 0, `rival_${w.style}`).setOrigin(65 / 130, 38 / 70).setFlipY(true),
+          body: this.add
+            .image(0, 0, rivalTruckKey(w.style))
+            .setOrigin(ART.truckCx / ART.truckW, ART.truckCy / ART.truckH)
+            .setFlipY(true),
           wheels: TRUCK.wheels.map(() => this.add.image(0, 0, 'wheel')),
           smokeClock: Math.random() * 0.3,
         };
@@ -487,7 +561,7 @@ export class GameScene extends Phaser.Scene {
         sp.smokeClock -= dt;
         if (sp.smokeClock <= 0) {
           sp.smokeClock = w.fresh ? 0.12 : 0.3;
-          this.smoke(sp.body.x - 6, sp.body.y - 26, w.fresh ? 0x333333 : 0x8a8a8f);
+          this.puffSmoke(sp.body.x - 6, sp.body.y - 26, w.fresh ? 0x333333 : 0x8a8a8f);
         }
       }
     }
@@ -520,54 +594,18 @@ export class GameScene extends Phaser.Scene {
       sp.wheels[i]
         .setPosition(w.x + lx * cos - ly * sin, y + lx * sin + ly * cos)
         .setRotation(w.angle + i)
-        .setScale(scale)
+        .setScale(scale * RIVAL_STYLES[w.style % RIVAL_STYLES.length].wheel)
         .setTint(tint)
         .setAlpha(fade)
         .setDepth(depth - 0.1);
     });
   }
 
-  /** Spawn a ring of dust/debris puffs. */
-  private burst(x: number, y: number, n: number, color: number, speed: number): void {
-    for (let i = 0; i < n; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const v = speed * (0.3 + Math.random() * 0.7);
-      this.addPuff({
-        x,
-        y,
-        vx: Math.cos(a) * v,
-        vy: Math.sin(a) * v - 60,
-        age: 0,
-        life: 0.4 + Math.random() * 0.4,
-        r0: 4 + Math.random() * 4,
-        r1: 10 + Math.random() * 8,
-        color,
-        alpha: 0.85,
-      });
-    }
+  private puffSmoke(x: number, y: number, color: number): void {
+    emitSmoke(this.particles, Math.random, x, y, color);
   }
 
-  private smoke(x: number, y: number, color: number): void {
-    this.addPuff({
-      x,
-      y,
-      vx: 30 + Math.random() * 30,
-      vy: -50 - Math.random() * 30,
-      age: 0,
-      life: 0.8 + Math.random() * 0.4,
-      r0: 5,
-      r1: 16,
-      color,
-      alpha: 0.6,
-    });
-  }
-
-  private addPuff(p: Puff): void {
-    if (this.puffs.length >= MAX_PUFFS) this.puffs.shift();
-    this.puffs.push(p);
-  }
-
-  /** Smoke from the damaged truck, speed lines while drafting, and the puff layer itself. */
+  /** Mud and dust off the wheels, tire tracks, damage smoke, the particle layer and speed lines. */
   private updateFx(dt: number): void {
     this.smokeClock -= dt;
     const t = this.truck;
@@ -575,23 +613,46 @@ export class GameScene extends Phaser.Scene {
     if (!this.run.over && dmg >= 0.5 && this.smokeClock <= 0) {
       const cos = Math.cos(t.angle);
       const sin = Math.sin(t.angle);
-      this.smoke(t.x + 44 * cos + 14 * sin, t.y + 44 * sin - 14 * cos, dmg >= 0.75 ? 0x1a1a1a : 0x6e6e72);
+      this.puffSmoke(t.x + 44 * cos + 14 * sin, t.y + 44 * sin - 14 * cos, dmg >= 0.75 ? 0x1a1a1a : 0x6e6e72);
     }
     if (this.smokeClock <= 0) this.smokeClock = dmg >= 0.75 ? 0.07 : 0.14;
 
+    this.wheelFx('p', t.wheelContacts, t.speed, dt, false);
+    for (const r of this.race.rivals) {
+      const far = r.laneBlend > 0.5;
+      this.wheelFx(`r${r.id}`, r.truck.wheelContacts, r.truck.speed, dt, far);
+    }
+
+    this.particles.update(dt, (x) => this.terrain.heightAt(x));
     const g = this.fx;
     g.clear();
-    for (const p of this.puffs) {
-      p.age += dt;
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.vy += 40 * dt;
-    }
-    this.puffs = this.puffs.filter((p) => p.age < p.life);
-    for (const p of this.puffs) {
-      const k = p.age / p.life;
-      g.fillStyle(p.color, p.alpha * (1 - k));
-      g.fillCircle(p.x, p.y, p.r0 + (p.r1 - p.r0) * k);
+    for (const p of this.particles.items) {
+      const fade = particleFade(p) * p.alpha;
+      const r = particleRadius(p);
+      switch (p.kind) {
+        case 'mud':
+          g.fillStyle(0x1c120a, fade * 0.6);
+          g.fillCircle(p.x, p.y, r + 1);
+          g.fillStyle(p.color, fade);
+          g.fillCircle(p.x, p.y, r);
+          break;
+        case 'chunk': {
+          const c = Math.cos(p.rot) * r;
+          const s2 = Math.sin(p.rot) * r;
+          g.fillStyle(p.color, fade);
+          g.fillTriangle(p.x - c, p.y - s2, p.x + c * 0.8 - s2 * 0.5, p.y + s2 * 0.8 + c * 0.5, p.x + s2, p.y - c);
+          break;
+        }
+        case 'spark': {
+          const len = 0.03;
+          g.lineStyle(2, p.color, fade);
+          g.lineBetween(p.x, p.y, p.x - p.vx * len, p.y - p.vy * len);
+          break;
+        }
+        default:
+          g.fillStyle(p.color, fade);
+          g.fillCircle(p.x, p.y, r);
+      }
     }
 
     // Slipstream: streaks tearing past the nose while the draft is on.
@@ -606,8 +667,38 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** Spray and tire tracks for the wheels of one vehicle. Far-lane trucks only kick up dust. */
+  private wheelFx(
+    key: string,
+    wheels: { inContact: boolean; x: number; y: number }[],
+    speed: number,
+    dt: number,
+    far: boolean,
+  ): void {
+    const biome = this.biome;
+    wheels.forEach((c, i) => {
+      const k = `${key}${i}`;
+      const rolling = c.inContact && Math.abs(speed) > FX.tracks.minSpeed && !this.run.over;
+      const gy = this.terrain.heightAt(c.x);
+      if (!far) this.tracks.add(k, c.x, rolling, biomeAtX(c.x, this.startX).track);
+      else this.tracks.forget(k);
+      if (!c.inContact) return;
+      const acc = (this.sprayAcc.get(k) ?? 0) + sprayRate(speed) * dt * (far ? 0.4 : 1);
+      const n = Math.floor(acc);
+      this.sprayAcc.set(k, acc - n);
+      if (n <= 0) return;
+      const y = far ? gy - RIVALS.farOffset : gy;
+      emitMud(this.particles, Math.random, biome, c.x, y, speed, far ? 0 : n);
+      emitDust(this.particles, Math.random, biome, c.x, y, speed, Math.max(1, Math.round(n / 2)), far ? 0.7 : 1);
+    });
+  }
+
   private onLanded(airTime: number): void {
     this.bestAir = Math.max(this.bestAir, airTime);
+    if (airTime > 0.12) {
+      const t = this.truck;
+      emitLanding(this.particles, Math.random, this.biome, t.x, this.terrain.heightAt(t.x), t.speed, airTime);
+    }
     const bonus = this.run.onLanded(airTime);
     if (airTime < GAMEPLAY.minAirToast) return;
     this.toast
@@ -658,9 +749,13 @@ export class GameScene extends Phaser.Scene {
   private addCheckpointGate(index: number, x: number): void {
     this.terrain.ensure(x + 200);
     const y = this.terrain.heightAt(x) + 4;
-    const img = this.add.image(x, y, 'cp_gate').setOrigin(0.5, 1).setDepth(0.5);
+    const zone = biomeChangesAt(index);
+    const img = this.add
+      .image(x, y, zone ? 'cp_gate_zone' : 'cp_gate')
+      .setOrigin(0.5, 1)
+      .setDepth(0.5);
     const label = this.add
-      .text(x, y - 212 + 35, `CHECKPOINT ${index}`, {
+      .text(x, y - 212 + (zone ? 28 : 35), `CHECKPOINT ${index}`, {
         fontFamily: 'monospace',
         fontSize: '18px',
         fontStyle: 'bold',
@@ -668,7 +763,21 @@ export class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setDepth(0.6);
-    this.gates.set(index, [img, label]);
+    const objs: Phaser.GameObjects.GameObject[] = [img, label];
+    if (zone) {
+      objs.push(
+        this.add
+          .text(x, y - 212 + 47, `> ${zone.name.toUpperCase()}`, {
+            fontFamily: 'monospace',
+            fontSize: '12px',
+            fontStyle: 'bold',
+            color: '#ffffff',
+          })
+          .setOrigin(0.5)
+          .setDepth(0.6),
+      );
+    }
+    this.gates.set(index, objs);
   }
 
   /** Mini-celebration: chime, confetti, screen flash, banner and a gold flash on the HUD clock. */
@@ -699,6 +808,8 @@ export class GameScene extends Phaser.Scene {
     const secs = String(Math.round(timeAdded % 60)).padStart(2, '0');
     const lines = [`CHECKPOINT ${index}!`, `+${mins}:${secs}  +${points} BONUS`];
     if (fuelAdded > 0) lines.push(`FUEL +${Math.round(fuelAdded * 100)}%`);
+    const zone = biomeChangesAt(index);
+    if (zone) lines.push(`ENTERING ${zone.name.toUpperCase()}`);
     this.tweens.killTweensOf(this.cpToast);
     this.cpToast.setText(lines).setAlpha(1).setScale(1.3);
     this.tweens.add({ targets: this.cpToast, scale: 1, duration: 160 });

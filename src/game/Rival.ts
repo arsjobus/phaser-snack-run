@@ -5,13 +5,25 @@ import { TruckPhysics } from './TruckPhysics';
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
-/** Numbers and liveries of the rival set (index = texture style). Matches the reference's cast. */
+/** Body shapes of the truck set (see `src/art/trucks.ts`). The player drives the first, `suv`. */
+export type BodyKind = 'suv' | 'pickup' | 'monster' | 'jeep' | 'van' | 'buggy';
+
+/**
+ * The rival set (index = texture style): number plate, livery name, body shape and how much bigger
+ * than the standard 20 px wheel its tires are drawn (the physics is the same for every truck).
+ * The first three match the reference's cast: red #3, blue #8 and a black monster truck.
+ */
 export const RIVAL_STYLES = [
-  { number: 3, name: 'red' },
-  { number: 8, name: 'blue' },
-  { number: 5, name: 'black' },
-  { number: 7, name: 'green' },
-] as const;
+  { number: 3, name: 'red', kind: 'suv', wheel: 1 },
+  { number: 8, name: 'blue', kind: 'pickup', wheel: 1.05 },
+  { number: 5, name: 'black', kind: 'monster', wheel: 1.2 },
+  { number: 7, name: 'green', kind: 'jeep', wheel: 1.1 },
+  { number: 2, name: 'orange', kind: 'van', wheel: 0.95 },
+  { number: 9, name: 'purple', kind: 'buggy', wheel: 1.15 },
+] as const satisfies readonly { number: number; name: string; kind: BodyKind; wheel: number }[];
+
+/** Tire scale of the player's truck. */
+export const PLAYER_WHEEL = 1;
 
 /** Which depth lane a rival is in right now: 0 = the player's, 1 = the far lane, -1 = swerving. */
 export type LaneKey = 0 | 1 | -1;
