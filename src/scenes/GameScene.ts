@@ -18,7 +18,7 @@ import {
   WRENCH,
 } from '../config';
 import { RIVAL_PAINT, rivalTruckKey, shade } from '../art/trucks';
-import { Beeper } from '../game/Beeper';
+import { AudioSystem, biomeIndex } from '../audio/AudioSystem';
 import { biomeAtX, biomeChangesAt, biomeSegments, type Biome } from '../game/Biomes';
 import { checkpointMeters } from '../game/Checkpoint';
 import { truckCircles } from '../game/Collision';
@@ -64,7 +64,7 @@ export class GameScene extends Phaser.Scene {
   private toast!: Phaser.GameObjects.Text;
   private warn!: Phaser.GameObjects.Text;
   private cpToast!: Phaser.GameObjects.Text;
-  private beeper!: Beeper;
+  private audio!: AudioSystem;
   private race!: Race;
   private fx!: Phaser.GameObjects.Graphics;
   private posText!: Phaser.GameObjects.Text;
@@ -114,7 +114,9 @@ export class GameScene extends Phaser.Scene {
     this.sprayAcc.clear();
     this.smokeClock = 0;
     this.lastBeepTick = -1;
-    this.beeper = new Beeper(this.sound);
+    this.audio?.dispose(); // a restart reuses the scene: silence the previous run's score and engine
+    this.audio = new AudioSystem(this.sound);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.audio.dispose());
 
     const param = new URLSearchParams(window.location.search).get('seed');
     this.seed = param ? hashSeed(param) : Math.floor(Math.random() * 2 ** 31);
@@ -146,7 +148,7 @@ export class GameScene extends Phaser.Scene {
         VIEW_W / 2,
         VIEW_H - HUD_H - 30,
         [
-          '←/A brake   ↑/W lean back   ↓/S lean forward   R reset   T auto-gas   M mute   H debug',
+          '←/A brake   ↑/W lean back   ↓/S lean forward   R reset   T auto-gas   M mute   N music   H debug',
           'BRAKE for wrecks · tuck in behind a rival to draft · ram it to wreck it for a takedown',
         ],
         { ...text(13, '#ffffff'), align: 'center' },
@@ -181,7 +183,7 @@ export class GameScene extends Phaser.Scene {
 
     const kb = this.input.keyboard!;
     this.cursors = kb.createCursorKeys();
-    this.keys = kb.addKeys('W,A,S,D,R,T,H,M,SPACE,ENTER') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = kb.addKeys('W,A,S,D,R,T,H,M,N,SPACE,ENTER') as Record<string, Phaser.Input.Keyboard.Key>;
 
     this.terrain.ensure(this.startX + VIEW_W + 1500);
     const cam = this.cameras.main;
@@ -215,7 +217,11 @@ export class GameScene extends Phaser.Scene {
       if (J(this.keys.T)) this.autoThrottle = !this.autoThrottle;
     }
     if (J(this.keys.H)) this.debug = !this.debug;
-    if (J(this.keys.M)) this.sound.mute = !this.sound.mute;
+    if (J(this.keys.M)) {
+      this.sound.mute = !this.sound.mute;
+      this.flash(this.sound.mute ? 'SOUND OFF' : 'SOUND ON');
+    }
+    if (J(this.keys.N)) this.flash(this.audio.toggleMusic() ? 'MUSIC ON' : 'MUSIC OFF');
 
     // Fixed-step physics (substeps keep the stiff suspension stable)
     const input = this.readInput();
@@ -237,6 +243,16 @@ export class GameScene extends Phaser.Scene {
       this.onRaceEvent(e);
     }
     this.lowFuelBeep();
+    this.audio.update({
+      speed: this.truck.speed,
+      throttle: input.throttle > 0,
+      grounded: this.truck.grounded,
+      engineOn: this.run.engineOn,
+      over: this.run.over,
+      multiplier: this.run.score.multiplier,
+      fuel: this.run.fuel.level,
+      biome: biomeIndex(this.biome.id),
+    });
 
     // Auto-recover when stuck upside down
     this.flippedTimer =
@@ -431,6 +447,13 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  /** Brief centre-screen label for the sound toggles. */
+  private flash(msg: string): void {
+    this.toast.setText(msg).setAlpha(1).setScale(1);
+    this.tweens.killTweensOf(this.toast);
+    this.tweens.add({ targets: this.toast, alpha: 0, delay: 700, duration: 400 });
+  }
+
   private onRunEvent(e: RunEvent): void {
     switch (e.type) {
       case 'snack':
@@ -448,13 +471,15 @@ export class GameScene extends Phaser.Scene {
           });
         }
         if (e.type === 'wrench') {
-          this.beeper.wrench();
+          this.audio.wrench();
           const label = e.repaired > 0 ? `REPAIR -${Math.round(e.repaired * 100)}%` : 'WRENCH';
           this.popup(e.pickup.x, e.pickup.y - 24, label, e.repaired > 0 ? '#9be0ff' : '#c9ced6');
         } else if (e.type === 'snack') {
+          this.audio.snack(e.multiplier);
           const label = e.multiplier > 1 ? `+${e.points} x${e.multiplier}` : `+${e.points}`;
           this.popup(e.pickup.x, e.pickup.y - 18, label, '#ffe066');
         } else {
+          this.audio.fuel();
           this.popup(e.pickup.x, e.pickup.y - 24, `FUEL +${Math.round(FUEL.canRestore * 100)}%`, '#7dff8a');
           this.tweens.killTweensOf(this.warn);
           this.warn.setAlpha(0);
@@ -465,11 +490,13 @@ export class GameScene extends Phaser.Scene {
         this.celebrateCheckpoint(e.index, e.timeAdded, e.points, e.fuelAdded);
         break;
       case 'empty':
+        this.audio.empty();
         this.tweens.killTweensOf(this.warn);
         this.warn.setText('OUT OF FUEL!').setAlpha(1);
         break;
       case 'over':
         this.overAt = this.time.now;
+        this.audio.gameOver();
         this.showGameOver();
         break;
       case 'damage':
@@ -486,7 +513,7 @@ export class GameScene extends Phaser.Scene {
     switch (e.type) {
       case 'bump': {
         const hard = e.damage > 0;
-        this.beeper.thud(hard);
+        this.audio.thud(hard);
         emitDust(this.particles, Math.random, this.biome, e.x, e.y, 0, hard ? 8 : 4);
         if (hard) emitCrash(this.particles, Math.random, e.x, e.y - 8, Math.min(1, e.impact / 520), 0xf2c200);
         if (hard) {
@@ -496,12 +523,12 @@ export class GameScene extends Phaser.Scene {
         break;
       }
       case 'wrecked':
-        this.beeper.thud(true);
+        this.audio.thud(true);
         emitCrash(this.particles, Math.random, e.x, e.y - 10, 1, RIVAL_PAINT[Math.max(0, RIVAL_STYLES.findIndex((st) => st.number === e.number))].body);
         break;
       case 'takedown': {
         const points = this.run.takedown();
-        this.beeper.takedown();
+        this.audio.takedown();
         this.popup(e.x, e.y - 60, `TAKEDOWN #${e.number}  +${points}`, '#ff9f45');
         this.toast.setText(`TAKEDOWN! +${points}`).setAlpha(1).setScale(1.3);
         this.tweens.killTweensOf(this.toast);
@@ -699,6 +726,7 @@ export class GameScene extends Phaser.Scene {
       const t = this.truck;
       emitLanding(this.particles, Math.random, this.biome, t.x, this.terrain.heightAt(t.x), t.speed, airTime);
     }
+    this.audio.land(airTime);
     const bonus = this.run.onLanded(airTime);
     if (airTime < GAMEPLAY.minAirToast) return;
     this.toast
@@ -720,7 +748,7 @@ export class GameScene extends Phaser.Scene {
     const tick = warnTick(this.run.time);
     if (tick !== this.lastBeepTick) {
       this.lastBeepTick = tick;
-      this.beeper.lowFuel();
+      this.audio.lowFuel();
     }
   }
 
@@ -784,7 +812,7 @@ export class GameScene extends Phaser.Scene {
   private celebrateCheckpoint(index: number, timeAdded: number, points: number, fuelAdded: number): void {
     const x = this.checkpointX(index);
     const y = this.terrain.heightAt(x) - 150;
-    this.beeper.chime();
+    this.audio.checkpoint();
     this.hudBar.celebrate(this.run.time);
     this.cameras.main.flash(180, 255, 255, 200, false);
     const colors = [0xffe066, 0xff5a4a, 0x6fc4ff, 0x7dff8a, 0xffffff];

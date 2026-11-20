@@ -9,10 +9,10 @@ Every asset in the game must be listed here with its source and licence.
 | Snack box ("Crunch Crackers"), fuel can, wrench, start gate | Texture | Generated in code (`src/art/props.ts`) | Project licence | Original designs; lettering from the built-in pixel font (`src/art/pixelFont.ts`) |
 | HUD bar, dials, logo plate ("CRUNCH 4x4") | UI      | Drawn in code (`src/game/Hud.ts`)             | Project licence | Original layout inspired by the reference's four-gauge bar; no brand marks |
 | Rival trucks (6 body styles with number plates), wrecks | Texture | Generated in code (`src/art/trucks.ts`) | Project licence | Original designs (wrecks reuse the rival bodies upside down) |
-| Bump, wrench and takedown sounds | Audio | Synthesized at runtime (`src/game/Beeper.ts`) | Project licence | Oscillator tones, no samples; replaced in Phase 6 |
+| Bump, wrench, takedown, pickup, landing, engine and game-over sounds | Audio | Synthesized at runtime (`src/audio/AudioSystem.ts`) | Project licence | Oscillators and filtered noise, no samples |
 | Checkpoint gates (normal and biome-change) | Texture | Generated in code (`src/art/props.ts`) | Project licence | Original design |
-| Warning beeps, checkpoint chime        | Audio   | Synthesized at runtime (`src/game/Beeper.ts`) | Project licence | Oscillator tones, no samples; replaced in Phase 6 |
-| Music                                  | Audio   | _none yet_                                    | n/a             | Phase 6: recompose or license (see roadmap §3) |
+| Warning beeps, checkpoint chime and stinger | Audio | Synthesized at runtime (`src/audio/AudioSystem.ts`) | Project licence | Oscillator tones, no samples |
+| Music (adaptive theme: pad, drums, bass, lead stems) | Audio | Composed for this project (`src/audio/Composition.ts`), synthesized at runtime | Project licence | Original composition (A minor, 132 bpm, Am-F-G-E). Not derived from the original game's music; no samples |
 
 ## Rules
 

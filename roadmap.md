@@ -1,6 +1,6 @@
 # 4x4 Snack Run: Redux Roadmap
 
-> **Status:** Phases 0 to 5 are complete (see `README.md`): the game is a playable alpha with its art pass done. Next up: Phase 6 (audio and remixed music). All art is generated in code (`src/art/`); texture keys (`truck_body`, `rival_0..5`, `wheel`, `snack`, `fuel_can`, `wrench`, `start_gate`, `cp_gate`, and `sky_<biome>`, `trees_<biome>`, ...) are stable so real sprites can drop in.
+> **Status:** Phases 0 to 6 are complete (see `README.md`): the game is a playable alpha with art and an adaptive score and SFX, all generated at runtime. Next up: Phase 7 (progression and retention). All art is generated in code (`src/art/`); texture keys (`truck_body`, `rival_0..5`, `wheel`, `snack`, `fuel_can`, `wrench`, `start_gate`, `cp_gate`, and `sky_<biome>`, `trees_<biome>`, ...) are stable so real sprites can drop in.
 
 An endless-runner redux of a late-90s Flash/Shockwave-era 4x4 racing game. Same spirit (muddy tracks, big trucks, jumps, snack pickups), rebuilt for modern browsers.
 
@@ -138,13 +138,12 @@ An endless-runner redux of a late-90s Flash/Shockwave-era 4x4 racing game. Same 
 
 ### Phase 6: Audio and Remixed Music (1-2 weeks)
 
-- [ ] Source/recreate the original theme in a rights-safe way (see Section 3)
-- [ ] **Remix plan:**
-  - Keep the melodic hook and tempo feel
-  - Change genre treatment (e.g. synthwave, big-beat breakbeat, or funky rock)
-  - Rebuild in layered stems: drums, bass, lead, pad
-  - **Adaptive music:** stems fade in with speed and combo level; low fuel filters the track and adds a heartbeat/alarm; checkpoint stinger
-- [ ] SFX: engine pitch tied to speed, pickup chimes, crunch, ramp landing, low-fuel warning
+- [x] Source/recreate the original theme in a rights-safe way (see Section 3): path 1, recomposed from scratch (`src/audio/Composition.ts`: A minor, 132 bpm, Am-F-G-E); no note of the original tune is used
+- [x] **Remix plan:**
+  - Funky big-beat treatment of an original hook (the original's hook is not reused, so the score is not a derivative)
+  - Built in layered stems: drums, bass, lead, pad
+  - **Adaptive music:** stems fade in with speed and combo level; low fuel closes a lowpass on the track and adds a heartbeat; checkpoint stinger; the theme transposes per biome at each loop start
+- [x] SFX: engine pitch tied to speed (revs in the air), mud-roll hiss, pickup chimes that climb with the combo, fuel gurgle, crunches, ramp landing, engine cough on empty, game-over wah, low-fuel warning
 - **Exit:** the game sounds like the original's spirit but not a copy
 
 ### Phase 7: Progression and Retention (1-2 weeks)

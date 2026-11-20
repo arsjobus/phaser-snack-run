@@ -318,3 +318,28 @@ export const FX = {
   /** Tire tracks: a mark every `spacing` px, never joined across a gap larger than `maxGap`. */
   tracks: { minSpeed: 120, spacing: 12, maxGap: 90, max: 700, alpha: 0.55, width: 3 },
 } as const;
+
+/** Audio (Phase 6): an original adaptive score plus synthesized SFX, all generated at runtime. */
+export const AUDIO = {
+  /** Tempo of the original theme; one bar is 16 sixteenth-note steps, the hook runs 4 bars. */
+  bpm: 132,
+  musicVolume: 0.5,
+  sfxVolume: 0.8,
+  /** How far ahead (s) the sequencer schedules notes on the audio clock. */
+  lookahead: 0.25,
+  /** Time constant (s) of stem fades, so layers swell in rather than switch. */
+  stemFade: 0.5,
+  /**
+   * Stem thresholds: [from, to] ranges of speed (0..1 of top speed) over which a layer fades in.
+   * The pad is always on; drums join first, then bass; the lead joins with speed or combo.
+   */
+  drumsSpeed: [0.12, 0.35],
+  bassSpeed: [0.3, 0.6],
+  leadSpeed: [0.62, 0.92],
+  /** The lead also joins from combo x2 (quietly) to this multiplier (full). */
+  leadCombo: [2, 5],
+  /** Low fuel closes a lowpass on the music from `open` Hz (tank at FUEL.low) down to `closed` (dry). */
+  lowFuelCutoff: { open: 18000, closed: 800 },
+  /** Semitone shift of the whole theme per biome (forest, desert, snow, swamp), applied at a loop start. */
+  biomeTranspose: [0, 2, -2, 3],
+} as const;

@@ -2,7 +2,7 @@
 
 An endless-runner redux of a classic Flash-era 4x4 racer. Muddy tracks, big trucks, ramps, snacks and fuel.
 
-**Status:** Phases 0 to 4 are done: setup, core driving, fuel/snacks/scoring, the HUD with checkpoints, and now rivals, collisions and wrecks. That makes it a playable alpha. See [`roadmap.md`](roadmap.md).
+**Status:** Phases 0 to 6 are done: setup, core driving, fuel/snacks/scoring, the HUD with checkpoints, rivals, collisions and wrecks, the art pass, and now audio (an adaptive original score plus synthesized SFX). That makes it a playable alpha with sound. See [`roadmap.md`](roadmap.md).
 
 ## Quick start
 
@@ -23,11 +23,23 @@ npm run dev        # http://localhost:5173
 
 ## Controls
 
-←/A brake/reverse · ↑/W lean back · ↓/S lean forward · →/D gas · R reset upright · T toggle auto-gas · M mute · H debug overlay · SPACE/ENTER/tap restart after game over
+←/A brake/reverse · ↑/W lean back · ↓/S lean forward · →/D gas · R reset upright · T toggle auto-gas · M mute all · N music on/off · H debug overlay · SPACE/ENTER/tap restart after game over
 
 Auto-gas is **on** by default (endless-runner mode: the truck drives itself, you brake and lean). Flip `GAMEPLAY.autoGas` in `src/config.ts` or press T for manual throttle.
 
 Add `?seed=anything` to the URL for a repeatable course (used later for daily challenges).
+
+## What's in Phase 6
+
+Everything you hear is synthesized at runtime with Web Audio (no audio files). Browsers keep audio locked until the first key press or tap, so the music starts then. `M` mutes everything, `N` just the music.
+
+- **Score:** an original theme (`src/audio/Composition.ts`): a funky big-beat groove in A minor at 132 bpm over Am-F-G-E, four stems (pad, drums, bass, lead). It is **not** a remix of the original game's music (see roadmap §3, path 1: recompose).
+- **Adaptive mix** (`src/audio/Mix.ts`, tuned in `AUDIO` in `src/config.ts`): the pad is always on; drums fade in with speed, then bass; the lead joins at high speed or from combo x2 (full at x5). Stems swell over about half a second rather than switching. A checkpoint plays a bright stinger in the current key; each biome transposes the theme (0, +2, -2, +3 semitones) at the next 4-bar loop start so chords never clash.
+- **Low fuel:** below 25% a lowpass closes on the music (dry tank: muffled) and a soft lub-dub heartbeat starts, alongside the dial's warning beep.
+- **Engine:** two oscillators (saw + sub square) pitched by speed and throttle, revving higher in the air, cut when the tank is dry (with a cough), plus a mud-roll hiss that follows ground speed.
+- **SFX:** snack chime that climbs a pentatonic scale with the combo, fuel gurgle, wrench, dull knock vs. metal crunch for bumps, landing thump scaled by air time, takedown fanfare, game-over wah.
+- **Structure:** the notes are scheduled ahead on the audio clock by a pure `Sequencer` (unit-tested without a browser); `AudioSystem` renders them. A scene restart disposes the old system so nothing doubles up.
+- Tests cover the stem thresholds, the low-fuel filter curve, engine and snack pitch, the pattern data, sequencer timing and gating, the heartbeat, loop-aligned transposition and resync after a stall.
 
 ## What's in Phase 5
 
@@ -100,7 +112,6 @@ src/
     Rival.ts           rival truck + AI, lanes, liveries (pure TS)
     Race.ts            rival spawning, bumps, takedowns, draft, position (pure TS)
     RivalView.ts       rival visuals (far lane is higher/smaller/darker)
-    Beeper.ts          synthesized warning beeps and chime
     Parallax.ts        tiling background layers, one set per biome, cross-faded
     Biomes.ts          biome palettes, rotation by checkpoint, ground segments (pure TS)
     Particles.ts       capped particle pool (pure TS)
@@ -108,11 +119,12 @@ src/
     TrackMarks.ts      tire-track segments (pure TS)
     Rotation.ts        nearest pre-rendered rotation frame (pure TS)
     Input.ts, Rng.ts
+  audio/               Composition.ts (the theme), Sequencer.ts + Mix.ts (pure, tested), AudioSystem.ts (Web Audio: music, engine, SFX)
   art/                 procedural art: trucks.ts (6 bodies + rotation strips), backdrops.ts (per biome), props.ts, pixelFont.ts
   scenes/
     BootScene.ts       builds every texture from src/art
     GameScene.ts       loop, camera, HUD, input
-tests/                 Vitest: terrain, physics, fuel, score, pickups, run, HUD, checkpoints, race, biomes, particles, tracks
+tests/                 Vitest: audio, terrain, physics, fuel, score, pickups, run, HUD, checkpoints, race, biomes, particles, tracks
 docs/GDD.md            one-page design doc
 ASSETS.md              asset and licence register
 ```

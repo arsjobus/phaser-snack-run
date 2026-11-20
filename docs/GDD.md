@@ -35,7 +35,8 @@ Drive → grab snacks and fuel → dodge or bump rivals → hit ramps for air �
 | R     | Reset upright                         |
 | T     | Toggle auto-gas (endless-runner mode) |
 | Space / Enter / tap | Restart after game over |
-| M     | Mute                                  |
+| M     | Mute all sound                        |
+| N     | Music on/off                          |
 | H     | Debug overlay                         |
 
 ## Out of scope for v1
