@@ -165,7 +165,14 @@ The original was pseudo-3D: a wide dirt field with trucks driving at different d
 - [x] Pickups sit in lanes (snack trails wander one lane at a time; cans stay in the middle lanes and can be grabbed one lane over); a lane radar under the race position shows what is ahead, lane by lane
 - [x] Close calls: swerving away from an obstacle at the last moment and passing it clean pays a BONUS
 
-- [ ] Actually the up and down arrows should be used to change the lane but lane changing isn't that intuitive and the pickups could use a under shadow to better help show what lane they're on. The player should be able to hold down up or down arrow keys to change the lane smoothly so its not like a deliberate change but feels more 3d like the original game
+### Phase 7.5: Change Requests and Feedback
+
+- [ ] The up and down arrows should be used to change the lane but lane changing isn't that intuitive and the pickups could use a under shadow to better help show what lane they're on when they're at ground level especially. The player should be able to hold down up or down arrow keys to change the lane smoothly so its not like a deliberate change but feels more 3d like the original game
+- [ ] The patches of grass should be placed on all lanes scattered
+- [ ] The player should be able to collect the pickups so long as they collide with the player character from any lane or depth.
+- [ ] There's no need to have the player to control the car while it's in air so remove that feature expecially since up and down arrows will be used to traverse up and down the 'lanes'
+- [ ] The player's car shouldn't move all that fast at all unless they press the right arrow key to accelerate and get up to speed or else it's like the game can play itself
+- [ ] The player's logo on thier car should best say CRUNCH like the other car sprite and not just be a circles logo
 
 ### Phase 8: Polish, Platform, and Launch (1-2 weeks)
 
