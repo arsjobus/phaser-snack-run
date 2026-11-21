@@ -173,6 +173,8 @@ The original was pseudo-3D: a wide dirt field with trucks driving at different d
 - [ ] There's no need to have the player to control the car while it's in air so remove that feature expecially since up and down arrows will be used to traverse up and down the 'lanes'
 - [ ] The player's car shouldn't move all that fast at all unless they press the right arrow key to accelerate and get up to speed or else it's like the game can play itself
 - [ ] The player's logo on thier car should best say CRUNCH like the other car sprite and not just be a circles logo
+- [ ] Smooth out the the race track more because it's like the vertices can be seen too much
+- [ ] The race track is too trough looking and should look more like the original images I've ever provided. That trough like look combined with the bad lane switching controls / mechanic gives me a headache
 
 ### Phase 8: Polish, Platform, and Launch (1-2 weeks)
 
