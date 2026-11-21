@@ -1,8 +1,7 @@
 import Phaser from 'phaser';
-import { AUDIO, FUEL } from '../config';
+import { AUDIO } from '../config';
 import { BIOME_LIST } from '../game/Biomes';
-import { Sequencer, type SeqEvent } from './Sequencer';
-import { engineFreq, lowFuelCutoff, midiToHz, snackNote, speedNorm, stemLevels, type StemLevels } from './Mix';
+import { engineFreq, midiToHz, snackNote, speedNorm } from './Mix';
 
 /** What the audio needs to know each frame. */
 export interface AudioState {
@@ -20,58 +19,37 @@ export interface AudioState {
   biome: number;
 }
 
-type Stem = keyof StemLevels;
-
 /**
- * Everything you hear, synthesized at runtime with Web Audio (no audio files):
- *  - the adaptive score: pad / drums / bass / lead stems, scheduled by `Sequencer`, faded by speed
- *    and combo, lowpass-filtered as the tank runs low (plus a heartbeat) and stung at checkpoints;
- *  - the engine, pitched by speed, plus a mud-roll hiss;
+ * Music comes from the bgm.mp3 audio asset. One-shot and engine sounds are synthesized at runtime:
+ *  - synthesized engine, mud-roll hiss and stingers;
  *  - one-shot SFX: pickups, crunches, landings, warnings.
  * Everything feeds Phaser's master mute node, so M mutes it all. The context stays suspended until
  * the first key press or tap; until then every call here is a no-op.
  */
 export class AudioSystem {
   private ctx: AudioContext | null = null;
-  private seq = new Sequencer();
-  private started = false;
   private stopped = false;
   private musicOn = true;
   private noise: AudioBuffer | null = null;
+  private bgm: (Phaser.Sound.BaseSound & { setVolume(value: number): void }) | null = null;
 
-  private musicIn: GainNode | null = null;
-  private musicFilter: BiquadFilterNode | null = null;
-  private musicOut: GainNode | null = null;
   private sfx: GainNode | null = null;
-  private stems = {} as Record<Stem, GainNode>;
   private engine: { oscs: OscillatorNode[]; filter: BiquadFilterNode; gain: GainNode } | null = null;
   private roll: { src: AudioBufferSourceNode; filter: BiquadFilterNode; gain: GainNode } | null = null;
-  private lastBiome = 0;
 
   constructor(sound: Phaser.Sound.BaseSoundManager) {
     if (!(sound instanceof Phaser.Sound.WebAudioSoundManager)) return;
     const ctx = sound.context;
     this.ctx = ctx;
 
-    this.musicOut = ctx.createGain();
-    this.musicOut.gain.value = AUDIO.musicVolume;
-    this.musicFilter = ctx.createBiquadFilter();
-    this.musicFilter.type = 'lowpass';
-    this.musicFilter.frequency.value = AUDIO.lowFuelCutoff.open;
-    this.musicIn = ctx.createGain();
-    this.musicIn.connect(this.musicFilter);
-    this.musicFilter.connect(this.musicOut);
-    this.musicOut.connect(sound.masterMuteNode);
     this.sfx = ctx.createGain();
     this.sfx.gain.value = AUDIO.sfxVolume;
     this.sfx.connect(sound.masterMuteNode);
 
-    for (const stem of ['pad', 'drums', 'bass', 'lead'] as const) {
-      const g = ctx.createGain();
-      g.gain.value = 0;
-      g.connect(this.musicIn);
-      this.stems[stem] = g;
-    }
+    this.bgm = sound.add('bgm', { loop: true, volume: AUDIO.musicVolume }) as
+      | (Phaser.Sound.BaseSound & { setVolume(value: number): void })
+      | null;
+
     this.noise = this.makeNoise(ctx);
   }
 
@@ -82,153 +60,27 @@ export class AudioSystem {
   /** M-independent switch for just the music (N key). Returns the new state. */
   toggleMusic(): boolean {
     this.musicOn = !this.musicOn;
-    if (this.ctx && this.musicOut) {
-      this.musicOut.gain.setTargetAtTime(this.musicOn ? AUDIO.musicVolume : 0, this.ctx.currentTime, 0.05);
-    }
+    this.bgm?.setVolume(this.musicOn ? AUDIO.musicVolume : 0);
     return this.musicOn;
   }
 
-  /** Per-frame: schedule music, fade stems, move the filter and drive the engine. */
+  /** Per-frame: keep the background track playing and drive the engine. */
   update(s: AudioState): void {
     const ctx = this.ctx;
     if (!ctx || ctx.state !== 'running' || this.stopped) return;
     const now = ctx.currentTime;
-    if (!this.started) {
-      this.started = true;
-      this.seq.resync(now);
-    } else if (this.seq.time < now - 0.05) {
-      this.seq.resync(now); // the tab stalled or the context was suspended: pick up from here
-    }
-    if (s.biome !== this.lastBiome) {
-      this.lastBiome = s.biome;
-      this.seq.setTranspose(AUDIO.biomeTranspose[s.biome % AUDIO.biomeTranspose.length] ?? 0);
+
+    if (this.bgm && !this.bgm.isPlaying) {
+      this.bgm.play({ loop: true, volume: this.musicOn ? AUDIO.musicVolume : 0 });
     }
 
-    const levels = stemLevels(s.speed, s.multiplier, s.over);
-    for (const stem of Object.keys(levels) as Stem[]) {
-      this.stems[stem].gain.setTargetAtTime(levels[stem], now, AUDIO.stemFade);
-    }
-    const dry = s.fuel < FUEL.low && !s.over;
-    this.musicFilter!.frequency.setTargetAtTime(lowFuelCutoff(s.over ? 1 : s.fuel), now, 0.25);
-    for (const e of this.seq.advance(now + AUDIO.lookahead, levels, dry)) this.play(e);
     this.updateEngine(s, now);
-  }
-
-  // ---- music voices ---------------------------------------------------------------------------
-
-  private play(e: SeqEvent): void {
-    switch (e.stem) {
-      case 'drums':
-        this.drum(e.voice, e.time, e.vel);
-        break;
-      case 'bass':
-        this.bass(e.midi, e.time, e.dur);
-        break;
-      case 'lead':
-        this.lead(e.midi, e.time, e.dur);
-        break;
-      case 'pad':
-        this.pad(e.midis, e.time, e.dur);
-        break;
-      case 'heart':
-        this.heart(e.voice, e.time);
-        break;
-    }
-  }
-
-  private drum(voice: 'kick' | 'snare' | 'hat' | 'ohat', t: number, vel: number): void {
-    const out = this.stems.drums;
-    if (voice === 'kick') {
-      const o = this.osc('sine', 150, t, out, 0.0001);
-      o.osc.frequency.exponentialRampToValueAtTime(42, t + 0.12);
-      this.env(o.gain, t, 0.002, 0.26, 0.9 * vel);
-      o.osc.stop(t + 0.3);
-    } else if (voice === 'snare') {
-      this.noiseHit(t, 0.17, 0.5 * vel, 'highpass', 1500, out);
-      const o = this.osc('triangle', 190, t, out, 0.0001);
-      o.osc.frequency.exponentialRampToValueAtTime(120, t + 0.1);
-      this.env(o.gain, t, 0.002, 0.12, 0.35 * vel);
-      o.osc.stop(t + 0.16);
-    } else {
-      this.noiseHit(t, voice === 'ohat' ? 0.2 : 0.04, 0.22 * vel, 'highpass', 7000, out);
-    }
-  }
-
-  private bass(midi: number, t: number, dur: number): void {
-    const out = this.stems.bass;
-    const f = midiToHz(midi);
-    const o = this.osc('sawtooth', f, t, out, 0.0001);
-    const lp = this.ctx!.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.Q.value = 4;
-    lp.frequency.setValueAtTime(900, t);
-    lp.frequency.exponentialRampToValueAtTime(220, t + dur);
-    o.osc.disconnect();
-    o.osc.connect(lp);
-    lp.connect(o.gain);
-    this.env(o.gain, t, 0.005, dur, 0.5);
-    o.osc.stop(t + dur + 0.05);
-    const sub = this.osc('sine', f, t, out, 0.0001);
-    this.env(sub.gain, t, 0.005, dur, 0.4);
-    sub.osc.stop(t + dur + 0.05);
-  }
-
-  private lead(midi: number, t: number, dur: number): void {
-    const out = this.stems.lead;
-    const lp = this.ctx!.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.frequency.value = 3200;
-    const g = this.ctx!.createGain();
-    lp.connect(g);
-    g.connect(out);
-    this.env(g, t, 0.01, dur, 0.22);
-    for (const cents of [-7, 7]) {
-      const o = this.ctx!.createOscillator();
-      o.type = 'sawtooth';
-      o.frequency.value = midiToHz(midi);
-      o.detune.value = cents;
-      o.connect(lp);
-      o.start(t);
-      o.stop(t + dur + 0.1);
-    }
-  }
-
-  private pad(midis: number[], t: number, dur: number): void {
-    const out = this.stems.pad;
-    const lp = this.ctx!.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.frequency.value = 1400;
-    const g = this.ctx!.createGain();
-    lp.connect(g);
-    g.connect(out);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(0.11, t + 0.35);
-    g.gain.setValueAtTime(0.11, t + dur - 0.2);
-    g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.25);
-    for (const m of midis) {
-      for (const cents of [-9, 9]) {
-        const o = this.ctx!.createOscillator();
-        o.type = 'triangle';
-        o.frequency.value = midiToHz(m);
-        o.detune.value = cents;
-        o.connect(lp);
-        o.start(t);
-        o.stop(t + dur + 0.3);
-      }
-    }
-  }
-
-  /** Soft "lub-dub", through the stem-independent music bus so the low-pass muffles it too. */
-  private heart(voice: 'lub' | 'dub', t: number): void {
-    const o = this.osc('sine', voice === 'lub' ? 58 : 48, t, this.musicIn!, 0.0001);
-    this.env(o.gain, t, 0.005, 0.16, voice === 'lub' ? 0.9 : 0.6);
-    o.osc.stop(t + 0.2);
   }
 
   /** Bright checkpoint stinger over the music, in the current key. */
   stinger(): void {
     if (!this.live) return;
-    const root = 69 + this.seq.transpose;
+    const root = 69;
     [0, 4, 7, 12, 16].forEach((n, i) => {
       this.blip('square', midiToHz(root + n), 0.2, 0.1, i * 0.07);
     });
@@ -370,7 +222,7 @@ export class AudioSystem {
     [110, 96, 80, 62].forEach((f, i) => this.blip('square', f, 0.12, 0.3, [0, 0.18, 0.4, 0.75][i]));
   }
 
-  /** Descending "wah-wah" when the run ends. The music is faded out by `update` (all stem levels go to 0). */
+  /** Descending "wah-wah" when the run ends. */
   gameOver(): void {
     if (!this.live) return;
     [64, 62, 60, 57].forEach((m, i) => this.blip('sawtooth', midiToHz(m), i === 3 ? 0.7 : 0.28, 0.14, i * 0.3));
@@ -381,6 +233,7 @@ export class AudioSystem {
   /** Silence everything and release the nodes (scene shutdown / restart). */
   dispose(): void {
     this.stopped = true;
+    this.bgm?.stop();
     const ctx = this.ctx;
     if (!ctx) return;
     const t = ctx.currentTime;
@@ -397,8 +250,7 @@ export class AudioSystem {
     } catch {
       /* already stopped */
     }
-    // Detach the buses so notes already scheduled in the lookahead window fall silent.
-    this.musicOut?.disconnect();
+    // Detach the SFX bus so pending nodes fall silent.
     this.sfx?.disconnect();
     this.engine = null;
     this.roll = null;
@@ -468,7 +320,7 @@ export class AudioSystem {
   }
 }
 
-/** Index of the biome a world position is in, for transposing the theme. */
+/** Index of the biome at a world position. */
 export function biomeIndex(id: string): number {
   return Math.max(0, BIOME_LIST.findIndex((b) => b.id === id));
 }

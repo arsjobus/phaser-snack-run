@@ -24,6 +24,10 @@ export class BootScene extends Phaser.Scene {
     super('Boot');
   }
 
+  preload(): void {
+    this.load.audio('bgm', 'audio/bgm.mp3');
+  }
+
   create(): void {
     makeBackdrops(this);
     if (ART.rotationFrames > 0) {
