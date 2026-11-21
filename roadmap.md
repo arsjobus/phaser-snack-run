@@ -177,6 +177,7 @@ The original was pseudo-3D: a wide dirt field with trucks driving at different d
 - [ ] The race track is too trough looking and should look more like the original images I've ever provided. That trough like look combined with the bad lane switching controls / mechanic gives me a headache
 - [ ] When changing lanes or depth, right? with the vertical arrows keys. However it changes, if the player's car will and does collide with the other car when switching then they should get into a collision and the player takes some damage too - so the player cannot clip through the other cars if they're in the way
 - [ ] But of course, the other cars physics should influence the player's car - so that if the player get rear-ended then it would accelerate the players car as well
+- [ ] From playtesting, there's too much fuel and not enough wrenches for repair
 
 ### Phase 8: Polish, Platform, and Launch (1-2 weeks)
 
