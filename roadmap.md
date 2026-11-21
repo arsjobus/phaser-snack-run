@@ -1,6 +1,6 @@
 # 4x4 Snack Run: Redux Roadmap
 
-> **Status:** Phases 0 to 7 are complete (see `README.md`): the game is a playable alpha with art, an adaptive score and SFX, depth lanes with obstacles, and a garage with saved progress, all generated at runtime. Next up: Phase 8 (polish, platform, and launch). All art is generated in code (`src/art/`); texture keys (`truck_body`, `rival_0..5`, `wheel`, `snack`, `fuel_can`, `wrench`, `start_gate`, `cp_gate`, and `sky_<biome>`, `trees_<biome>`, ...) are stable so real sprites can drop in.
+> **Status:** Phases 0 to 7.5 are complete (see `README.md`): the game is a playable alpha with art, an adaptive score and SFX, depth lanes with obstacles, a garage with saved progress, and the playtest feedback of Phase 7.5 (smooth depth control, solid cars, manual gas), all generated at runtime. Next up: Phase 8 (polish, platform, and launch). All art is generated in code (`src/art/`); texture keys (`truck_body`, `rival_0..5`, `wheel`, `snack`, `fuel_can`, `wrench`, `start_gate`, `cp_gate`, and `sky_<biome>`, `trees_<biome>`, ...) are stable so real sprites can drop in.
 
 An endless-runner redux of a late-90s Flash/Shockwave-era 4x4 racing game. Same spirit (muddy tracks, big trucks, jumps, snack pickups), rebuilt for modern browsers.
 
@@ -159,7 +159,7 @@ An endless-runner redux of a late-90s Flash/Shockwave-era 4x4 racing game. Same 
 The original was pseudo-3D: a wide dirt field with trucks driving at different depths. The two-lane trick from Phase 4 is now a proper field:
 
 - [x] **4 depth lanes** (`LANES` in `src/config.ts`): each lane is drawn higher, smaller and darker; the ground is a set of terraces stepping up and away, like the reference screenshots' field. The terrain (jumps, hills) is the same in every lane
-- [x] **The player changes lanes** (Q/E, or Shift + Up/Down; one lane per press, 0.22 s per lane, also in the air). Only things in (nearly) the same lane collide, so a swerve sideswipes whatever is in the lane you cut through
+- [x] **The player changes lanes** (Q/E, or Shift + Up/Down; one lane per press, 0.22 s per lane, also in the air). *Superseded in Phase 7.5: depth is now continuous and set by holding Up/Down.* Only things in (nearly) the same lane collide, so a swerve sideswipes whatever is in the lane you cut through
 - [x] **Obstacles** in the lanes: rocks and tire stacks (knocked loose, rocks hurt a little, tires only slow you) and logs and boulders (fixed: hit one at speed and you stop dead and take damage). Rows never block more than 2 of 4 lanes, wrecks included
 - [x] **Rivals use all lanes**, dodge wrecks and obstacles with a skill-based chance (a careless rival drives into the rock) and crash for real; they keep clear of the player's lane unless they are far enough up the road to be seen
 - [x] Pickups sit in lanes (snack trails wander one lane at a time; cans stay in the middle lanes and can be grabbed one lane over); a lane radar under the race position shows what is ahead, lane by lane
@@ -167,17 +167,28 @@ The original was pseudo-3D: a wide dirt field with trucks driving at different d
 
 ### Phase 7.5: Change Requests and Feedback
 
-- [ ] The up and down arrows should be used to change the lane but lane changing isn't that intuitive and the pickups could use a under shadow to better help show what lane they're on when they're at ground level especially. The player should be able to hold down up or down arrow keys to change the lane smoothly so its not like a deliberate change but feels more 3d like the original game
-- [ ] The patches of grass should be placed on all lanes scattered
-- [ ] The player should be able to collect the pickups so long as they collide with the player character from any lane or depth.
-- [ ] There's no need to have the player to control the car while it's in air so remove that feature expecially since up and down arrows will be used to traverse up and down the 'lanes'
-- [ ] The player's car shouldn't move all that fast at all unless they press the right arrow key to accelerate and get up to speed or else it's like the game can play itself i.e. no auto gas feature - remove it
-- [ ] The player's logo on thier car should best say CRUNCH like the other car sprite and not just be a circles logo
-- [ ] Smooth out the the race track more because it's like the vertices can be seen too much
-- [ ] The race track is too trough looking and should look more like the original images I've ever provided. That trough like look combined with the bad lane switching controls / mechanic gives me a headache
-- [ ] When changing lanes or depth, right? with the vertical arrows keys. However it changes, if the player's car will and does collide with the other car when switching then they should get into a collision and the player takes some damage too - so the player cannot clip through the other cars if they're in the way
-- [ ] But of course, the other cars physics should influence the player's car - so that if the player get rear-ended then it would accelerate the players car as well
-- [ ] From playtesting, there's too much fuel and not enough wrenches for repair
+- [x] The up and down arrows should be used to change the lane but lane changing isn't that intuitive and the pickups could use a under shadow to better help show what lane they're on when they're at ground level especially. The player should be able to hold down up or down arrow keys to change the lane smoothly so its not like a deliberate change but feels more 3d like the original game
+  - **Done:** The up and down arrows (and W/S) now change depth, held, with easing: depth is continuous (`PlayerLane`, `LANES.moveSpeed`/`moveEase`); every pickup, obstacle, wreck and truck has a ground shadow at its own depth (`GameScene.drawShadows`).
+- [x] The patches of grass should be placed on all lanes scattered
+  - **Done:** Grass tufts (and the biome's scrub, frost and reeds) are scattered over every lane, by world position, far rows first (`GameScene.drawTufts`).
+- [x] The player should be able to collect the pickups so long as they collide with the player character from any lane or depth.
+  - **Done:** Pickups are grabbed by touching the truck at any depth (`PickupField.collect` no longer checks the lane; `LANES.snackBand`/`canBand` are gone).
+- [x] There's no need to have the player to control the car while it's in air so remove that feature expecially since up and down arrows will be used to traverse up and down the 'lanes'
+  - **Done:** Lean is removed (`playerInput` returns lean 0); a mild passive assist (`TruckPhysics.autoLevel`, `PHYSICS.autoLevelStrength`) keeps the truck landing on its wheels.
+- [x] The player's car shouldn't move all that fast at all unless they press the right arrow key to accelerate and get up to speed or else it's like the game can play itself i.e. no auto gas feature - remove it
+  - **Done:** No auto-gas: `GAMEPLAY.autoGas` and the T key are gone, and engine braking (`PHYSICS.coastDrag`) slows the truck when you let go of the gas.
+- [x] The player's logo on thier car should best say CRUNCH like the other car sprite and not just be a circles logo
+  - **Done:** The player's truck wears a CRUNCH badge on the cab door (`roundel` in `src/art/trucks.ts`).
+- [x] Smooth out the the race track more because it's like the vertices can be seen too much
+  - **Done:** Terrain heights are a Catmull-Rom spline (`Terrain.heightAt`/`slopeAt`) and the ground is drawn in 8 px steps, so no vertices show and the wheels see no kinks.
+- [x] The race track is too trough looking and should look more like the original images I've ever provided. That trough like look combined with the bad lane switching controls / mechanic gives me a headache
+  - **Done:** The terraces are replaced by one smooth dirt field: 14 thin slivers with a gentle gradient, a contact line with the tree line and scattered mud patches (`GameScene.drawGround`/`drawMud`).
+- [x] When changing lanes or depth, right? with the vertical arrows keys. However it changes, if the player's car will and does collide with the other car when switching then they should get into a collision and the player takes some damage too - so the player cannot clip through the other cars if they're in the way
+  - **Done:** A vehicle alongside stops the drift (`Race.depthLimits`) and pushing into it is a side-swipe (`Race.sideswipe`): rebound, at least 6% damage, the rival is hurt and credited for a takedown.
+- [x] But of course, the other cars physics should influence the player's car - so that if the player get rear-ended then it would accelerate the players car as well
+  - **Done:** Already true through the truck-to-truck impulses, now covered by a test: a rival rear-ending a parked truck shoves it forward and damages it.
+- [x] From playtesting, there's too much fuel and not enough wrenches for repair
+  - **Done:** Cans restore 30% (was 35%), gaps are 70% to 95% of one can's range (was 50% to 80%), checkpoints give +10% fuel (was 15%); wrenches start at 250 m (was 400) and come every 220 to 420 m (was 450 to 800).
 
 ### Phase 8: Polish, Platform, and Launch (1-2 weeks)
 
@@ -195,16 +206,18 @@ The original was pseudo-3D: a wide dirt field with trucks driving at different d
 | Parameter                 | Start value                 |
 | ------------------------- | --------------------------- |
 | Base fuel drain           | ~1.5% per second (+50% at top speed, +50% by 3 km) |
-| Fuel can restore          | ~35%                        |
-| Max gap between fuel cans | fuel to cross it at the reference pace ≤ 80% of what ONE can restores (ramps from 50% over the first 2.5 km). A literal "80% of a full tank" cannot hold with a 35% can: arriving at a can with a near-empty tank you'd never reach the next one. |
+| Fuel can restore          | ~30%                        |
+| Max gap between fuel cans | fuel to cross it at the reference pace ≤ 95% of what ONE can restores (ramps from 70% over the first 2.5 km; playtests said fuel was too plentiful at 50% to 80%). That leaves a 25 to 45% surplus over what a reference-pace driver burns. |
 | Snack points              | 100 (x combo, max x8; +1 step per 3 pickups in a row) |
 | Distance points           | 10 per metre (furthest point reached) |
 | Air-time bonus            | +50 per 0.25s airborne      |
 | Hit damage (rival or wreck) | 10-25% per hit, scaled by closing speed; free below 170 px/s. Rivals take x2.5 so a takedown is two hard hits |
-| Wrench                    | repairs 30% damage; first at 400 m, then every 450-800 m |
+| Wrench                    | repairs 30% damage; first at 250 m, then every 220-420 m |
 | Takedown                  | +500 BONUS for wrecking a rival you rammed within 3 s |
 | Roadside wrecks           | from 250 m; 10% per flat/hill chunk rising to 30% at 2.5 km; at least 2,400 px apart, never just after a jump; random lane |
-| Lanes                     | 4; 15 px higher and 6% smaller per lane; 0.22 s per lane change; collide when < 0.55 lanes apart; snacks need < 0.75, cans and wrenches < 1.1 |
+| Lanes                     | 4; 15 px higher and 6% smaller per lane; the player drifts at 2.1 lanes/s while Up/Down is held (eased); collide when < 0.55 lanes apart; any pickup is grabbed from any depth |
+| Side-swipe                | a car overlapping in x (118 px; wrecks 106) blocks the drift at 0.55 lanes; pushing in costs the player max(6%, impact damage) while moving, rebound 35%; the same car again after 1.1 s |
+| Engine braking            | extra drag (0.5 per wheel) while neither gas nor brake is held |
 | Obstacles                 | from 150 m (rock), 250 m (tires), 400 m (log), 600 m (boulder); 30% per flat/hill chunk rising to 80% at 3 km, 15% rising to 50% for a second one; rows 420 px apart, at most 2 of 4 lanes blocked (wrecks included) |
 | Obstacle hits             | rock: 0.6x bump damage, takes 35% of the closing speed; tires: no damage, 22%; log: 0.9x, 50%; boulder: 1.3x (up to 33%), 65%; fixed ones cannot hurt again for 0.5 s |
 | Close call                | +50 BONUS for passing an obstacle you swerved away from (it was ahead in the lane you left) |
@@ -215,7 +228,7 @@ The original was pseudo-3D: a wide dirt field with trucks driving at different d
 | Rival speed               | cruise 520-720 px/s by skill, +/-190 rubber band over 700 px |
 | Draft                     | within 260 px behind a rival in your lane: builds over 1 s to +45% engine force, +12% top speed |
 | Checkpoint spacing        | 1,000 m, each segment +150 m longer |
-| Checkpoint clock          | segment length / 8 m/s (+20 s on the first); time left carries over; reaching a gate: +15% fuel, +250 BONUS +10 per second left; a dry clock ends the run |
+| Checkpoint clock          | segment length / 8 m/s (+20 s on the first); time left carries over; reaching a gate: +10% fuel, +250 BONUS +10 per second left; a dry clock ends the run |
 
 ---
 

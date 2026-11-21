@@ -28,7 +28,7 @@ export interface TruckSample {
   y: number;
   /** Forward speed, px/s. */
   speed: number;
-  /** The truck's depth-lane position. Leave it out and pickups in every lane can be grabbed. */
+  /** The truck's depth (informational: pickups are grabbed from any depth). */
   lane?: number;
 }
 
@@ -131,7 +131,7 @@ export class RunModel {
 
     this.pickups.ensure(truck.x + PICKUPS.spawnAhead);
 
-    for (const p of this.pickups.collect(truck.x, truck.y, truck.lane)) {
+    for (const p of this.pickups.collect(truck.x, truck.y)) {
       if (p.kind === 'snack') {
         const multiplier = this.score.multiplier;
         events.push({ type: 'snack', pickup: p, points: this.score.collectSnack(), multiplier });

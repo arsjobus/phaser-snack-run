@@ -102,12 +102,20 @@ export function drawTruck(
     g.slice(ox + wx, oy + cy, 20 * wheel + extra, Math.PI, Math.PI * 2, false);
     g.fillPath();
   };
-  /** Number roundel on the door (a blank painted dot for the player). */
+  /**
+   * Number roundel on the door. The player's truck has no number: it wears a CRUNCH badge (the
+   * snack's name, like the van's side panel) in a roundel-sized spot on the door instead.
+   */
   const roundel = (cx: number, cy: number, r: number): void => {
+    if (number === null) {
+      round(OUT, cx - 26, cy - 8, 52, 16, 3);
+      round(paint.plate, cx - 25, cy - 7, 50, 14, 2);
+      drawPixelTextCentered(g, 'CRUNCH', ox + cx, oy + cy, 2, OUT);
+      return;
+    }
     disc(OUT, cx, cy, r + 1.5);
-    disc(number === null ? 0xffffff : paint.plate, cx, cy, r);
-    if (number === null) disc(paint.stripe, cx, cy, r * 0.55);
-    else drawPixelTextCentered(g, String(number), ox + cx, oy + cy, 2, OUT);
+    disc(paint.plate, cx, cy, r);
+    drawPixelTextCentered(g, String(number), ox + cx, oy + cy, 2, OUT);
   };
   const headlamp = (x: number, y: number): void => {
     rect(LAMP, x, y, 6, 8);
@@ -130,7 +138,7 @@ export function drawTruck(
       rect(GLARE, -7, -25, 8, 4);
       well(-42, 1);
       well(42, 1);
-      roundel(-22, 3, 9);
+      roundel(number === null ? -12 : -22, number === null ? -7 : 3, 9);
       rect(DARK, -42, -36, 56, 3); // roof rack and spotlights
       rect(LAMP, -36, -40, 6, 4);
       rect(LAMP, -20, -40, 6, 4);

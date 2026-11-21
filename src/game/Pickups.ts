@@ -105,16 +105,16 @@ export class PickupField {
   }
 
   /**
-   * Marks and returns the pickups within reach of (x, y). With a `lane` (the truck's lane position)
-   * a pickup must also be in a lane close enough: snacks need to be nearly the same lane, cans and
-   * wrenches may be one lane over. Without one, every lane counts.
+   * Marks and returns the pickups within reach of (x, y). The depth lane does not matter: a pickup
+   * is grabbed by touching the truck from any lane or depth. (Pass a `lane` and `band` only to
+   * restrict the grab to nearby depths, as the old lane rules did.)
    */
-  collect(x: number, y: number, lane?: number): Pickup[] {
+  collect(x: number, y: number, lane?: number, band = Infinity): Pickup[] {
     const got: Pickup[] = [];
     const r2 = PICKUPS.collectRadius * PICKUPS.collectRadius;
     for (const p of this.items) {
       if (p.taken || p.missed) continue;
-      if (lane !== undefined && Math.abs(p.lane - lane) >= (p.kind === 'snack' ? LANES.snackBand : LANES.canBand)) continue;
+      if (lane !== undefined && Math.abs(p.lane - lane) >= band) continue;
       const dx = p.x - x;
       const dy = p.y - y;
       if (dx * dx + dy * dy <= r2) {

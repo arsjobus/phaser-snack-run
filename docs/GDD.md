@@ -7,7 +7,7 @@
 
 ## Pillars
 
-1. **Instantly readable:** one hand, three inputs (gas, brake, lean).
+1. **Instantly readable:** one hand, three inputs (gas, brake, and Up/Down to drift across the field).
 2. **Fuel is the clock:** every run is a question of how far the next can is.
 3. **Rivals are the personality:** numbered, colour-coded trucks that bump, jump and wreck.
 4. **Nostalgic look, modern feel:** chunky colours, 60 fps, instant restarts.
@@ -28,13 +28,11 @@ Drive → grab snacks and fuel → dodge or bump rivals → hit ramps for air �
 
 | Key   | Action                                |
 | ----- | ------------------------------------- |
-| → / D | Gas (auto-gas is on by default)       |
+| → / D | Gas (hold it: there is no auto-gas)   |
 | ← / A | Brake, then reverse                   |
-| ↑ / W | Lean back (nose up)                   |
-| ↓ / S | Lean forward (nose down)              |
-| Q / E (or Shift + ↑ / ↓) | Change lane: further from / nearer to the camera |
+| ↑ / W (or Q) | Hold: drift away from the camera, through the depth field |
+| ↓ / S (or E) | Hold: drift towards the camera |
 | R     | Reset upright                         |
-| T     | Toggle auto-gas (endless-runner mode) |
 | Space / Enter / tap | Restart after game over |
 | G     | Garage (from the game-over screen)    |
 | D     | Daily challenge / free run (from the game-over screen) |

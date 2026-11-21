@@ -22,39 +22,81 @@ export const laneDepth = (f: number, offset = 0): number => LANES.depthBase - LA
 /** True when two lane positions are close enough for the things in them to touch. */
 export const sameLane = (a: number, b: number, band: number = LANES.hitBand): boolean => Math.abs(a - b) < band;
 
+/** What a depth move did this frame. */
+export interface LaneStep {
+  /** The whole lane the player just left (the nearest lane changed), or null. */
+  changedFrom: number | null;
+  /** Set when a limit that is not the edge of the field stopped the move: the index into `limits`. */
+  blocked: 'lo' | 'hi' | null;
+  /** Depth speed (lanes/s) at the moment of the block, always positive. */
+  impactSpeed: number;
+}
+
 /**
- * The player's lane: a wanted lane (whole number) and the animated position that chases it, so a
- * lane change is a quick swerve. Pressing again while moving queues another step.
+ * The player's depth. Holding Up (+1, away from the camera) or Down (-1, towards it) drifts the
+ * truck through the field with a little easing, so it feels like steering through a 3D field
+ * instead of hopping between rails. Other vehicles can limit the move (`lo`/`hi`): pushing into
+ * one stops the truck and rebounds it a little, which the race turns into a side-swipe.
  */
 export class PlayerLane {
-  /** Wanted lane. */
-  target: number = LANES.startLane;
-  /** Current (animated) lane position; this is what collisions and drawing use. */
+  /** Current depth; this is what collisions and drawing use. */
   f: number = LANES.startLane;
-  /** How many lane changes have been made this run. */
+  /** Depth speed (lanes per second, positive = away from the camera). */
+  v = 0;
+  /** What is being held right now (-1, 0 or 1). */
+  dir: -1 | 0 | 1 = 0;
+  /** How many times the nearest whole lane has changed this run. */
   changes = 0;
+  private home: number = LANES.startLane;
 
-  /** Step one lane away from the camera (+1) or towards it (-1). Returns the lane left, or null at the edge. */
-  request(dir: 1 | -1): number | null {
-    const next = clampLane(this.target + dir);
-    if (next === this.target) return null;
-    const from = this.target;
-    this.target = next;
-    this.changes++;
-    return from;
-  }
-
-  update(dt: number): void {
-    const step = dt / LANES.changeTime;
-    this.f = this.target > this.f ? Math.min(this.target, this.f + step) : Math.max(this.target, this.f - step);
+  /** The lane the player is nearest, looking a little ahead in the direction of travel. */
+  get target(): number {
+    return clampLane(Math.round(this.f + this.dir * 0.6));
   }
 
   get swerving(): boolean {
-    return this.f !== this.target;
+    return Math.abs(this.v) > 0.05;
+  }
+
+  /** Move for `dt` seconds with `dir` held, within [lo, hi] (the field edges unless something blocks). */
+  update(dt: number, dir: -1 | 0 | 1, lo = 0, hi = LANES.count - 1): LaneStep {
+    this.dir = dir;
+    const goal = dir * LANES.moveSpeed;
+    this.v += (goal - this.v) * (1 - Math.exp(-LANES.moveEase * dt));
+    if (dir === 0 && Math.abs(this.v) < 0.02) this.v = 0;
+    const step: LaneStep = { changedFrom: null, blocked: null, impactSpeed: 0 };
+    let next = this.f + this.v * dt;
+    const top = Math.min(hi, LANES.count - 1);
+    const bottom = Math.max(lo, 0);
+    if (next > top) {
+      if (hi < LANES.count - 1 && this.v > 0.3 && this.f <= top + 1e-6) {
+        step.blocked = 'hi';
+        step.impactSpeed = this.v;
+      }
+      next = top;
+      this.v = step.blocked ? -this.v * LANES.rebound : 0;
+    } else if (next < bottom) {
+      if (lo > 0 && this.v < -0.3 && this.f >= bottom - 1e-6) {
+        step.blocked = 'lo';
+        step.impactSpeed = -this.v;
+      }
+      next = bottom;
+      this.v = step.blocked ? -this.v * LANES.rebound : 0;
+    }
+    this.f = next;
+    const nearest = Math.round(this.f);
+    if (nearest !== this.home) {
+      step.changedFrom = this.home;
+      this.home = nearest;
+      this.changes++;
+    }
+    return step;
   }
 
   reset(): void {
-    this.target = this.f = LANES.startLane;
+    this.f = this.home = LANES.startLane;
+    this.v = 0;
+    this.dir = 0;
     this.changes = 0;
   }
 }

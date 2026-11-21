@@ -60,20 +60,41 @@ export class Terrain {
     }
   }
 
+  /**
+   * Ground height at x. The samples are joined with a Catmull-Rom spline, so the track is smooth
+   * (no visible corners at the sample spacing, no kinks under the wheels) while still passing
+   * through every sample.
+   */
   heightAt(x: number): number {
     const f = (x - this.originX) / TERRAIN_STEP;
-    if (f <= 0) return this.heights[0];
+    const h = this.heights;
+    if (f <= 0) return h[0];
     const i = Math.floor(f);
-    if (i >= this.heights.length - 1) return this.heights[this.heights.length - 1];
+    if (i >= h.length - 1) return h[h.length - 1];
     const t = f - i;
-    return this.heights[i] * (1 - t) + this.heights[i + 1] * t;
+    const p0 = h[Math.max(0, i - 1)];
+    const p1 = h[i];
+    const p2 = h[i + 1];
+    const p3 = h[Math.min(h.length - 1, i + 2)];
+    return (
+      0.5 *
+      (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (3 * p1 - p0 - 3 * p2 + p3) * t * t * t)
+    );
   }
 
-  /** dy/dx at x (y-down, so negative = uphill to the right). */
+  /** dy/dx at x (y-down, so negative = uphill to the right): the derivative of the same spline. */
   slopeAt(x: number): number {
     const f = (x - this.originX) / TERRAIN_STEP;
-    const i = Math.max(0, Math.min(this.heights.length - 2, Math.floor(f)));
-    return (this.heights[i + 1] - this.heights[i]) / TERRAIN_STEP;
+    const h = this.heights;
+    const i = Math.max(0, Math.min(h.length - 2, Math.floor(f)));
+    const t = Math.max(0, Math.min(1, f - i));
+    const p0 = h[Math.max(0, i - 1)];
+    const p1 = h[i];
+    const p2 = h[i + 1];
+    const p3 = h[Math.min(h.length - 1, i + 2)];
+    const d =
+      0.5 * (p2 - p0 + 2 * (2 * p0 - 5 * p1 + 4 * p2 - p3) * t + 3 * (3 * p1 - p0 - 3 * p2 + p3) * t * t);
+    return d / TERRAIN_STEP;
   }
 
   private difficulty(): number {

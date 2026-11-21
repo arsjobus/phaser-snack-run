@@ -11,7 +11,6 @@ import {
   OBSTACLE_KINDS,
   PX_PER_METER,
   SCROLL_Y0,
-  TERRAIN_STEP,
   TRUCK,
   VIEW_H,
   VIEW_W,
@@ -42,7 +41,7 @@ import { Terrain } from '../game/Terrain';
 import { TruckPhysics } from '../game/TruckPhysics';
 import { TruckView } from '../game/TruckView';
 import { wreckCircles, type Wreck } from '../game/Wrecks';
-import type { InputState } from '../game/Input';
+import { playerInput, type InputState } from '../game/Input';
 import { unlockAchievements, type Achievement } from '../progress/Achievements';
 import { dailySeed, dayKey } from '../progress/Daily';
 import { loadSave, perksFor, recordRun, writeSave, type RunResult, type SaveData } from '../progress/Progress';
@@ -50,6 +49,28 @@ import { defaultStore, type KeyValueStore } from '../progress/Storage';
 
 const FIXED_DT = 1 / 60 / PHYSICS.substeps;
 const TUFT_SPACING = 72;
+/** The ground is drawn in steps of this many px (finer than the terrain samples: the track is a spline). */
+const RENDER_STEP = 8;
+/** Depth of the far edge of the dirt field, and how many slivers it is drawn from (a smooth gradient). */
+const FIELD_DEPTH = LANES.count - 1 + 0.7;
+const FIELD_BANDS = 14;
+const MUD_CELL = 130;
+
+/** Deterministic hash of two integers into [0, 1): scatters tufts and mud patches by world position. */
+function hash01(a: number, b: number): number {
+  let h = Math.imul(a | 0, 0x9e3779b1) ^ Math.imul((b | 0) + 0x7f4a7c15, 0x85ebca6b);
+  h ^= h >>> 15;
+  h = Math.imul(h, 0x2c1b3c6d);
+  h ^= h >>> 12;
+  return (h >>> 0) / 4294967296;
+}
+
+/** Blend two 0xRRGGBB colours (t = 0 gives a, 1 gives b). */
+function mixColor(a: number, b: number, t: number): number {
+  const ch = (sh: number) => Math.round(((a >> sh) & 255) * (1 - t) + ((b >> sh) & 255) * t);
+  return (ch(16) << 16) | (ch(8) << 8) | ch(0);
+}
+
 const GATE_X = GAMEPLAY.startX + 420;
 interface WreckSprite {
   body: Phaser.GameObjects.Image;
@@ -92,6 +113,7 @@ export class GameScene extends Phaser.Scene {
   private particles = new ParticleSystem();
   private tracks = new TrackMarks();
   private decals!: Phaser.GameObjects.Graphics;
+  private shadows!: Phaser.GameObjects.Graphics;
   /** Fractional particle counts carried between frames, per wheel key. */
   private sprayAcc = new Map<string, number>();
   private biome!: Biome;
@@ -104,7 +126,6 @@ export class GameScene extends Phaser.Scene {
 
   private acc = 0;
   private seed = 0;
-  private autoThrottle = GAMEPLAY.autoGas;
   private debug = false;
   private bestAir = 0;
   private flippedTimer = 0;
@@ -124,7 +145,6 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     // Scene instances are reused on restart, so reset every piece of run state here.
     this.acc = 0;
-    this.autoThrottle = GAMEPLAY.autoGas;
     this.debug = false;
     this.bestAir = 0;
     this.flippedTimer = 0;
@@ -163,8 +183,10 @@ export class GameScene extends Phaser.Scene {
     this.parallax = new Parallax(this, this.biome.id);
     this.ground = this.add.graphics().setDepth(1);
     this.decals = this.add.graphics().setDepth(1.2);
+    this.shadows = this.add.graphics().setDepth(1.5);
     this.addStartGate();
     this.truck = new TruckPhysics(this.startX, BASE_Y - 45);
+    this.truck.autoLevel = true; // no air control: a gentle assist keeps it landing on its wheels
     this.view = new TruckView(this, playerTruckKey(this.save.skin));
     this.fx = this.add.graphics().setDepth(4.5);
     this.debugGfx = this.add.graphics().setDepth(5);
@@ -184,8 +206,8 @@ export class GameScene extends Phaser.Scene {
         VIEW_W / 2,
         VIEW_H - HUD_H - 30,
         [
-          '←/A brake   ↑/W lean back   ↓/S lean forward   Q/E change lane   R reset   T auto-gas   M mute   N music   H debug',
-          'Change lanes to dodge rocks, logs and boulders · tuck in behind a rival to draft · ram it for a takedown',
+          'HOLD →/D to accelerate   ←/A brake   ↑/W and ↓/S drift across the field (hold)   R reset   M mute   N music   H debug',
+          'Drift sideways to dodge rocks, logs and boulders · you cannot slip through other cars · tuck in behind a rival to draft',
         ],
         { ...text(13, '#ffffff'), align: 'center' },
       )
@@ -238,18 +260,25 @@ export class GameScene extends Phaser.Scene {
     this.add.image(GATE_X, y, 'start_gate').setOrigin(0.5, 1).setDepth(0.5);
   }
 
+  /** No auto-gas and no air control: the truck only drives while the gas is held. */
   private readInput(): InputState {
     if (this.run.over) return { throttle: 0, brake: 0, lean: 0 };
     const k = this.keys;
     const c = this.cursors;
-    const engine = this.run.engineOn; // a dry tank means no throttle and no brake torque
-    const gas = engine && (c.right.isDown || k.D.isDown || this.autoThrottle);
-    const brake = engine && (c.left.isDown || k.A.isDown);
-    // Shift + Up/Down changes lanes, so the arrows do not also lean while Shift is held.
-    const shift = c.shift.isDown;
-    const back = (c.up.isDown && !shift) || k.W.isDown;
-    const fwd = (c.down.isDown && !shift) || k.S.isDown;
-    return { throttle: gas ? 1 : 0, brake: brake ? 1 : 0, lean: (fwd ? 1 : 0) - (back ? 1 : 0) };
+    return playerInput(
+      { gas: c.right.isDown || k.D.isDown, brake: c.left.isDown || k.A.isDown },
+      this.run.engineOn, // a dry tank means no throttle and no brake torque
+    );
+  }
+
+  /** Up/W (or Q): away from the camera, Down/S (or E): towards it. Held, so the drift is smooth. */
+  private readLaneDir(): -1 | 0 | 1 {
+    if (this.run.over) return 0;
+    const c = this.cursors;
+    const k = this.keys;
+    const far = c.up.isDown || k.W.isDown || k.Q.isDown;
+    const near = c.down.isDown || k.S.isDown || k.E.isDown;
+    return far === near ? 0 : far ? 1 : -1;
   }
 
   update(time: number, delta: number): void {
@@ -260,9 +289,7 @@ export class GameScene extends Phaser.Scene {
       else if (J(this.keys.D)) this.restart(!this.daily);
       else if (J(this.keys.R) || J(this.keys.SPACE) || J(this.keys.ENTER)) this.restart();
     } else {
-      this.readLaneKeys();
       if (J(this.keys.R)) this.recover();
-      if (J(this.keys.T)) this.autoThrottle = !this.autoThrottle;
     }
     if (J(this.keys.H)) this.debug = !this.debug;
     if (J(this.keys.M)) {
@@ -273,7 +300,15 @@ export class GameScene extends Phaser.Scene {
 
     // Fixed-step physics (substeps keep the stiff suspension stable)
     const input = this.readInput();
-    this.lane.update(dt);
+    // Depth: hold Up/Down to drift. A vehicle alongside stops the drift, and rubbing it hurts.
+    const limits = this.race.depthLimits(this.truck, this.lane.f);
+    const laneStep = this.lane.update(dt, this.readLaneDir(), limits.lo, limits.hi);
+    if (laneStep.changedFrom !== null) this.onLaneChanged(laneStep.changedFrom);
+    if (laneStep.blocked) {
+      const by = laneStep.blocked === 'hi' ? limits.hiBy : limits.loBy;
+      const ev = by ? this.race.sideswipe(this.truck, by, laneStep.impactSpeed) : null;
+      if (ev) this.onRaceEvent(ev);
+    }
     this.acc += dt;
     let steps = 0;
     while (this.acc >= FIXED_DT && steps < 40) {
@@ -319,6 +354,7 @@ export class GameScene extends Phaser.Scene {
     this.syncRivals(dt);
     this.syncWrecks(dt);
     this.syncObstacles();
+    this.drawShadows();
     this.updateFx(dt);
     this.drawDecals();
     this.syncGates();
@@ -328,19 +364,10 @@ export class GameScene extends Phaser.Scene {
     this.drawLaneHud();
   }
 
-  /** Q/E (or Shift+Up/Down): one lane further from / nearer to the camera. */
-  private readLaneKeys(): void {
-    const J = Phaser.Input.Keyboard.JustDown;
-    const c = this.cursors;
-    const far = J(this.keys.Q) || (c.shift.isDown && J(c.up));
-    const near = J(this.keys.E) || (c.shift.isDown && J(c.down));
-    const dir = far ? 1 : near ? -1 : 0;
-    if (dir === 0) return;
-    const from = this.lane.request(dir);
-    if (from === null) return;
+  /** The player drifted across a lane boundary: score the dodge, whoosh, kick up a little mud. */
+  private onLaneChanged(from: number): void {
     this.run.laneChanged(this.truck.x, from);
     this.audio.swerve();
-    // A little mud kicked up at the wheels as the truck slews across.
     const t = this.truck;
     emitDust(this.particles, Math.random, this.biome, t.x - 30, this.terrain.heightAt(t.x) - laneLift(from), t.speed, 5, 0.8);
   }
@@ -364,18 +391,19 @@ export class GameScene extends Phaser.Scene {
   private drawGround(): void {
     const cam = this.cameras.main;
     const g = this.ground;
-    const x0 = Math.floor(cam.scrollX / TERRAIN_STEP) * TERRAIN_STEP - TERRAIN_STEP;
-    const x1 = cam.scrollX + VIEW_W + TERRAIN_STEP * 2;
+    const x0 = Math.floor(cam.scrollX / RENDER_STEP) * RENDER_STEP - RENDER_STEP;
+    const x1 = cam.scrollX + VIEW_W + RENDER_STEP * 2;
     const bottom = cam.scrollY + VIEW_H + 80;
     g.clear();
 
-    // Paint one strip of terrain between xa and xb. Segment borders sit on terrain sample steps
-    // (or are clipped to them), so neighbouring biomes meet exactly at the checkpoint gate.
+    // Paint one strip of terrain between xa and xb, in steps of RENDER_STEP (the track is a smooth
+    // spline, so the strips follow it without visible corners). Segment borders are clipped to the
+    // step grid, so neighbouring biomes meet exactly at the checkpoint gate.
     const strip = (color: number, topOffset: number, bottomOffset: number | null, xa: number, xb: number) => {
       g.fillStyle(color, 1);
       g.beginPath();
       g.moveTo(xa, this.terrain.heightAt(xa) + topOffset);
-      for (let x = Math.ceil(xa / TERRAIN_STEP) * TERRAIN_STEP; x < xb; x += TERRAIN_STEP) {
+      for (let x = Math.ceil(xa / RENDER_STEP) * RENDER_STEP; x < xb; x += RENDER_STEP) {
         if (x > xa) g.lineTo(x, this.terrain.heightAt(x) + topOffset);
       }
       g.lineTo(xb, this.terrain.heightAt(xb) + topOffset);
@@ -384,7 +412,7 @@ export class GameScene extends Phaser.Scene {
         g.lineTo(xa, bottom);
       } else {
         g.lineTo(xb, this.terrain.heightAt(xb) + bottomOffset);
-        for (let x = Math.floor(xb / TERRAIN_STEP) * TERRAIN_STEP; x > xa; x -= TERRAIN_STEP) {
+        for (let x = Math.floor(xb / RENDER_STEP) * RENDER_STEP; x > xa; x -= RENDER_STEP) {
           if (x < xb) g.lineTo(x, this.terrain.heightAt(x) + bottomOffset);
         }
         g.lineTo(xa, this.terrain.heightAt(xa) + bottomOffset);
@@ -398,58 +426,128 @@ export class GameScene extends Phaser.Scene {
       const { x0: xa, x1: xb } = seg;
       strip(c.dirt, 0, null, xa, xb);
       strip(c.deep, 44, null, xa, xb);
-      strip(c.crust, 0, 10, xa, xb); // sunlit crust
-      strip(c.crustShadow, 10, 15, xa, xb);
-      strip(c.rut1, 22, 26, xa, xb); // tire ruts, like the reference's rutted mud
-      strip(c.rut2, 33, 36, xa, xb);
-      // The other lanes' roads: terraces of dirt stepping up and away, like the original's wide field.
-      // Drawn from the furthest lane down so each nearer terrace covers the foot of the one behind it.
-      for (let k = LANES.count - 1; k >= 1; k--) {
-        const lift = laneLift(k);
-        strip(shade(c.crust, 0.86 - 0.06 * k), -lift, 0, xa, xb); // the terrace's face
-        strip(c.crustShadow, -lift + 5, -lift + 8, xa, xb); // a rut along the lane
-        strip(shade(c.crust, 1.08 - 0.05 * k), -lift, -lift + 3, xa, xb); // sunlit lip
+      // The dirt field behind the near lane: one wide, flat field like the reference's, drawn from
+      // the far edge down in thin slivers that darken a little with distance. There are no steps or
+      // lips, so it reads as open ground rather than a staircase of troughs.
+      for (let i = FIELD_BANDS; i >= 1; i--) {
+        const f = (FIELD_DEPTH * i) / FIELD_BANDS;
+        const nearer = (FIELD_DEPTH * (i - 1)) / FIELD_BANDS;
+        strip(shade(c.crust, 1 - 0.05 * f), -laneLift(f), -laneLift(nearer) + 1.5, xa, xb);
       }
+      strip(shade(c.crust, 0.6), -laneLift(FIELD_DEPTH) - 2, -laneLift(FIELD_DEPTH) + 1, xa, xb); // contact line with the tree line
+      strip(c.crust, 0, 10, xa, xb); // the near lane's sunlit crust
+      strip(c.crustShadow, 10, 15, xa, xb);
+      strip(c.rut1, 22, 26, xa, xb); // tire ruts in the foreground, like the reference's rutted mud
+      strip(c.rut2, 33, 36, xa, xb);
+      this.drawMud(seg.biome, xa, xb);
       this.drawTufts(seg.biome, xa, xb);
     }
   }
 
-  /** Verge tufts (deterministic by world position): grass, dry scrub, frost or reeds. */
+  /** Dark mud patches scattered over the whole field (deterministic by world position). */
+  private drawMud(biome: Biome, xa: number, xb: number): void {
+    const g = this.ground;
+    const c = biome.ground;
+    const patch = mixColor(c.crust, c.crustShadow, 0.75);
+    for (let k = Math.floor(xa / MUD_CELL) - 1; k * MUD_CELL < xb; k++) {
+      for (let j = 0; j < 2; j++) {
+        if (hash01(k, 11 + j) > 0.55) continue;
+        const x = k * MUD_CELL + hash01(k, 21 + j) * MUD_CELL;
+        if (x < xa || x > xb) continue;
+        const f = hash01(k, 31 + j) * (FIELD_DEPTH - 0.1);
+        const sc = laneScale(f);
+        const y = this.terrain.heightAt(x) - laneLift(f) + 3;
+        g.fillStyle(patch, 0.45);
+        g.fillEllipse(x, y, (46 + hash01(k, 41 + j) * 80) * sc, (6 + hash01(k, 51 + j) * 6) * sc);
+      }
+    }
+  }
+
+  /**
+   * Verge tufts (grass, dry scrub, frost or reeds), scattered by world position over EVERY lane of
+   * the field, drawn from the far rows to the near ones so nearer tufts cover farther ones.
+   */
   private drawTufts(biome: Biome, xa: number, xb: number): void {
     const g = this.ground;
     const { color, shape } = biome.tuft;
-    g.fillStyle(color, 1);
-    for (let k = Math.floor(xa / TUFT_SPACING) - 1; k * TUFT_SPACING < xb; k++) {
-      const r = ((Math.imul(k, 2654435761) >>> 0) % 1000) / 1000;
-      if (r > 0.6) continue;
-      const x = k * TUFT_SPACING + r * 90;
-      if (x < xa || x > xb) continue;
-      const y = this.terrain.heightAt(x) + 1;
-      switch (shape) {
-        case 'grass':
-          g.fillTriangle(x - 5, y, x - 1, y, x - 4, y - 9);
-          g.fillTriangle(x - 2, y, x + 2, y, x, y - 12);
-          g.fillTriangle(x + 1, y, x + 5, y, x + 4, y - 8);
-          break;
-        case 'scrub': // low, wide dry bush with a woody centre
-          g.fillTriangle(x - 9, y, x - 2, y, x - 7, y - 7);
-          g.fillTriangle(x - 4, y, x + 5, y, x + 1, y - 10);
-          g.fillTriangle(x + 2, y, x + 9, y, x + 7, y - 6);
-          break;
-        case 'frost': // snow clumps with an icy crystal
-          g.fillEllipse(x, y - 2, 16, 6);
-          g.fillTriangle(x - 2, y - 3, x + 2, y - 3, x, y - 11);
-          break;
-        case 'reed': // tall thin blades with a cattail
-          g.fillRect(x - 4, y - 16, 1.5, 16);
-          g.fillRect(x, y - 20, 1.5, 20);
-          g.fillRect(x + 4, y - 14, 1.5, 14);
-          g.fillStyle(0x5b3a1e, 1);
-          g.fillRect(x - 0.5, y - 26, 3, 7);
-          g.fillStyle(color, 1);
-          break;
+    const rows = 5;
+    for (let row = rows - 1; row >= 0; row--) {
+      for (let k = Math.floor(xa / TUFT_SPACING) - 1; k * TUFT_SPACING < xb; k++) {
+        if (hash01(k, 100 + row) > 0.17) continue;
+        const x = k * TUFT_SPACING + hash01(k, 200 + row) * TUFT_SPACING;
+        if (x < xa || x > xb) continue;
+        const f = -0.1 + ((row + hash01(k, 300 + row)) * (LANES.count - 0.7)) / rows;
+        this.tuft(g, shape, shade(color, 1 - 0.07 * f), x, this.terrain.heightAt(x) - laneLift(f) + 1, laneScale(f));
       }
     }
+  }
+
+  /** One tuft standing at (x, y), `s` times its full size. */
+  private tuft(g: Phaser.GameObjects.Graphics, shape: Biome['tuft']['shape'], color: number, x: number, y: number, s: number): void {
+    g.fillStyle(color, 1);
+    switch (shape) {
+      case 'grass':
+        g.fillTriangle(x - 5 * s, y, x - 1 * s, y, x - 4 * s, y - 9 * s);
+        g.fillTriangle(x - 2 * s, y, x + 2 * s, y, x, y - 12 * s);
+        g.fillTriangle(x + 1 * s, y, x + 5 * s, y, x + 4 * s, y - 8 * s);
+        break;
+      case 'scrub': // low, wide dry bush with a woody centre
+        g.fillTriangle(x - 9 * s, y, x - 2 * s, y, x - 7 * s, y - 7 * s);
+        g.fillTriangle(x - 4 * s, y, x + 5 * s, y, x + 1 * s, y - 10 * s);
+        g.fillTriangle(x + 2 * s, y, x + 9 * s, y, x + 7 * s, y - 6 * s);
+        break;
+      case 'frost': // snow clumps with an icy crystal
+        g.fillEllipse(x, y - 2 * s, 16 * s, 6 * s);
+        g.fillTriangle(x - 2 * s, y - 3 * s, x + 2 * s, y - 3 * s, x, y - 11 * s);
+        break;
+      case 'reed': // tall thin blades with a cattail
+        g.fillRect(x - 4 * s, y - 16 * s, 1.5 * s, 16 * s);
+        g.fillRect(x, y - 20 * s, 1.5 * s, 20 * s);
+        g.fillRect(x + 4 * s, y - 14 * s, 1.5 * s, 14 * s);
+        g.fillStyle(0x5b3a1e, 1);
+        g.fillRect(x - 0.5 * s, y - 26 * s, 3 * s, 7 * s);
+        break;
+    }
+  }
+
+  /**
+   * Soft ground shadows under pickups, obstacles, wrecks and every truck, drawn on the ground at
+   * the thing's own depth. They tell you which lane something is in at a glance (a snack floating
+   * at truck height is hard to place in depth without one), and a pickup's shadow tightens as it
+   * gets closer to the ground.
+   */
+  private drawShadows(): void {
+    const g = this.shadows;
+    g.clear();
+    const cam = this.cameras.main;
+    const left = cam.scrollX - 120;
+    const right = cam.scrollX + VIEW_W + 120;
+    const blob = (x: number, lane: number, w: number, h: number, alpha: number) => {
+      const sc = laneScale(lane);
+      g.fillStyle(0x000000, alpha);
+      g.fillEllipse(x, this.terrain.heightAt(x) - laneLift(lane) + 2 * sc, w * sc, h * sc);
+    };
+    for (const p of this.run.pickups.items) {
+      if (p.taken || p.x < left || p.x > right) continue;
+      const height = this.terrain.heightAt(p.x) - p.y;
+      const near = Math.max(0, Math.min(1, 1 - height / 110)); // 1 on the ground, fading as it floats higher
+      const w = (p.kind === 'wrench' ? 34 : 26) * (0.65 + 0.35 * near);
+      blob(p.x, p.lane, w, 8 * (0.65 + 0.35 * near), 0.14 + 0.24 * near);
+    }
+    for (const o of this.run.obstacles.items) {
+      if (!o.solid || o.x < left || o.x > right) continue;
+      blob(o.x, o.lane, OBSTACLE_KINDS[o.kind].radius * 2 + (OBSTACLE_KINDS[o.kind].offsets.length > 1 ? 50 : 14), 9, 0.3);
+    }
+    for (const w of this.run.wrecks.items) {
+      if (!w.solid || w.x < left || w.x > right) continue;
+      blob(w.x, w.lane, 112, 12, 0.28);
+    }
+    for (const r of this.race.rivals) {
+      if (r.truck.x < left || r.truck.x > right) continue;
+      blob(r.truck.x, r.laneF, 116, 13, r.truck.grounded ? 0.3 : 0.18);
+    }
+    const t = this.truck;
+    blob(t.x, this.lane.f, 116, 13, t.grounded ? 0.32 : 0.2);
   }
 
   /** Tire tracks on the crust, in the colour of the biome they were laid in. */
@@ -758,8 +856,10 @@ export class GameScene extends Phaser.Scene {
     }
     if (this.smokeClock <= 0) this.smokeClock = dmg >= 0.75 ? 0.07 : 0.14;
 
-    this.wheelFx('p', t.wheelContacts, t.speed, dt, this.lane.f);
-    for (const r of this.race.rivals) this.wheelFx(`r${r.id}`, r.truck.wheelContacts, r.truck.speed, dt, r.laneF);
+    this.wheelFx('p', t.wheelContacts, t.speed, dt, this.lane.f, !this.lane.swerving);
+    for (const r of this.race.rivals) {
+      this.wheelFx(`r${r.id}`, r.truck.wheelContacts, r.truck.speed, dt, r.laneF, Math.abs(r.laneF - Math.round(r.laneF)) <= 0.2, true);
+    }
 
     this.particles.update(dt, (x) => this.terrain.heightAt(x));
     const g = this.fx;
@@ -805,23 +905,29 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** Spray and tire tracks for the wheels of one vehicle in lane position `lane` (further lanes spray less). */
+  /**
+   * Spray and tire tracks for the wheels of one vehicle at depth `lane` (further lanes spray less).
+   * Tracks are only laid while the vehicle holds its depth (`settled`); a rival's are drawn on its
+   * nearest whole lane (`snap`), the player's exactly where the truck is.
+   */
   private wheelFx(
     key: string,
     wheels: { inContact: boolean; x: number; y: number }[],
     speed: number,
     dt: number,
     lane: number,
+    settled: boolean,
+    snap = false,
   ): void {
     const biome = this.biome;
     const lift = laneLift(lane);
-    const swerving = Math.abs(lane - Math.round(lane)) > 0.2;
     const share = 1 - 0.25 * lane;
+    const markLift = snap ? laneLift(Math.round(lane)) : Math.round(lift * 2) / 2;
     wheels.forEach((c, i) => {
       const k = `${key}${i}`;
-      const rolling = c.inContact && Math.abs(speed) > FX.tracks.minSpeed && !this.run.over && !swerving;
+      const rolling = c.inContact && Math.abs(speed) > FX.tracks.minSpeed && !this.run.over && settled;
       const gy = this.terrain.heightAt(c.x);
-      this.tracks.add(k, c.x, rolling, biomeAtX(c.x, this.startX).track, laneLift(Math.round(lane)));
+      this.tracks.add(k, c.x, rolling, biomeAtX(c.x, this.startX).track, markLift);
       if (!c.inContact) return;
       const acc = (this.sprayAcc.get(k) ?? 0) + sprayRate(speed) * dt * Math.max(0.2, share);
       const n = Math.floor(acc);
@@ -1211,7 +1317,6 @@ export class GameScene extends Phaser.Scene {
 
     const lines: string[] = [];
     if (t.airTime > 0) lines.push(`AIR ${t.airTime.toFixed(2)}s   BEST ${this.bestAir.toFixed(2)}s`);
-    if (!this.autoThrottle) lines.push('AUTO-GAS OFF (T)');
     if (this.debug) {
       lines.push(
         `angle ${t.angle.toFixed(2)}  vy ${t.vy.toFixed(0)}  grounded ${t.grounded}`,

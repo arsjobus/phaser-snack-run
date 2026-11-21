@@ -23,22 +23,32 @@ npm run dev        # http://localhost:5173
 
 ## Controls
 
-←/A brake/reverse · ↑/W lean back · ↓/S lean forward · →/D gas · **Q/E change lane** (or Shift+↑/↓) · R reset upright · T toggle auto-gas · M mute all · N music on/off · H debug overlay · SPACE/ENTER/tap restart after game over · **G** garage and **D** daily challenge / free run (game-over screen)
+→/D gas (**hold it: there is no auto-gas**; let go and engine braking slows you down) · ←/A brake/reverse · **↑/W and ↓/S: hold to drift away from / towards the camera through the depth field** (Q/E also work) · R reset upright · M mute all · N music on/off · H debug overlay · SPACE/ENTER/tap restart after game over · **G** garage and **D** daily challenge / free run (game-over screen)
 
-Auto-gas is **on** by default (endless-runner mode: the truck drives itself, you brake and lean). Flip `GAMEPLAY.autoGas` in `src/config.ts` or press T for manual throttle.
+There is no air control and no lean: the arrow keys steer through the field instead, and a gentle passive assist levels the truck in the air so it lands on its wheels.
 
 Add `?seed=anything` to the URL for a repeatable course, or `?daily` to start in the daily challenge.
+
+## What's in Phase 7.5 (playtest feedback)
+
+- **Smooth depth control:** hold ↑/↓ (or W/S) to drift through the field. Depth is continuous (it eases in and out), not a hop between rails; pickups, obstacles and wrecks still sit on whole lanes (`LANES.moveSpeed` / `moveEase` in `src/config.ts`).
+- **Other cars are solid:** you cannot slip through a car alongside. A rival or wreck that overlaps you in x stops the drift just short of touching, and pushing into it is a **side-swipe**: you rebound, you take at least 6% damage while moving (more with the speed difference), the rival takes damage, and a rubbed rival that wrecks counts as your takedown (one rub per car per 1.1 s). Rivals' own physics acts on you: a rear-end bump shoves your truck forward.
+- **Pickups are grabbed from any depth** by touching the truck, and every pickup, obstacle, wreck and truck now has a **ground shadow** at its own depth (a pickup's shadow tightens as it gets closer to the ground), so you can tell which lane something is in.
+- **No auto-gas, no air control:** the truck only drives while you hold →/D, and coasts to a stop (engine braking). Lean is gone; a mild landing assist (`PHYSICS.autoLevelStrength`) keeps the truck landing on its wheels.
+- **Track:** one smooth wide dirt field instead of terraces (a gentle gradient with mud patches), and the terrain is a Catmull-Rom spline (smooth to look at and to drive on, no visible vertices). **Grass tufts** are scattered over every lane.
+- **Player truck** wears a **CRUNCH** badge like the van.
+- **Balance:** less fuel (a can restores 30%, cans spaced at 70% to 95% of one can's range; checkpoints give +10%) and more wrenches (the first at 250 m, then every 220 to 420 m).
 
 ## What's in Phase 7 (and depth lanes)
 
 **Depth lanes and obstacles**
 
 - **Four lanes**, like the original's wide dirt field: lane 0 is nearest the camera, each lane further away is drawn 15 px higher, 6% smaller and darker, and the ground is a set of terraces stepping up and away. Jumps and hills are the same in every lane. You start in lane 1.
-- **Change lanes** with **Q** (further away) and **E** (nearer), or Shift+↑/↓. One lane per press (0.22 s), also in the air; press twice to cross two lanes. Only things in (nearly) the same lane touch, so cutting across a lane with a rival or an obstacle in it is a sideswipe. The lane radar under `POS` shows your lane, rivals, wrecks and obstacles ahead.
+- **Change depth** by holding **↑/W** (further away) or **↓/S** (nearer) (Phase 7.5: it used to be one lane per Q/E press). Only things in (nearly) the same lane touch, so cutting across a lane with a rival or an obstacle in it is a sideswipe. The lane radar under `POS` shows your lane, rivals, wrecks and obstacles ahead.
 - **Obstacles** (`src/game/Obstacles.ts`): **rocks** and **tire stacks** are knocked loose when hit (a rock hurts a little, tires only slow you); **logs** and **boulders** stay put: hit one at speed and you stop dead and take damage (a boulder up to 33%). Rows of obstacles never block more than 2 of the 4 lanes (wrecks included), they never sit just after a jump, and snacks, cans and wrenches stay off them. A fixed obstacle can always be passed by switching lanes, so nothing traps a run.
 - **Close calls:** swerve away from an obstacle at the last moment and drive past it clean for +50 BONUS.
 - **Rivals** use all four lanes: they dodge wrecks and obstacles with a chance that rises with skill (a careless rival just drives into the rock and may wreck itself), get out of the way when they are stuck, and only move into your lane (or the one you are heading for) when they are clear of your truck and, if ahead, far enough up the road to be seen.
-- **Pickups** sit in lanes: snack trails wander one lane at a time, so following one means a lane change now and then; fuel cans stay in the two middle lanes and can be grabbed from one lane over.
+- **Pickups** sit in lanes: snack trails wander one lane at a time, so following one means a lane change now and then; fuel cans stay in the two middle lanes. Since Phase 7.5 any pickup can be grabbed from any depth.
 
 **Progression** (`src/progress/`, all saved in `localStorage`; if it is blocked the game keeps progress in memory for the session)
 

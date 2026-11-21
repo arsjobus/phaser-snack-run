@@ -33,12 +33,16 @@ export const PHYSICS = {
   reverseForce: 160,
   reverseTop: 260,
   rollingResistance: 0.08, // along-ground drag coefficient at contacts
+  /** Extra drag per wheel while neither gas nor brake is held (engine braking). */
+  coastDrag: 0.5,
   driveLever: 0.2, // fraction of the real lever arm used for drive torque (anti-wheelie)
   airDrag: 0.04,
 
   // Lean (pitch) control
   airTorque: 11000,
   groundTorque: 4200,
+  /** Strength (0..1 of the air torque) of the player's passive landing assist. */
+  autoLevelStrength: 1,
   airAngularDamping: 0.9, // per second
   maxAngularVelocity: 7,
 } as const;
@@ -77,17 +81,15 @@ export const GAMEPLAY = {
   flipRecoverTime: 2,
   startX: 200,
   flatStartPx: 900,
-  /** Endless-runner mode: the truck drives itself; brake and lean stay manual. T toggles. */
-  autoGas: true,
 };
 
 /**
- * Depth lanes, like the original's pseudo-3D dirt field: every vehicle, pickup and obstacle sits in
- * one of `count` lanes. Lane 0 is nearest the camera (lowest, biggest); each lane further away is
- * drawn `spacing` px higher, a little smaller and darker. The terrain is shared, so jumps and hills
- * are the same in every lane; only things in (nearly) the same lane touch each other. The player
- * switches lanes with Q/E (or Shift+Up/Down); lane changes take `changeTime` per lane and can be
- * made in the air.
+ * Depth field, like the original's pseudo-3D dirt field: every vehicle, pickup and obstacle sits at
+ * a depth between 0 (nearest the camera, lowest, biggest) and `count - 1` (furthest); each step of
+ * depth is drawn `spacing` px higher, a little smaller and darker. Pickups, obstacles and wrecks
+ * sit on whole lanes, but the player's depth is continuous: hold Up/W to drift away from the camera
+ * and Down/S to drift towards it. The terrain is shared, so jumps and hills are the same at every
+ * depth; only things at (nearly) the same depth and the same x touch each other.
  */
 export const LANES = {
   count: 4,
@@ -102,13 +104,25 @@ export const LANES = {
   /** Draw order: lane f sits at depthBase - depthStep * f (+ a small per-entity offset). */
   depthBase: 2.9,
   depthStep: 0.4,
-  /** Two things collide only when their lane positions are closer than this (a swerve counts). */
+  /** Two things collide only when their depths are closer than this (a swerve counts). */
   hitBand: 0.55,
-  /** Seconds the player (and rivals) need to cross one lane. */
-  changeTime: 0.22,
-  /** Pickups are grabbed when the truck's lane is this close to theirs. Cans and wrenches are generous. */
-  snackBand: 0.75,
-  canBand: 1.1,
+  /** Depth speed (lanes per second) of the player while Up/Down is held, and how fast it eases in. */
+  moveSpeed: 2.1,
+  moveEase: 10,
+  /** Share of its speed the player rebounds with when a lane change hits another vehicle. */
+  rebound: 0.35,
+  /** Another vehicle blocks a depth move when its x is closer than this (px): the trucks overlap. */
+  blockX: 118,
+  /** Same for a wreck (smaller than a truck). */
+  blockXWreck: 106,
+  /** Side-swipe damage: impact = closing speed * `sideSlip` + the lane speed in px/s * `sideLane`. */
+  sideSlip: 0.6,
+  sideLane: 55,
+  /** A side-swipe always costs at least this much damage while the truck is moving (0..1). */
+  sideMinDamage: 0.06,
+  /** Seconds before the same vehicle can be side-swiped (and hurt the player) again. */
+  sideCooldown: 1.1,
+  /** Pickups are grabbed by touching the truck at ANY depth (no lane check). */
 } as const;
 
 /** Fuel tank. Fuel is the run's clock: it drains continuously and cans refill it. */
@@ -122,14 +136,14 @@ export const FUEL = {
   distanceFactor: 0.5,
   distanceRampMeters: 3000,
   /** Tank fraction restored by one can. */
-  canRestore: 0.35,
+  canRestore: 0.3,
   /** Below this the gauge blinks. */
   low: 0.25,
   /** Speed (px/s) assumed when guaranteeing that the next can is reachable (a slowish pace). */
   refSpeed: 380,
   /** Gap between cans, measured as a fraction of what ONE can restores (see roadmap, balance sheet). */
-  minGapRatio: 0.5,
-  maxGapRatio: 0.8,
+  minGapRatio: 0.7,
+  maxGapRatio: 0.95,
   /** Distance over which the gap ratio ramps from min to max. */
   gapRampMeters: 2500,
   /** With the tank empty the truck coasts; the run ends below this speed (px/s)... */
@@ -152,7 +166,7 @@ export const CHECKPOINT = {
   /** Extra seconds on the very first clock so the opening is forgiving. */
   startBuffer: 20,
   /** Tank fraction restored on reaching a checkpoint. */
-  fuelBonus: 0.15,
+  fuelBonus: 0.1,
   /** BONUS points for reaching one: flat + per second left on the clock. */
   basePoints: 250,
   pointsPerSecondLeft: 10,
@@ -206,8 +220,8 @@ export const WRENCH = {
   /** Height of the wrench centre above the ground (px). */
   hover: 16,
   /** Metres to the first wrench, then the (min, max) metres between wrenches. */
-  firstMeters: 400,
-  gapMeters: [450, 800],
+  firstMeters: 250,
+  gapMeters: [220, 420],
   /** A wrench never sits this close (px) to a can, a wreck or a jump. */
   clearance: 160,
 } as const;

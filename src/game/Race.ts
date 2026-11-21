@@ -6,7 +6,7 @@ import { Rival, RIVAL_STYLES } from './Rival';
 import { Rng } from './Rng';
 import type { Terrain } from './Terrain';
 import type { TruckPhysics } from './TruckPhysics';
-import type { WreckField } from './Wrecks';
+import type { Wreck, WreckField } from './Wrecks';
 
 export type RaceEvent =
   /**
@@ -27,6 +27,19 @@ export type RaceEvent =
   | { type: 'rivalCrash'; rivalId: number; number: number; kind: ObstacleKind | 'wreck'; impact: number; x: number; y: number; lane: number }
   | { type: 'takedown'; rivalId: number; number: number; x: number; y: number; lane: number }
   | { type: 'wrecked'; rivalId: number; number: number; x: number; y: number; lane: number };
+
+/** Another vehicle that stops the player from drifting into its depth. */
+export type LaneBlocker =
+  | { kind: 'rival'; key: string; rival: Rival }
+  | { kind: 'wreck'; key: string; wreck: Wreck };
+
+/** How far the player may drift in depth right now, and what stops it on each side (if a vehicle does). */
+export interface DepthLimits {
+  lo: number;
+  hi: number;
+  loBy: LaneBlocker | null;
+  hiBy: LaneBlocker | null;
+}
 
 /**
  * The race around the player: spawns rivals (a small grid at the start, then more as the run
@@ -52,6 +65,8 @@ export class Race {
   /** The player's lane position and wanted lane, as of the last `update`. */
   private playerLane: number = LANES.startLane;
   private playerTarget: number = LANES.startLane;
+  /** Race time of the last side-swipe per blocking vehicle (for the cooldown). */
+  private sideLast = new Map<string, number>();
 
   constructor(
     seed: number,
@@ -73,6 +88,71 @@ export class Race {
   position(playerX: number): { place: number; of: number } {
     const ahead = this.rivals.filter((r) => r.truck.x > playerX).length;
     return { place: 1 + ahead, of: 1 + this.rivals.length };
+  }
+
+  /**
+   * Depth limits for the player at depth `f`: a vehicle alongside (overlapping in x) cannot be
+   * driven through by drifting sideways, so it stops the move just short of touching. A vehicle the
+   * player is already touching is left to the ordinary collision (so you can always back out).
+   */
+  depthLimits(player: TruckPhysics, f: number): DepthLimits {
+    const out: DepthLimits = { lo: 0, hi: LANES.count - 1, loBy: null, hiBy: null };
+    const consider = (lane: number, blocker: LaneBlocker): void => {
+      const gap = lane - f;
+      if (Math.abs(gap) < LANES.hitBand) return;
+      if (gap > 0) {
+        if (lane - LANES.hitBand < out.hi) {
+          out.hi = lane - LANES.hitBand;
+          out.hiBy = blocker;
+        }
+      } else if (lane + LANES.hitBand > out.lo) {
+        out.lo = lane + LANES.hitBand;
+        out.loBy = blocker;
+      }
+    };
+    for (const r of this.rivals) {
+      if (Math.abs(r.truck.x - player.x) < LANES.blockX) consider(r.laneF, { kind: 'rival', key: `r${r.id}`, rival: r });
+    }
+    for (const w of this.wrecks.items) {
+      if (w.solid && Math.abs(w.x - player.x) < LANES.blockXWreck) consider(w.lane, { kind: 'wreck', key: `w${w.id}`, wreck: w });
+    }
+    return out;
+  }
+
+  /**
+   * The player pushed a depth move into `by` (see `depthLimits`): a side-swipe. It costs the player
+   * damage (at least `LANES.sideMinDamage` while moving), hurts a rival, swaps a little speed and,
+   * for a rival, counts towards a takedown. One per vehicle per `LANES.sideCooldown`.
+   */
+  sideswipe(player: TruckPhysics, by: LaneBlocker, laneSpeed: number): RaceEvent | null {
+    if (this.time - (this.sideLast.get(by.key) ?? -Infinity) < LANES.sideCooldown) return null;
+    if (this.sideLast.size > 64) this.sideLast.clear();
+    this.sideLast.set(by.key, this.time);
+    const other = by.kind === 'rival' ? by.rival.truck : null;
+    const otherVx = other ? other.vx : 0;
+    const closing = Math.abs(player.vx - otherVx);
+    const impact = closing * LANES.sideSlip + laneSpeed * LANES.sideLane;
+    const moving = Math.abs(player.speed) > COLLISION.softSpeed || closing > COLLISION.softSpeed;
+    const damage = moving ? Math.max(LANES.sideMinDamage, damageForImpact(impact)) : 0;
+    if (by.kind === 'rival') {
+      const r = by.rival;
+      r.lastBump = this.time;
+      r.lastPlayerHit = this.time;
+      if (damage > 0) r.damage = Math.min(1, r.damage + damage * COLLISION.rivalDamageScale);
+      // Rubbing swaps a little speed, so a faster car alongside drags yours and the other way round.
+      const dv = (player.vx - otherVx) * 0.15;
+      player.vx -= dv;
+      r.truck.vx += dv;
+    }
+    return {
+      type: 'bump',
+      with: by.kind,
+      impact,
+      damage,
+      x: (player.x + (by.kind === 'rival' ? by.rival.truck.x : by.wreck.x)) / 2,
+      y: player.y,
+      lane: this.playerLane,
+    };
   }
 
   /** Step every rival's body by one fixed physics step. */

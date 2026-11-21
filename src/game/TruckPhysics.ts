@@ -35,6 +35,12 @@ export class TruckPhysics {
   roofTime = 0;
   /** Slipstream strength 0..1 (Phase 4): more engine force and a higher top speed. */
   boost = 0;
+  /**
+   * Passive landing assist: while airborne a gentle torque levels the truck with the slope below
+   * (the player has no air control; this just keeps it landing on its wheels). Off for rivals,
+   * which level themselves through their own lean input.
+   */
+  autoLevel = false;
 
   private airGrace = 0;
 
@@ -133,6 +139,9 @@ export class TruckPhysics {
 
       // Along-ground forces
       let Ft = -P.rollingResistance * vt;
+      // Engine braking: off the throttle (and not braking) the truck slows by itself, so it only
+      // keeps its speed while the driver holds the gas.
+      if (drives && input.throttle <= 0 && input.brake <= 0) Ft -= P.coastDrag * vt;
       if (drives) {
         if (input.throttle > 0) {
           Ft += input.throttle * force * Math.max(0, 1 - vt / top);
@@ -170,6 +179,11 @@ export class TruckPhysics {
     const leanTorque =
       wheelsDown === 0 ? P.airTorque : wheelsDown === 1 ? P.airTorque * 0.8 : P.groundTorque;
     torque += input.lean * leanTorque;
+    if (airborne && this.autoLevel) {
+      const want = Math.atan(terrain.slopeAt(this.x + this.vx * 0.3));
+      const lvl = 2.2 * (want - this.angle) - 0.45 * this.angVel;
+      torque += Math.max(-1, Math.min(1, lvl)) * P.airTorque * P.autoLevelStrength;
+    }
     if (airborne) {
       this.angVel *= Math.max(0, 1 - P.airAngularDamping * dt);
       fx -= P.airDrag * this.vx;

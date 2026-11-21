@@ -338,7 +338,8 @@ describe('Rivals and the race', () => {
       plain.step(DT, GAS, terrain);
       boosted.step(DT, GAS, terrain);
     }
-    expect(boosted.speed).toBeGreaterThan(plain.speed + 40);
+    // Compare the ground covered, not one instant's speed (which depends on the slope underfoot).
+    expect(boosted.x - plain.x).toBeGreaterThan(150);
   });
 
   it('ranks the player among the live rivals', () => {

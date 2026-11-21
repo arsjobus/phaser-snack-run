@@ -44,25 +44,70 @@ describe('Lane geometry', () => {
     expect(sameLane(1.5, 2)).toBe(true);
   });
 
-  it('the player changes lanes one at a time, clamped to the field, and swerves smoothly', () => {
+  it('holding Up/Down drifts the player through the field smoothly, clamped to its edges', () => {
     const p = new PlayerLane();
-    expect(p.target).toBe(LANES.startLane);
-    expect(p.request(1)).toBe(LANES.startLane); // returns the lane left
-    expect(p.target).toBe(LANES.startLane + 1);
-    expect(p.swerving).toBe(true);
-    p.update(LANES.changeTime / 2);
-    expect(p.f).toBeCloseTo(LANES.startLane + 0.5, 6);
-    p.update(1);
-    expect(p.f).toBe(p.target);
+    expect(p.f).toBe(LANES.startLane);
     expect(p.swerving).toBe(false);
-    while (p.request(1) !== null);
-    expect(p.target).toBe(LANES.count - 1);
-    expect(p.request(1)).toBeNull();
-    while (p.request(-1) !== null);
-    expect(p.target).toBe(0);
-    expect(p.changes).toBeGreaterThan(3);
+    // Eases in: the first frames are slower than the cruising depth speed.
+    p.update(1 / 60, 1);
+    expect(p.v).toBeGreaterThan(0);
+    expect(p.v).toBeLessThan(LANES.moveSpeed * 0.5);
+    // Continuous, not rail-to-rail: sampled over a second the depth takes many in-between values.
+    const seen = new Set<number>();
+    for (let i = 0; i < 40; i++) {
+      p.update(1 / 60, 1);
+      seen.add(Math.round(p.f * 100));
+    }
+    expect(seen.size).toBeGreaterThan(20);
+    expect(p.f).toBeGreaterThan(LANES.startLane + 1);
+    for (let i = 0; i < 300; i++) p.update(1 / 60, 1);
+    expect(p.f).toBe(LANES.count - 1); // the far edge
+    expect(p.v).toBe(0);
+    for (let i = 0; i < 600; i++) p.update(1 / 60, -1);
+    expect(p.f).toBe(0);
+    expect(p.changes).toBeGreaterThanOrEqual(LANES.count - 1);
     expect(clampLane(-3)).toBe(0);
     expect(clampLane(99)).toBe(LANES.count - 1);
+  });
+
+  it('releasing the key lets the drift die out where it is, mid-lane', () => {
+    const p = new PlayerLane();
+    for (let i = 0; i < 20; i++) p.update(1 / 60, 1);
+    const f = p.f;
+    expect(f % 1).not.toBe(0);
+    for (let i = 0; i < 120; i++) p.update(1 / 60, 0);
+    expect(p.swerving).toBe(false);
+    expect(p.f).toBeGreaterThanOrEqual(f);
+    expect(p.f).toBeLessThan(f + 0.5); // coasts a little, then stops
+    expect(p.f % 1).not.toBe(0); // stays between lanes: no snapping to a rail
+  });
+
+  it('reports the lane it leaves, once per crossing', () => {
+    const p = new PlayerLane();
+    const left: number[] = [];
+    for (let i = 0; i < 400; i++) {
+      const st = p.update(1 / 60, 1);
+      if (st.changedFrom !== null) left.push(st.changedFrom);
+    }
+    expect(left).toEqual([1, 2]); // 1 -> 2 -> 3
+    expect(p.changes).toBe(2);
+  });
+
+  it('a limit from another vehicle stops the drift just short, and rebounds a little', () => {
+    const p = new PlayerLane();
+    let blocked = 0;
+    let impact = 0;
+    for (let i = 0; i < 120; i++) {
+      const st = p.update(1 / 60, 1, 0, 1.45);
+      if (st.blocked) {
+        blocked++;
+        impact = Math.max(impact, st.impactSpeed);
+      }
+      expect(p.f).toBeLessThanOrEqual(1.45 + 1e-9);
+    }
+    expect(blocked).toBeGreaterThan(0);
+    expect(impact).toBeGreaterThan(0.3);
+    expect(p.f).toBeGreaterThan(1.3); // pressed right up against it
   });
 });
 
@@ -247,18 +292,30 @@ describe('Obstacle collisions', () => {
 });
 
 describe('Run with lanes', () => {
-  it('snacks need the lane; cans reach one lane over; no lane given means any lane', () => {
+  it('pickups are grabbed from ANY depth: touching the truck is enough', () => {
     const t = new Terrain(1);
     const f = new PickupField(1, t, START);
     f.ensure(START + 20000);
     const snack = f.items.find((p) => p.kind === 'snack' && p.lane === 1)!;
-    expect(f.collect(snack.x, snack.y, 3)).not.toContain(snack);
-    expect(f.collect(snack.x, snack.y, 2)).not.toContain(snack); // a whole lane off: no
-    expect(f.collect(snack.x, snack.y, 1.2)).toContain(snack);
+    // The old rules refused a snack two lanes away; now the lane is not even asked.
+    expect(f.collect(snack.x, snack.y)).toContain(snack);
     const can = f.items.find((p) => p.kind === 'fuel')!;
-    expect(f.collect(can.x, can.y, can.lane + 1)).toContain(can);
+    expect(f.collect(can.x, can.y)).toContain(can);
+    const wrench = f.items.find((p) => p.kind === 'wrench')!;
+    expect(f.collect(wrench.x, wrench.y)).toContain(wrench);
+    // The optional band still restricts when asked to.
     const other = f.items.filter((p) => p.kind === 'snack' && !p.taken)[3];
-    expect(f.collect(other.x, other.y)).toContain(other);
+    expect(f.collect(other.x, other.y, other.lane + 3, 1)).not.toContain(other);
+    expect(f.collect(other.x, other.y, other.lane, 1)).toContain(other);
+  });
+
+  it('the run grabs a pickup whatever depth the truck is in', () => {
+    const run = new RunModel(1, new Terrain(1), START);
+    for (const depth of [0, 1.37, 3]) {
+      const snack = run.pickups.items.find((p) => p.kind === 'snack' && !p.taken)!;
+      const ev = run.update(1 / 60, { x: snack.x, y: snack.y, speed: 400, lane: depth });
+      expect(ev.some((e) => e.type === 'snack' && e.pickup === snack)).toBe(true);
+    }
   });
 
   it('fuel cans stay in the middle lanes and snack trails wander one lane at a time', () => {
@@ -374,8 +431,8 @@ describe('Rivals in the lanes', () => {
           s.player.step(DT, GAS, s.terrain);
           s.race.stepPhysics(DT);
         }
-        lane.update(1 / 60);
-        if (f % 300 === 150) lane.request(f % 600 === 150 ? 1 : -1);
+        const lim = s.race.depthLimits(s.player, lane.f);
+        lane.update(1 / 60, (Math.floor(f / 90) % 2 === 0 ? 1 : -1) as 1 | -1, lim.lo, lim.hi);
         s.run.pickups.ensure(s.player.x + 2600);
         for (const e of s.race.update(1 / 60, s.player, Math.max(0, (s.player.x - START) / PX_PER_METER), true, lane.f, lane.target)) {
           if (e.type === 'rivalCrash') rivalCrashes++;
