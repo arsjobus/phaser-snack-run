@@ -345,6 +345,19 @@ export class AudioSystem {
     this.stinger();
   }
 
+  /** A quick tire "swish" for a lane change. */
+  swerve(): void {
+    if (!this.live) return;
+    this.noiseHit(this.ctx!.currentTime, 0.16, 0.22, 'bandpass', 900, this.sfx!, 500, 1800);
+  }
+
+  /** Bright two-step chime for a dodge, an achievement or a purchase. */
+  reward(): void {
+    if (!this.live) return;
+    this.blip('triangle', 784, 0.1, 0.13, 0);
+    this.blip('triangle', 1175, 0.2, 0.13, 0.09);
+  }
+
   /** Low-fuel warning, once per blink of the HUD dial. */
   lowFuel(): void {
     if (!this.live) return;

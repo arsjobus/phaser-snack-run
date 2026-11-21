@@ -1,5 +1,7 @@
-import { FUEL, PICKUPS, PX_PER_METER, WRENCH } from '../config';
+import { FUEL, LANES, PICKUPS, PX_PER_METER, WRENCH } from '../config';
 import { fuelPerPx } from './Fuel';
+import { clampLane } from './Lanes';
+import type { ObstacleField } from './Obstacles';
 import { Rng } from './Rng';
 import { JUMP_KINDS, type PieceKind, type Terrain, type TerrainPiece } from './Terrain';
 import type { WreckField } from './Wrecks';
@@ -11,6 +13,8 @@ export interface Pickup {
   kind: PickupKind;
   x: number;
   y: number;
+  /** Depth lane it sits in (0 = nearest the camera). The truck must be near that lane to grab it. */
+  lane: number;
   taken: boolean;
   missed: boolean;
 }
@@ -28,7 +32,9 @@ const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
 /**
  * Places snacks (lines on the ground, arcs over ramps), fuel cans and wrenches ahead of the truck.
- * Uses its own RNG so adding pickups never changes the terrain for a seed.
+ * Each group sits in one depth lane; snack groups wander one lane at a time (so following the trail
+ * means a lane change now and then), cans stay in the two middle lanes. Uses its own RNG so adding
+ * pickups never changes the terrain for a seed.
  *
  * Fuel guarantee: the fuel needed to cover the gap between two cans at the reference speed is
  * never more than `maxGapRatio` of what one can restores, so a driver who grabs every can and
@@ -41,27 +47,33 @@ export class PickupField {
 
   private rng: Rng;
   private wrenchRng: Rng;
+  /** Lane choices have their own stream, so lanes never shift where cans and snacks go. */
+  private laneRng: Rng;
   private nextId = 1;
   private pieceCursor: number;
   private lastFuelX: number;
   private nextFuelX: number;
   private nextWrenchX: number;
+  /** Lane of the latest snack group. */
+  private snackLane: number = LANES.startLane;
 
-  /** `wrecks` (optional) keeps snacks, cans and wrenches off the roadside hulks. */
+  /** `wrecks` and `obstacles` (optional) keep snacks, cans and wrenches off the hulks and rocks. */
   constructor(
     seed: number,
     private terrain: Terrain,
     private startX: number,
     private wrecks?: WreckField,
+    private obstacles?: ObstacleField,
   ) {
     this.rng = new Rng((seed ^ 0x9e3779b9) >>> 0);
     this.wrenchRng = new Rng((seed ^ 0x7f4a7c15) >>> 0);
+    this.laneRng = new Rng((seed ^ 0x1b873593) >>> 0);
     this.pieceCursor = terrain.endX;
     this.lastFuelX = startX;
     // Starter line on the opening flat so the first thing the player learns is "grab these".
     for (let i = 0; i < 6; i++) {
       const x = startX + 380 + i * PICKUPS.spacing;
-      this.add('snack', x, terrain.heightAt(x) - PICKUPS.hover);
+      this.add('snack', x, terrain.heightAt(x) - PICKUPS.hover, LANES.startLane);
     }
     this.nextFuelX = this.planFuel(startX);
     this.nextWrenchX = startX + WRENCH.firstMeters * PX_PER_METER;
@@ -76,7 +88,8 @@ export class PickupField {
       this.spawnSnacks();
       const x = this.safeFuelX(this.nextFuelX);
       this.items = this.items.filter((p) => !(p.kind === 'snack' && Math.abs(p.x - x) < 70));
-      this.add('fuel', x, this.terrain.heightAt(x) - PICKUPS.hover);
+      const lane = this.laneRng.int(1, Math.max(1, LANES.count - 2));
+      this.add('fuel', x, this.terrain.heightAt(x) - PICKUPS.hover, lane);
       this.fuelXs.push(x);
       this.lastFuelX = x;
       this.nextFuelX = this.planFuel(x);
@@ -85,18 +98,23 @@ export class PickupField {
       this.terrain.ensure(this.nextWrenchX + 1200);
       this.spawnSnacks();
       const x = this.safeWrenchX(this.nextWrenchX);
-      this.add('wrench', x, this.terrain.heightAt(x) - WRENCH.hover);
+      this.add('wrench', x, this.terrain.heightAt(x) - WRENCH.hover, this.laneRng.int(0, LANES.count - 1));
       const [lo, hi] = WRENCH.gapMeters;
       this.nextWrenchX = x + this.wrenchRng.range(lo, hi) * PX_PER_METER;
     }
   }
 
-  /** Marks and returns the pickups within reach of (x, y). */
-  collect(x: number, y: number): Pickup[] {
+  /**
+   * Marks and returns the pickups within reach of (x, y). With a `lane` (the truck's lane position)
+   * a pickup must also be in a lane close enough: snacks need to be nearly the same lane, cans and
+   * wrenches may be one lane over. Without one, every lane counts.
+   */
+  collect(x: number, y: number, lane?: number): Pickup[] {
     const got: Pickup[] = [];
     const r2 = PICKUPS.collectRadius * PICKUPS.collectRadius;
     for (const p of this.items) {
       if (p.taken || p.missed) continue;
+      if (lane !== undefined && Math.abs(p.lane - lane) >= (p.kind === 'snack' ? LANES.snackBand : LANES.canBand)) continue;
       const dx = p.x - x;
       const dy = p.y - y;
       if (dx * dx + dy * dy <= r2) {
@@ -126,8 +144,8 @@ export class PickupField {
     }
   }
 
-  private add(kind: PickupKind, x: number, y: number): void {
-    this.items.push({ id: this.nextId++, kind, x, y, taken: false, missed: false });
+  private add(kind: PickupKind, x: number, y: number, lane: number): void {
+    this.items.push({ id: this.nextId++, kind, x, y, lane: clampLane(lane), taken: false, missed: false });
   }
 
   /** Picks the x of the next can: the guaranteed-reachable gap, with a little jitter. */
@@ -152,9 +170,9 @@ export class PickupField {
       if (!piece) break;
       x = piece.x0 - 140;
     }
-    // Nor on a roadside wreck.
+    // Nor on a roadside wreck or obstacle.
     for (let i = 0; i < 4; i++) {
-      const w = this.wrecks?.near(x, 110);
+      const w = this.wrecks?.near(x, 110) ?? this.obstacles?.near(x, 110);
       if (!w) break;
       x = w.x - 150;
     }
@@ -167,7 +185,7 @@ export class PickupField {
       const jump = this.terrain.pieces.find(
         (p) => JUMP_KINDS.includes(p.kind) && x > p.x0 - 60 && x < p.x1 + 60,
       );
-      const wreck = this.wrecks?.near(x, WRENCH.clearance);
+      const wreck = this.wrecks?.near(x, WRENCH.clearance) ?? this.obstacles?.near(x, WRENCH.clearance);
       const can = this.fuelXs.find((f) => Math.abs(f - x) < WRENCH.clearance);
       if (jump) x = jump.x1 + 60;
       else if (wreck) x = wreck.x + WRENCH.clearance;
@@ -181,6 +199,7 @@ export class PickupField {
 
   private spawnSnacks(): void {
     this.wrecks?.sync();
+    this.obstacles?.sync();
     for (const piece of this.terrain.pieces) {
       if (piece.x0 < this.pieceCursor) continue;
       this.snacksFor(piece);
@@ -192,14 +211,15 @@ export class PickupField {
     if (this.rng.next() > SNACK_CHANCE[p.kind]) return;
     const t = this.terrain;
     const hover = PICKUPS.hover;
+    const lane = (this.snackLane = clampLane(this.snackLane + this.laneRng.int(-1, 1)));
     if (p.kind === 'ramp' || p.kind === 'table') {
       // Two on the climb, then an arc over the gap: the arc teaches "hit the ramp".
       for (const f of [0.45, 0.8]) {
         const x = p.x0 + (p.liftX - p.x0) * f;
-        this.add('snack', x, t.heightAt(x) - hover);
+        this.add('snack', x, t.heightAt(x) - hover, lane);
       }
       const lipY = t.heightAt(p.lipX);
-      PICKUPS.arcX.forEach((dx, i) => this.add('snack', p.lipX + dx, lipY - PICKUPS.arcY[i]));
+      PICKUPS.arcX.forEach((dx, i) => this.add('snack', p.lipX + dx, lipY - PICKUPS.arcY[i], lane));
       return;
     }
     const len = p.x1 - p.x0;
@@ -208,8 +228,8 @@ export class PickupField {
     const start = p.x0 + (len - (count - 1) * PICKUPS.spacing) / 2;
     for (let i = 0; i < count; i++) {
       const x = start + i * PICKUPS.spacing;
-      if (this.wrecks?.near(x, 80)) continue; // a hulk lies there
-      this.add('snack', x, t.heightAt(x) - hover);
+      if (this.wrecks?.near(x, 80, lane) || this.obstacles?.near(x, 80, lane)) continue; // something lies there
+      this.add('snack', x, t.heightAt(x) - hover, lane);
     }
   }
 }

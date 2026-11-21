@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { ART } from '../config';
 import { PLAYER_WHEEL, RIVAL_STYLES, type BodyKind } from '../game/Rival';
 import { Rng } from '../game/Rng';
+import { SKINS } from '../progress/Skins';
 import { drawPixelText, drawPixelTextCentered } from './pixelFont';
 
 export interface Paint {
@@ -12,7 +13,8 @@ export interface Paint {
   plate: number;
 }
 
-export const PLAYER_PAINT: Paint = { body: 0xf2c200, light: 0xffe066, stripe: 0xb83a1a, plate: 0xffffff };
+/** The default paint job (the garage sells more: see `src/progress/Skins.ts`). */
+export const PLAYER_PAINT: Paint = SKINS[0].paint;
 
 /** One livery per rival style, in `RIVAL_STYLES` order. */
 export const RIVAL_PAINT: readonly Paint[] = [
@@ -50,6 +52,9 @@ interface Part {
 /** Truck-sprite texture key of the un-rotated body, the player's and each rival's. */
 export const PLAYER_TRUCK_KEY = 'truck_body';
 export const rivalTruckKey = (style: number): string => `rival_${style}`;
+/** Texture key of the player's body in a garage paint job (the default paint keeps `truck_body`). */
+export const playerTruckKey = (skinId: string): string =>
+  skinId === SKINS[0].id ? PLAYER_TRUCK_KEY : `${PLAYER_TRUCK_KEY}_${skinId}`;
 /** Key of the pre-rendered rotation strip made from a body texture. */
 export const atlasKey = (key: string): string => `${key}_rot`;
 
@@ -300,7 +305,7 @@ export function makeTruckTextures(scene: Phaser.Scene): string[] {
     g.destroy();
     keys.push(key);
   };
-  build(PLAYER_TRUCK_KEY, 'suv', PLAYER_PAINT, null, PLAYER_WHEEL, 1);
+  for (const skin of SKINS) build(playerTruckKey(skin.id), 'suv', skin.paint, null, PLAYER_WHEEL, 1);
   RIVAL_STYLES.forEach((st, i) => build(rivalTruckKey(i), st.kind, RIVAL_PAINT[i], st.number, st.wheel, 10 + i));
   return keys;
 }

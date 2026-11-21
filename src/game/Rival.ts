@@ -1,5 +1,6 @@
-import { PHYSICS, RIVALS } from '../config';
+import { LANES, PHYSICS, RIVALS } from '../config';
 import type { InputState } from './Input';
+import { sameLane } from './Lanes';
 import type { Terrain } from './Terrain';
 import { TruckPhysics } from './TruckPhysics';
 
@@ -25,14 +26,12 @@ export const RIVAL_STYLES = [
 /** Tire scale of the player's truck. */
 export const PLAYER_WHEEL = 1;
 
-/** Which depth lane a rival is in right now: 0 = the player's, 1 = the far lane, -1 = swerving. */
-export type LaneKey = 0 | 1 | -1;
-
 /**
  * A rival truck: the same rigid body as the player (so it bumps, jumps and flips for real) driven
  * by a small AI. The AI cruises at a skill-dependent speed, speeds up when it is behind the player
  * and eases off when it is far ahead (rubber banding), and levels itself in the air so it lands on
- * its wheels. Lane changes are decided by `Race`; the rival just animates them. Pure TypeScript.
+ * its wheels. Lane changes are decided by `Race`; the rival just animates them (`lane` is the wanted
+ * lane, `laneF` the animated position that collisions and drawing use). Pure TypeScript.
  */
 export class Rival {
   readonly truck: TruckPhysics;
@@ -49,10 +48,14 @@ export class Rival {
   /** Race time of the last reported bump with the player (for the hit cooldown). */
   lastBump = -Infinity;
   input: InputState = { throttle: 0, brake: 0, lean: 0 };
-  /** Wanted lane (0 near, 1 far) and how far the swerve has got (0 = near, 1 = far). */
-  lane: 0 | 1 = 1;
-  laneBlend = 1;
+  /** Wanted depth lane, the animated lane position (a float while swerving) and the re-think timer. */
+  lane = 1;
+  laneF = 1;
   laneTimer = 0;
+  /** Hazards (wreck/obstacle keys) this rival has looked at: true = it saw it and will dodge. */
+  seen = new Map<string, boolean>();
+  /** Seconds spent crawling (for getting unstuck behind a fixed obstacle). */
+  crawlTime = 0;
 
   constructor(
     readonly id: number,
@@ -72,11 +75,14 @@ export class Rival {
     return RIVAL_STYLES[this.style % RIVAL_STYLES.length].number;
   }
 
-  /** The lane the rival counts as being in for collisions. */
-  get laneKey(): LaneKey {
-    if (this.laneBlend < 0.35) return 0;
-    if (this.laneBlend > 0.65) return 1;
-    return -1;
+  /** Chance that this rival notices a given hazard in time and dodges it (rises with skill). */
+  get noticeChance(): number {
+    return Math.min(1, RIVALS.noticeBase + RIVALS.noticeSkill * this.skill * this.skill);
+  }
+
+  /** True when this rival is close enough to lane position `lane` to touch things in it. */
+  inLane(lane: number): boolean {
+    return sameLane(this.laneF, lane);
   }
 
   /** Target speed (px/s): cruise, plus the rubber band towards the player. */
@@ -108,13 +114,14 @@ export class Rival {
     this.truck.step(dt, this.input, terrain);
   }
 
-  /** Per frame: swerve towards the wanted lane, and track how long the rival is stuck on its roof. */
+  /** Per frame: swerve towards the wanted lane, and track how long the rival is stuck or on its roof. */
   watch(dt: number): void {
-    const goal = this.lane;
+    const goal = Math.max(0, Math.min(LANES.count - 1, this.lane));
     const rate = dt / RIVALS.laneSwitchTime;
-    this.laneBlend = goal > this.laneBlend ? Math.min(goal, this.laneBlend + rate) : Math.max(goal, this.laneBlend - rate);
+    this.laneF = goal > this.laneF ? Math.min(goal, this.laneF + rate) : Math.max(goal, this.laneF - rate);
     const t = this.truck;
     this.flipTime = t.flipped && Math.abs(t.speed) < 220 ? this.flipTime + dt : 0;
+    this.crawlTime = !t.flipped && t.speed < 80 ? this.crawlTime + dt : 0;
   }
 
   get dead(): boolean {

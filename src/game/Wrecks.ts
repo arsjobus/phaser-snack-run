@@ -1,5 +1,6 @@
-import { COLLISION, PX_PER_METER, WRECKS } from '../config';
+import { COLLISION, LANES, PX_PER_METER, WRECKS } from '../config';
 import { deepestContact, truckCircles, type Circle } from './Collision';
+import { sameLane } from './Lanes';
 import { RIVAL_STYLES } from './Rival';
 import { Rng } from './Rng';
 import { JUMP_KINDS, type PieceKind, type Terrain, type TerrainPiece } from './Terrain';
@@ -27,8 +28,8 @@ export interface Wreck {
   age: number;
   /** Came from a rival (as opposed to a roadside hulk): drawn smoking. */
   fresh: boolean;
-  /** Lies in the far lane: scenery only, never collides with anything. */
-  far: boolean;
+  /** Depth lane it lies in (0 = nearest the camera); only vehicles in that lane can hit it. */
+  lane: number;
 }
 
 export interface WreckHit {
@@ -50,13 +51,19 @@ export function wreckCircles(w: Wreck): Circle[] {
 }
 
 /**
- * Wrecked vehicles on the course. Roadside hulks are placed on flat and hilly chunks (never just
- * after a jump, where nobody could brake in time); rivals that flip join them. A solid wreck is
- * hit once: the truck pays in speed and damage and the wreck is flung away as debris, so a wreck
- * can never trap the player. Own RNG, so placing wrecks never changes the terrain for a seed.
+ * Wrecked vehicles on the course. Roadside hulks are placed on flat and hilly chunks, each in a
+ * random lane (never just after a jump, where nobody could brake in time); rivals that flip join
+ * them where they lie. A solid wreck is hit once: the truck pays in speed and damage and the wreck
+ * is flung away as debris, so a wreck can never trap the player. Own RNG, so placing wrecks never
+ * changes the terrain for a seed.
  */
 export class WreckField {
   items: Wreck[] = [];
+  /**
+   * Asks whether a hulk may block `lane` at x without closing a row of obstacles (set by `RunModel`),
+   * so the lanes left open never drop below `count - OBSTACLES.maxBlocked`.
+   */
+  canBlock?: (x: number, lane: number) => boolean;
 
   private rng: Rng;
   private nextId = 1;
@@ -81,39 +88,47 @@ export class WreckField {
     }
   }
 
-  /** The nearest solid wreck within `margin` px of x, if any. */
-  near(x: number, margin: number): Wreck | undefined {
-    return this.items.find((w) => w.solid && !w.far && Math.abs(w.x - x) <= margin);
+  /** The nearest solid wreck within `margin` px of x (in `lane`, or in any lane if omitted), if any. */
+  near(x: number, margin: number, lane?: number): Wreck | undefined {
+    return this.items.find(
+      (w) => w.solid && (lane === undefined || sameLane(w.lane, lane)) && Math.abs(w.x - x) <= margin,
+    );
   }
 
-  /** The first solid wreck ahead of x within `distance` px (for rivals that look ahead). */
-  ahead(x: number, distance: number): Wreck | undefined {
+  /** The first solid wreck ahead of x within `distance` px in `lane` (for rivals that look ahead). */
+  ahead(x: number, distance: number, lane: number): Wreck | undefined {
     let best: Wreck | undefined;
     for (const w of this.items) {
-      if (!w.solid || w.far || w.x < x || w.x > x + distance) continue;
+      if (!w.solid || !sameLane(w.lane, lane) || w.x < x || w.x > x + distance) continue;
       if (!best || w.x < best.x) best = w;
     }
     return best;
   }
 
-  /** A rival that just died becomes a wreck where it lies. */
-  addFromRival(x: number, angle: number, style: number, vx: number, far: boolean): Wreck {
-    const w = this.make(x, style, true);
-    w.far = far;
+  /** Lanes blocked by a solid wreck within `gap` px of x. */
+  blockedLanes(x: number, gap: number): Set<number> {
+    const out = new Set<number>();
+    for (const w of this.items) if (w.solid && Math.abs(w.x - x) <= gap) out.add(w.lane);
+    return out;
+  }
+
+  /** A rival that just died becomes a wreck where it lies (in its lane). */
+  addFromRival(x: number, angle: number, style: number, vx: number, lane = 0): Wreck {
+    const w = this.make(x, style, true, lane);
     w.angle = angle;
     w.vx = Math.max(0, vx);
     return w;
   }
 
   /**
-   * Tests a truck against the solid wrecks. A hit knocks the wreck loose (so it is never hit
-   * twice), takes speed off the truck, gives it a hop and pushes it out of the overlap.
-   * Returns the first hit (one per call is plenty).
+   * Tests a truck (at lane position `lane`) against the solid wrecks in its lane. A hit knocks the
+   * wreck loose (so it is never hit twice), takes speed off the truck, gives it a hop and pushes it
+   * out of the overlap. Returns the first hit (one per call is plenty).
    */
-  collide(truck: TruckPhysics): WreckHit | null {
+  collide(truck: TruckPhysics, lane = 0): WreckHit | null {
     const circles = truckCircles(truck);
     for (const w of this.items) {
-      if (!w.solid || w.far || Math.abs(w.x - truck.x) > 200) continue;
+      if (!w.solid || !sameLane(w.lane, lane) || Math.abs(w.x - truck.x) > 200) continue;
       const c = deepestContact(circles, wreckCircles(w));
       if (!c) continue;
       // Closing speed: the truck's velocity at the contact point, along the normal to the wreck.
@@ -177,7 +192,7 @@ export class WreckField {
     w.angle = Math.atan(this.terrain.slopeAt(w.x));
   }
 
-  private make(x: number, style: number, fresh: boolean): Wreck {
+  private make(x: number, style: number, fresh: boolean, lane = 0): Wreck {
     const w: Wreck = {
       id: this.nextId++,
       x,
@@ -190,7 +205,7 @@ export class WreckField {
       spin: 0,
       age: 0,
       fresh,
-      far: false,
+      lane: Math.max(0, Math.min(LANES.count - 1, Math.round(lane))),
     };
     this.settle(w);
     this.items.push(w);
@@ -211,6 +226,7 @@ export class WreckField {
     const roll = this.rng.next();
     const jitter = this.rng.range(-60, 60);
     const style = this.rng.int(0, RIVAL_STYLES.length - 1);
+    let lane = this.rng.int(0, LANES.count - 1);
     if (roll > this.chance((mid - this.startX) / PX_PER_METER)) return;
 
     let x = mid + jitter;
@@ -219,7 +235,12 @@ export class WreckField {
     if (prev && JUMP_KINDS.includes(prev.kind)) x = Math.max(x, prev.x1 + WRECKS.landingClear);
     if (x > p.x1 - 120 || x < p.x0 + 40) return;
     if (x - this.lastX < WRECKS.minSpacing) return;
+    if (this.canBlock && !this.canBlock(x, lane)) {
+      const other = [...Array(LANES.count).keys()].find((l) => this.canBlock!(x, l));
+      if (other === undefined) return;
+      lane = other;
+    }
     this.lastX = x;
-    this.make(x, style, false);
+    this.make(x, style, false, lane);
   }
 }

@@ -1,13 +1,14 @@
 import Phaser from 'phaser';
-import { PHYSICS, RIVALS, TRUCK } from '../config';
+import { PHYSICS, TRUCK } from '../config';
 import { rivalTruckKey } from '../art/trucks';
+import { laneDepth, laneProject, laneScale, laneShade } from './Lanes';
 import { RIVAL_STYLES, type Rival } from './Rival';
 import type { Terrain } from './Terrain';
 import { bodyOrigin, placeBody } from './TruckView';
 
 /**
- * Visuals for one rival: livery body plus two spinning wheels. In the far lane the truck is drawn
- * higher, smaller and a shade darker, and behind the player (the original's pseudo-3D depth).
+ * Visuals for one rival: livery body plus two spinning wheels. In a far lane the truck is drawn
+ * higher, smaller and a shade darker, and behind nearer lanes (the original's pseudo-3D depth).
  */
 export class RivalView {
   private body: Phaser.GameObjects.Image;
@@ -30,14 +31,13 @@ export class RivalView {
   update(terrain: Terrain, dt: number): void {
     const r = this.rival;
     const t = r.truck;
-    const far = r.laneBlend; // 0 near .. 1 far, animated during a swerve
-    const scale = 1 - (1 - RIVALS.farScale) * far;
-    const lift = RIVALS.farOffset * far;
-    // Anchor the lane offset at the ground below the truck so the whole truck scales together.
+    const f = r.laneF; // animated during a swerve
+    const scale = laneScale(f);
     const gy = terrain.heightAt(t.x);
-    const place = (x: number, y: number) => ({ x, y: gy + (y - gy) * scale - lift });
-    const depth = far > 0.5 ? 1.6 : 2.6;
-    const tint = Phaser.Display.Color.GetColor(255 - 55 * far, 255 - 55 * far, 255 - 40 * far);
+    const place = (x: number, y: number) => ({ x, y: laneProject(gy, y, f) });
+    const depth = laneDepth(f, 0.06);
+    const shade = laneShade(f);
+    const tint = Phaser.Display.Color.GetColor(shade, shade, Math.min(255, shade + 8));
 
     const bp = place(t.x, t.y);
     this.body.setPosition(bp.x, bp.y).setScale(scale).setDepth(depth).setTint(tint);
@@ -52,7 +52,7 @@ export class RivalView {
         .setPosition(p.x, p.y)
         .setRotation(this.spin)
         .setScale(scale * this.tire)
-        .setDepth(depth + 0.1)
+        .setDepth(depth + 0.02)
         .setTint(tint);
     });
   }

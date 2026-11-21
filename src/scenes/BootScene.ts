@@ -2,12 +2,15 @@ import Phaser from 'phaser';
 import { ART } from '../config';
 import { makeBackdrops } from '../art/backdrops';
 import {
+  OBSTACLE_ART,
+  OBSTACLE_VARIANTS,
   drawCheckpointGate,
   drawFuelCan,
   drawSnack,
   drawStartGate,
   drawWheel,
   drawWrench,
+  obstacleKey,
 } from '../art/props';
 import { makeRotationAtlas, makeTruckTextures } from '../art/trucks';
 
@@ -35,6 +38,10 @@ export class BootScene extends Phaser.Scene {
     this.bake('start_gate', 132, 220, drawStartGate);
     this.bake('cp_gate', 260, 212, (g) => drawCheckpointGate(g, 0x2f6fd6, 0xffe066));
     this.bake('cp_gate_zone', 260, 212, (g) => drawCheckpointGate(g, 0xe8742a, 0x9be0ff));
+    for (const kind of Object.keys(OBSTACLE_ART) as (keyof typeof OBSTACLE_ART)[]) {
+      const art = OBSTACLE_ART[kind];
+      for (let v = 0; v < OBSTACLE_VARIANTS; v++) this.bake(obstacleKey(kind, v), art.w, art.h, (g) => art.draw(g, v));
+    }
     this.scene.start('Game');
   }
 

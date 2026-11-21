@@ -1,6 +1,6 @@
 # 4x4 Snack Run: Redux Roadmap
 
-> **Status:** Phases 0 to 6 are complete (see `README.md`): the game is a playable alpha with art and an adaptive score and SFX, all generated at runtime. Next up: Phase 7 (progression and retention). All art is generated in code (`src/art/`); texture keys (`truck_body`, `rival_0..5`, `wheel`, `snack`, `fuel_can`, `wrench`, `start_gate`, `cp_gate`, and `sky_<biome>`, `trees_<biome>`, ...) are stable so real sprites can drop in.
+> **Status:** Phases 0 to 7 are complete (see `README.md`): the game is a playable alpha with art, an adaptive score and SFX, depth lanes with obstacles, and a garage with saved progress, all generated at runtime. Next up: Phase 8 (polish, platform, and launch). All art is generated in code (`src/art/`); texture keys (`truck_body`, `rival_0..5`, `wheel`, `snack`, `fuel_can`, `wrench`, `start_gate`, `cp_gate`, and `sky_<biome>`, `trees_<biome>`, ...) are stable so real sprites can drop in.
 
 An endless-runner redux of a late-90s Flash/Shockwave-era 4x4 racing game. Same spirit (muddy tracks, big trucks, jumps, snack pickups), rebuilt for modern browsers.
 
@@ -148,11 +148,24 @@ An endless-runner redux of a late-90s Flash/Shockwave-era 4x4 racing game. Same 
 
 ### Phase 7: Progression and Retention (1-2 weeks)
 
-- [ ] Local high-score table and run stats
-- [ ] Coins/"snack bank" currency spent on: truck skins, tank size, fuel efficiency, damage resistance
-- [ ] Daily seed challenge (same course for everyone)
-- [ ] Achievements (e.g. "10-snack combo", "longest air time", "no damage to 2 km")
+- [x] Local high-score table and run stats (top 10 plus lifetime stats, saved in `localStorage`, with an in-memory fallback)
+- [x] Coins/"snack bank" currency spent in the garage (`G` on the game-over screen) on: truck paint (5 skins), tank size, fuel efficiency, damage resistance (5 levels each)
+- [x] Daily seed challenge (same course for everyone: the UTC day is the seed; stock truck, no upgrades; best score kept per day; first run of the day pays a bonus)
+- [x] Achievements (15, with coin rewards: e.g. "10-snack combo", "hang time", "no damage to 2 km"); unlock with a toast mid-run
 - **Exit:** a reason to play "one more run"
+
+### Added with Phase 7: Depth Lanes and Obstacles
+
+The original was pseudo-3D: a wide dirt field with trucks driving at different depths. The two-lane trick from Phase 4 is now a proper field:
+
+- [x] **4 depth lanes** (`LANES` in `src/config.ts`): each lane is drawn higher, smaller and darker; the ground is a set of terraces stepping up and away, like the reference screenshots' field. The terrain (jumps, hills) is the same in every lane
+- [x] **The player changes lanes** (Q/E, or Shift + Up/Down; one lane per press, 0.22 s per lane, also in the air). Only things in (nearly) the same lane collide, so a swerve sideswipes whatever is in the lane you cut through
+- [x] **Obstacles** in the lanes: rocks and tire stacks (knocked loose, rocks hurt a little, tires only slow you) and logs and boulders (fixed: hit one at speed and you stop dead and take damage). Rows never block more than 2 of 4 lanes, wrecks included
+- [x] **Rivals use all lanes**, dodge wrecks and obstacles with a skill-based chance (a careless rival drives into the rock) and crash for real; they keep clear of the player's lane unless they are far enough up the road to be seen
+- [x] Pickups sit in lanes (snack trails wander one lane at a time; cans stay in the middle lanes and can be grabbed one lane over); a lane radar under the race position shows what is ahead, lane by lane
+- [x] Close calls: swerving away from an obstacle at the last moment and passing it clean pays a BONUS
+
+- [ ] Actually the up and down arrows should be used to change the lane but lane changing isn't that intuitive and the pickups could use a under shadow to better help show what lane they're on. The player should be able to hold down up or down arrow keys to change the lane smoothly so its not like a deliberate change but feels more 3d like the original game
 
 ### Phase 8: Polish, Platform, and Launch (1-2 weeks)
 
@@ -178,7 +191,14 @@ An endless-runner redux of a late-90s Flash/Shockwave-era 4x4 racing game. Same 
 | Hit damage (rival or wreck) | 10-25% per hit, scaled by closing speed; free below 170 px/s. Rivals take x2.5 so a takedown is two hard hits |
 | Wrench                    | repairs 30% damage; first at 400 m, then every 450-800 m |
 | Takedown                  | +500 BONUS for wrecking a rival you rammed within 3 s |
-| Roadside wrecks           | from 250 m; 10% per flat/hill chunk rising to 30% at 2.5 km; at least 2,400 px apart, never just after a jump |
+| Roadside wrecks           | from 250 m; 10% per flat/hill chunk rising to 30% at 2.5 km; at least 2,400 px apart, never just after a jump; random lane |
+| Lanes                     | 4; 15 px higher and 6% smaller per lane; 0.22 s per lane change; collide when < 0.55 lanes apart; snacks need < 0.75, cans and wrenches < 1.1 |
+| Obstacles                 | from 150 m (rock), 250 m (tires), 400 m (log), 600 m (boulder); 30% per flat/hill chunk rising to 80% at 3 km, 15% rising to 50% for a second one; rows 420 px apart, at most 2 of 4 lanes blocked (wrecks included) |
+| Obstacle hits             | rock: 0.6x bump damage, takes 35% of the closing speed; tires: no damage, 22%; log: 0.9x, 50%; boulder: 1.3x (up to 33%), 65%; fixed ones cannot hurt again for 0.5 s |
+| Close call                | +50 BONUS for passing an obstacle you swerved away from (it was ahead in the lane you left) |
+| Coins                     | 2 per snack, 1 per 25 m, 15 per checkpoint, 10 per takedown, 2 per close call; +50 for the first daily run of a day |
+| Upgrades                  | tank +20% capacity, efficiency -7% burn, armor -8% damage per level (5 levels); level n costs about base x 1.7^n (150 / 120 / 140 to start) |
+| Paint                     | 5 skins: free, 300, 300, 500, 800 coins |
 | Rivals on course          | 1 at the start, +1 per 800 m, max 3; opening grid of two just past the line |
 | Rival speed               | cruise 520-720 px/s by skill, +/-190 rubber band over 700 px |
 | Draft                     | within 260 px behind a rival in your lane: builds over 1 s to +45% engine force, +12% top speed |
@@ -187,7 +207,7 @@ An endless-runner redux of a late-90s Flash/Shockwave-era 4x4 racing game. Same 
 
 ---
 
-**Depth lanes (design note).** The original was pseudo-3D, so trucks could pass each other. A single flat lane would make every overtake a collision, so rivals also use a *far lane* (drawn higher, smaller and darker) where nothing touches the player. A rival may drop into your lane only when it is clear of your truck and, if ahead, at least 480 px up the road, so you always see it coming. Brake behind it to draft, ram it for a takedown, or wait for it to swerve out. Wrecks are always in the near lane and are knocked aside when hit (once), so one can never trap you: **braking below 170 px/s makes the hit free.**
+**Depth lanes (design note).** The original was pseudo-3D, so trucks could pass each other. A single flat lane would make every overtake a collision, so everything lives in one of 4 *depth lanes* (drawn higher, smaller and darker the further away they are), and only things within 0.55 of a lane of each other touch. A rival may move into your lane (or the one you are heading for) only when it is clear of your truck and, if ahead, at least 480 px up the road, so you always see it coming. Brake behind it to draft, ram it for a takedown, or switch lanes to get past. Wrecks and loose obstacles are knocked aside when hit (once); fixed ones (logs, boulders) stay, but changing lanes always gets you past, so nothing can trap you: **braking below 170 px/s makes a hit free.**
 
 ---
 

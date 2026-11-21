@@ -5,6 +5,8 @@ export interface TrackSegment {
   x0: number;
   x1: number;
   color: number;
+  /** Pixels the track is drawn above the ground line (the lane it was laid in). */
+  lift: number;
 }
 
 /**
@@ -16,7 +18,7 @@ export class TrackMarks {
   private last = new Map<string, number>();
 
   /** Report a wheel. `rolling` is true while it is on the ground and moving over `minSpeed`. */
-  add(key: string, x: number, rolling: boolean, color: number): void {
+  add(key: string, x: number, rolling: boolean, color: number, lift = 0): void {
     const T = FX.tracks;
     const prev = this.last.get(key);
     if (!rolling) {
@@ -28,7 +30,7 @@ export class TrackMarks {
       return;
     }
     if (Math.abs(x - prev) < T.spacing) return;
-    this.segments.push({ x0: Math.min(prev, x), x1: Math.max(prev, x), color });
+    this.segments.push({ x0: Math.min(prev, x), x1: Math.max(prev, x), color, lift });
     this.last.set(key, x);
     if (this.segments.length > T.max) this.segments.splice(0, this.segments.length - T.max);
   }

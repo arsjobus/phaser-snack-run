@@ -216,3 +216,133 @@ export function drawCheckpointGate(g: G, banner: number, bulbs: number): void {
   tireStack(g, 6, 212);
   tireStack(g, 254, 212);
 }
+
+/** Unit-square outline of a rock, and its lit top and two shaded flanks (scaled by `rockShape`). */
+const ROCK_OUTLINE: [number, number][] = [
+  [0.02, 0.98],
+  [0, 0.58],
+  [0.17, 0.26],
+  [0.48, 0.03],
+  [0.8, 0.14],
+  [1, 0.55],
+  [0.96, 0.98],
+];
+
+/** A chunky grey rock of any size: dark outline, lit top, shaded flanks, a crack and a bit of moss. */
+function rockShape(g: G, w: number, h: number, variant: number): void {
+  const j = [0, 0.05, -0.04][variant % 3];
+  const pts = (list: [number, number][]) => list.map(([x, y]) => [x * w, y * h] as [number, number]);
+  poly(g, OUT, pts(ROCK_OUTLINE.map(([x, y]) => [x, y + (y < 0.3 ? j : 0)] as [number, number])));
+  const m = 2.5 / w; // outline thickness in unit space
+  const n = 2.5 / h;
+  poly(
+    g,
+    0x8c909a,
+    pts([
+      [0.02 + m, 0.98 - n],
+      [m, 0.6],
+      [0.18 + m, 0.28 + j],
+      [0.48, 0.05 + n + j],
+      [0.79 - m, 0.16 + j],
+      [1 - m, 0.55],
+      [0.96 - m, 0.98 - n],
+    ]),
+  );
+  poly(
+    g,
+    0xbcc0c9,
+    pts([
+      [0.2, 0.3 + j],
+      [0.48, 0.07 + j],
+      [0.78, 0.18 + j],
+      [0.62, 0.33],
+      [0.38, 0.36],
+    ]),
+  );
+  poly(
+    g,
+    0x676b75,
+    pts([
+      [0.04, 0.96],
+      [0.03, 0.6],
+      [0.17, 0.52],
+      [0.27, 0.96],
+    ]),
+  );
+  poly(
+    g,
+    0x555963,
+    pts([
+      [0.62, 0.96],
+      [0.7, 0.55],
+      [0.97, 0.56],
+      [0.93, 0.96],
+    ]),
+  );
+  g.lineStyle(Math.max(1.5, w / 30), OUT, 0.65);
+  g.lineBetween(0.44 * w, 0.4 * h, 0.52 * w, 0.62 * h);
+  g.lineBetween(0.52 * w, 0.62 * h, 0.47 * w, 0.9 * h);
+  g.fillStyle(0x5d8a3a, 0.95); // moss at the foot
+  g.fillEllipse(0.28 * w, 0.93 * h, 0.22 * w, 0.07 * h);
+}
+
+/** Small rock, 42x34. Loose: a truck knocks it away. */
+export function drawRock(g: G, variant = 0): void {
+  rockShape(g, 42, 34, variant);
+}
+
+/** Big boulder, 78x64. Fixed: hit it at speed and you stop dead. */
+export function drawBoulder(g: G, variant = 0): void {
+  rockShape(g, 78, 64, variant);
+  g.fillStyle(0x4a7d33, 0.9); // moss cap
+  g.fillEllipse(30, 9, 22, 6);
+}
+
+/** Fallen log, 104x34. Fixed. */
+export function drawLog(g: G, variant = 0): void {
+  g.fillStyle(OUT, 1);
+  g.fillRoundedRect(3, 3, 98, 30, 11);
+  g.fillStyle(0x7a4a24, 1);
+  g.fillRoundedRect(6, 5, 92, 26, 9);
+  g.fillStyle(0x93602f, 1);
+  g.fillRect(12, 7, 80, 6);
+  g.fillStyle(0x5a3416, 1);
+  g.fillRect(12, 24, 80, 5);
+  g.lineStyle(1.5, 0x4a2a10, 1);
+  for (const x of [22, 44, 66, 82]) g.lineBetween(x + (variant % 2) * 3, 8, x + 4, 28);
+  g.fillStyle(0x4a2a10, 1); // knot
+  g.fillCircle(52 - variant * 4, 15, 4);
+  g.fillStyle(0x6a3c1a, 1);
+  g.fillCircle(52 - variant * 4, 15, 2);
+  // sawn end with growth rings
+  g.fillStyle(OUT, 1);
+  g.fillEllipse(95, 18, 16, 30);
+  g.fillStyle(0xd9a066, 1);
+  g.fillEllipse(95, 18, 12, 26);
+  g.lineStyle(1.5, 0xb27a40, 1);
+  g.strokeEllipse(95, 18, 7, 16);
+  g.strokeEllipse(95, 18, 2.5, 7);
+}
+
+/** A stack of three tires, 40x48. Loose: it scatters, and costs speed rather than health. */
+export function drawTireObstacle(g: G, variant = 0): void {
+  tireStack(g, 20 + (variant % 2), 47);
+  g.fillStyle(0xd23a2a, 1); // a red tire on top
+  g.fillRoundedRect(7 + (variant % 2), 9, 26, 10, 5);
+  g.fillStyle(0x161616, 1);
+  g.fillEllipse(20 + (variant % 2), 14, 12, 4);
+}
+
+/** Texture sizes and drawing code of every obstacle kind (`OBSTACLE_KINDS`), three variants each. */
+export const OBSTACLE_ART = {
+  rock: { w: 42, h: 34, draw: drawRock },
+  boulder: { w: 78, h: 64, draw: drawBoulder },
+  log: { w: 104, h: 34, draw: drawLog },
+  tires: { w: 40, h: 48, draw: drawTireObstacle },
+} as const;
+
+export const OBSTACLE_VARIANTS = 3;
+
+/** Stable texture key of an obstacle's look, so real sprites can drop in. */
+export const obstacleKey = (kind: keyof typeof OBSTACLE_ART, variant: number): string =>
+  `obs_${kind}_${((variant % OBSTACLE_VARIANTS) + OBSTACLE_VARIANTS) % OBSTACLE_VARIANTS}`;

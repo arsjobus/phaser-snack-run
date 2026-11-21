@@ -3,12 +3,13 @@ import {
   BASE_Y,
   ART,
   CAMERA,
-  FUEL,
   FX,
   GAMEPLAY,
+  LANES,
   PHYSICS,
+  OBSTACLES,
+  OBSTACLE_KINDS,
   PX_PER_METER,
-  RIVALS,
   SCROLL_Y0,
   TERRAIN_STEP,
   TRUCK,
@@ -17,11 +18,15 @@ import {
   WRECKS,
   WRENCH,
 } from '../config';
-import { RIVAL_PAINT, rivalTruckKey, shade } from '../art/trucks';
+import { obstacleKey } from '../art/props';
+import { RIVAL_PAINT, playerTruckKey, rivalTruckKey, shade } from '../art/trucks';
 import { AudioSystem, biomeIndex } from '../audio/AudioSystem';
 import { biomeAtX, biomeChangesAt, biomeSegments, type Biome } from '../game/Biomes';
 import { checkpointMeters } from '../game/Checkpoint';
 import { truckCircles } from '../game/Collision';
+import { PlayerLane, laneDepth, laneLift, laneProject, laneScale, laneShade } from '../game/Lanes';
+import { NO_PERKS } from '../game/Perks';
+import { obstacleCircles } from '../game/Obstacles';
 import { emitCrash, emitDust, emitLanding, emitMud, emitSmoke, sprayRate } from '../game/Effects';
 import { ParticleSystem, particleFade, particleRadius } from '../game/Particles';
 import { TrackMarks } from '../game/TrackMarks';
@@ -38,6 +43,10 @@ import { TruckPhysics } from '../game/TruckPhysics';
 import { TruckView } from '../game/TruckView';
 import { wreckCircles, type Wreck } from '../game/Wrecks';
 import type { InputState } from '../game/Input';
+import { unlockAchievements, type Achievement } from '../progress/Achievements';
+import { dailySeed, dayKey } from '../progress/Daily';
+import { loadSave, perksFor, recordRun, writeSave, type RunResult, type SaveData } from '../progress/Progress';
+import { defaultStore, type KeyValueStore } from '../progress/Storage';
 
 const FIXED_DT = 1 / 60 / PHYSICS.substeps;
 const TUFT_SPACING = 72;
@@ -70,6 +79,16 @@ export class GameScene extends Phaser.Scene {
   private posText!: Phaser.GameObjects.Text;
   private rivalViews = new Map<number, RivalView>();
   private wreckSprites = new Map<number, WreckSprite>();
+  private obstacleSprites = new Map<number, Phaser.GameObjects.Image>();
+  private lane = new PlayerLane();
+  private laneHud!: Phaser.GameObjects.Graphics;
+  private store: KeyValueStore = defaultStore();
+  private save!: SaveData;
+  private daily = false;
+  private day = dayKey();
+  private achClock = 0;
+  private banked: (RunResult & { achievements: Achievement[] }) | null = null;
+  private achToast!: Phaser.GameObjects.Text;
   private particles = new ParticleSystem();
   private tracks = new TrackMarks();
   private decals!: Phaser.GameObjects.Graphics;
@@ -97,6 +116,11 @@ export class GameScene extends Phaser.Scene {
     super('Game');
   }
 
+  /** `daily: true` starts the daily challenge: the day's seed, and the stock truck for everyone. */
+  init(data?: { daily?: boolean }): void {
+    this.daily = data?.daily === true || new URLSearchParams(window.location.search).has('daily');
+  }
+
   create(): void {
     // Scene instances are reused on restart, so reset every piece of run state here.
     this.acc = 0;
@@ -109,6 +133,12 @@ export class GameScene extends Phaser.Scene {
     this.gates.clear();
     this.rivalViews.clear();
     this.wreckSprites.clear();
+    this.obstacleSprites.clear();
+    this.lane = new PlayerLane();
+    this.banked = null;
+    this.achClock = 0;
+    this.day = dayKey();
+    this.save = loadSave(this.store);
     this.particles = new ParticleSystem();
     this.tracks = new TrackMarks();
     this.sprayAcc.clear();
@@ -119,21 +149,27 @@ export class GameScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.audio.dispose());
 
     const param = new URLSearchParams(window.location.search).get('seed');
-    this.seed = param ? hashSeed(param) : Math.floor(Math.random() * 2 ** 31);
+    this.seed = this.daily
+      ? dailySeed(this.day)
+      : param
+        ? hashSeed(param)
+        : Math.floor(Math.random() * 2 ** 31);
 
     this.terrain = new Terrain(this.seed);
-    this.run = new RunModel(this.seed, this.terrain, this.startX);
-    this.race = new Race(this.seed, this.terrain, this.run.wrecks, this.startX);
+    // The daily challenge is the same stock truck for everyone; otherwise garage upgrades apply.
+    this.run = new RunModel(this.seed, this.terrain, this.startX, this.daily ? NO_PERKS : perksFor(this.save));
+    this.race = new Race(this.seed, this.terrain, this.run.wrecks, this.startX, this.run.obstacles);
     this.biome = biomeAtX(this.startX, this.startX);
     this.parallax = new Parallax(this, this.biome.id);
     this.ground = this.add.graphics().setDepth(1);
     this.decals = this.add.graphics().setDepth(1.2);
     this.addStartGate();
     this.truck = new TruckPhysics(this.startX, BASE_Y - 45);
-    this.view = new TruckView(this);
+    this.view = new TruckView(this, playerTruckKey(this.save.skin));
     this.fx = this.add.graphics().setDepth(4.5);
     this.debugGfx = this.add.graphics().setDepth(5);
     this.hudBar = new Hud(this);
+    this.laneHud = this.add.graphics().setScrollFactor(0).setDepth(10);
 
     const text = (size: number, color: string) => ({
       fontFamily: 'monospace',
@@ -148,8 +184,8 @@ export class GameScene extends Phaser.Scene {
         VIEW_W / 2,
         VIEW_H - HUD_H - 30,
         [
-          '←/A brake   ↑/W lean back   ↓/S lean forward   R reset   T auto-gas   M mute   N music   H debug',
-          'BRAKE for wrecks · tuck in behind a rival to draft · ram it to wreck it for a takedown',
+          '←/A brake   ↑/W lean back   ↓/S lean forward   Q/E change lane   R reset   T auto-gas   M mute   N music   H debug',
+          'Change lanes to dodge rocks, logs and boulders · tuck in behind a rival to draft · ram it for a takedown',
         ],
         { ...text(13, '#ffffff'), align: 'center' },
       )
@@ -179,11 +215,18 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(10)
       .setAlpha(0);
+    this.achToast = this.add
+      .text(VIEW_W / 2, 196, '', { ...text(20, '#ffd34d'), align: 'center' })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(10)
+      .setAlpha(0);
     this.tweens.add({ targets: this.hint, alpha: 0, delay: 9000, duration: 1200 });
+    if (this.daily) this.flash('DAILY CHALLENGE  ' + this.day);
 
     const kb = this.input.keyboard!;
     this.cursors = kb.createCursorKeys();
-    this.keys = kb.addKeys('W,A,S,D,R,T,H,M,N,SPACE,ENTER') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = kb.addKeys('W,A,S,D,Q,E,G,R,T,H,M,N,SPACE,ENTER') as Record<string, Phaser.Input.Keyboard.Key>;
 
     this.terrain.ensure(this.startX + VIEW_W + 1500);
     const cam = this.cameras.main;
@@ -202,8 +245,10 @@ export class GameScene extends Phaser.Scene {
     const engine = this.run.engineOn; // a dry tank means no throttle and no brake torque
     const gas = engine && (c.right.isDown || k.D.isDown || this.autoThrottle);
     const brake = engine && (c.left.isDown || k.A.isDown);
-    const back = c.up.isDown || k.W.isDown;
-    const fwd = c.down.isDown || k.S.isDown;
+    // Shift + Up/Down changes lanes, so the arrows do not also lean while Shift is held.
+    const shift = c.shift.isDown;
+    const back = (c.up.isDown && !shift) || k.W.isDown;
+    const fwd = (c.down.isDown && !shift) || k.S.isDown;
     return { throttle: gas ? 1 : 0, brake: brake ? 1 : 0, lean: (fwd ? 1 : 0) - (back ? 1 : 0) };
   }
 
@@ -211,8 +256,11 @@ export class GameScene extends Phaser.Scene {
     const dt = Math.min(delta / 1000, 1 / 20);
     const J = Phaser.Input.Keyboard.JustDown;
     if (this.run.over) {
-      if (J(this.keys.R) || J(this.keys.SPACE) || J(this.keys.ENTER)) this.restart();
+      if (J(this.keys.G)) this.scene.start('Garage');
+      else if (J(this.keys.D)) this.restart(!this.daily);
+      else if (J(this.keys.R) || J(this.keys.SPACE) || J(this.keys.ENTER)) this.restart();
     } else {
+      this.readLaneKeys();
       if (J(this.keys.R)) this.recover();
       if (J(this.keys.T)) this.autoThrottle = !this.autoThrottle;
     }
@@ -225,6 +273,7 @@ export class GameScene extends Phaser.Scene {
 
     // Fixed-step physics (substeps keep the stiff suspension stable)
     const input = this.readInput();
+    this.lane.update(dt);
     this.acc += dt;
     let steps = 0;
     while (this.acc >= FIXED_DT && steps < 40) {
@@ -238,10 +287,13 @@ export class GameScene extends Phaser.Scene {
     if (steps === 40) this.acc = 0;
     this.terrain.prune(this.truck.x - 1800);
 
-    for (const e of this.run.update(dt, this.truck)) this.onRunEvent(e);
-    for (const e of this.race.update(dt, this.truck, this.run.meters, !this.run.over)) {
+    for (const e of this.run.update(dt, { x: this.truck.x, y: this.truck.y, speed: this.truck.speed, lane: this.lane.f })) {
+      this.onRunEvent(e);
+    }
+    for (const e of this.race.update(dt, this.truck, this.run.meters, !this.run.over, this.lane.f, this.lane.target)) {
       this.onRaceEvent(e);
     }
+    this.checkAchievements(dt);
     this.lowFuelBeep();
     this.audio.update({
       speed: this.truck.speed,
@@ -260,18 +312,37 @@ export class GameScene extends Phaser.Scene {
     if (this.flippedTimer > GAMEPLAY.flipRecoverTime) this.recover();
 
     this.updateCamera(dt);
-    this.view.update(this.truck, this.terrain, dt);
+    this.view.update(this.truck, this.terrain, dt, this.lane.f);
     this.syncBiome();
     this.drawGround();
     this.syncPickups(time / 1000);
     this.syncRivals(dt);
     this.syncWrecks(dt);
+    this.syncObstacles();
     this.updateFx(dt);
     this.drawDecals();
     this.syncGates();
     this.parallax.update(this.cameras.main.scrollX, this.cameras.main.scrollY, dt);
     this.drawDebug();
     this.updateHud();
+    this.drawLaneHud();
+  }
+
+  /** Q/E (or Shift+Up/Down): one lane further from / nearer to the camera. */
+  private readLaneKeys(): void {
+    const J = Phaser.Input.Keyboard.JustDown;
+    const c = this.cursors;
+    const far = J(this.keys.Q) || (c.shift.isDown && J(c.up));
+    const near = J(this.keys.E) || (c.shift.isDown && J(c.down));
+    const dir = far ? 1 : near ? -1 : 0;
+    if (dir === 0) return;
+    const from = this.lane.request(dir);
+    if (from === null) return;
+    this.run.laneChanged(this.truck.x, from);
+    this.audio.swerve();
+    // A little mud kicked up at the wheels as the truck slews across.
+    const t = this.truck;
+    emitDust(this.particles, Math.random, this.biome, t.x - 30, this.terrain.heightAt(t.x) - laneLift(from), t.speed, 5, 0.8);
   }
 
   private updateCamera(dt: number): void {
@@ -331,9 +402,14 @@ export class GameScene extends Phaser.Scene {
       strip(c.crustShadow, 10, 15, xa, xb);
       strip(c.rut1, 22, 26, xa, xb); // tire ruts, like the reference's rutted mud
       strip(c.rut2, 33, 36, xa, xb);
-      // The far lane's road: a raised shelf of dirt, so trucks driving there rest on something.
-      strip(shade(c.crust, 0.78), -RIVALS.farOffset, 0, xa, xb);
-      strip(c.crustShadow, -RIVALS.farOffset, -RIVALS.farOffset + 3, xa, xb);
+      // The other lanes' roads: terraces of dirt stepping up and away, like the original's wide field.
+      // Drawn from the furthest lane down so each nearer terrace covers the foot of the one behind it.
+      for (let k = LANES.count - 1; k >= 1; k--) {
+        const lift = laneLift(k);
+        strip(shade(c.crust, 0.86 - 0.06 * k), -lift, 0, xa, xb); // the terrace's face
+        strip(c.crustShadow, -lift + 5, -lift + 8, xa, xb); // a rut along the lane
+        strip(shade(c.crust, 1.08 - 0.05 * k), -lift, -lift + 3, xa, xb); // sunlit lip
+      }
       this.drawTufts(seg.biome, xa, xb);
     }
   }
@@ -387,12 +463,14 @@ export class GameScene extends Phaser.Scene {
     let open = false;
     let color = -1;
     let endX = Number.NaN;
-    const y = (x: number) => this.terrain.heightAt(x) + 3;
+    let lift = 0;
+    const y = (x: number) => this.terrain.heightAt(x) + 3 - lift;
     for (const seg of this.tracks.segments) {
       if (seg.x0 > right) continue;
-      if (!open || seg.color !== color || seg.x0 !== endX) {
+      if (!open || seg.color !== color || seg.x0 !== endX || seg.lift !== lift) {
         if (open) g.strokePath();
         g.lineStyle(FX.tracks.width, seg.color, FX.tracks.alpha);
+        lift = seg.lift;
         g.beginPath();
         g.moveTo(seg.x0, y(seg.x0));
         open = true;
@@ -413,13 +491,22 @@ export class GameScene extends Phaser.Scene {
       let sprite = this.sprites.get(p.id);
       if (visible && !sprite) {
         const key = p.kind === 'fuel' ? 'fuel_can' : p.kind === 'wrench' ? 'wrench' : 'snack';
-        sprite = this.add.image(p.x, p.y, key).setDepth(2.5);
+        sprite = this.add.image(p.x, p.y, key);
         if (p.kind === 'wrench') sprite.setAngle(-14);
         this.sprites.set(p.id, sprite);
       }
       if (!sprite) continue;
-      if (visible && p.kind !== 'wrench') sprite.y = p.y + Math.sin(seconds * 4 + p.id) * 3;
-      else if (!p.taken) {
+      if (visible) {
+        // Placed in the pickup's lane: higher, smaller and darker further away.
+        const gy = this.terrain.heightAt(p.x);
+        const bob = p.kind !== 'wrench' ? Math.sin(seconds * 4 + p.id) * 3 : 0;
+        const shadeV = laneShade(p.lane);
+        sprite
+          .setPosition(p.x, laneProject(gy, p.y + bob, p.lane))
+          .setScale(laneScale(p.lane))
+          .setTint(Phaser.Display.Color.GetColor(shadeV, shadeV, shadeV))
+          .setDepth(laneDepth(p.lane, 0.04));
+      } else if (!p.taken) {
         sprite.destroy();
         this.sprites.delete(p.id);
       }
@@ -473,14 +560,14 @@ export class GameScene extends Phaser.Scene {
         if (e.type === 'wrench') {
           this.audio.wrench();
           const label = e.repaired > 0 ? `REPAIR -${Math.round(e.repaired * 100)}%` : 'WRENCH';
-          this.popup(e.pickup.x, e.pickup.y - 24, label, e.repaired > 0 ? '#9be0ff' : '#c9ced6');
+          this.popup(e.pickup.x, this.liftY(e.pickup.x, e.pickup.y, e.pickup.lane) - 24, label, e.repaired > 0 ? '#9be0ff' : '#c9ced6');
         } else if (e.type === 'snack') {
           this.audio.snack(e.multiplier);
           const label = e.multiplier > 1 ? `+${e.points} x${e.multiplier}` : `+${e.points}`;
-          this.popup(e.pickup.x, e.pickup.y - 18, label, '#ffe066');
+          this.popup(e.pickup.x, this.liftY(e.pickup.x, e.pickup.y, e.pickup.lane) - 18, label, '#ffe066');
         } else {
           this.audio.fuel();
-          this.popup(e.pickup.x, e.pickup.y - 24, `FUEL +${Math.round(FUEL.canRestore * 100)}%`, '#7dff8a');
+          this.popup(e.pickup.x, this.liftY(e.pickup.x, e.pickup.y, e.pickup.lane) - 24, `FUEL +${Math.round(e.added * 100)}%`, '#7dff8a');
           this.tweens.killTweensOf(this.warn);
           this.warn.setAlpha(0);
         }
@@ -494,10 +581,16 @@ export class GameScene extends Phaser.Scene {
         this.tweens.killTweensOf(this.warn);
         this.warn.setText('OUT OF FUEL!').setAlpha(1);
         break;
+      case 'nearmiss': {
+        this.audio.reward();
+        const o = e.obstacle;
+        this.popup(this.truck.x + 40, this.liftY(o.x, o.y, o.lane) - 40, `CLOSE CALL +${e.points}`, '#9be0ff');
+        break;
+      }
       case 'over':
         this.overAt = this.time.now;
         this.audio.gameOver();
-        this.showGameOver();
+        this.showGameOver(this.bankRun());
         break;
       case 'damage':
         this.popup(this.truck.x, this.truck.y - 70, `DAMAGE +${Math.round(e.amount * 100)}%`, '#ff6a5a');
@@ -508,28 +601,46 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** Bumps, wrecks and takedowns from the race model. */
+  /** Screen y of a physics point (x, y) seen in lane position `lane`. */
+  private liftY(x: number, y: number, lane: number): number {
+    return laneProject(this.terrain.heightAt(x), y, lane);
+  }
+
+  /** Bumps, crashes, wrecks and takedowns from the race model. */
   private onRaceEvent(e: RaceEvent): void {
     switch (e.type) {
       case 'bump': {
         const hard = e.damage > 0;
+        const y = this.liftY(e.x, e.y, e.lane);
         this.audio.thud(hard);
-        emitDust(this.particles, Math.random, this.biome, e.x, e.y, 0, hard ? 8 : 4);
-        if (hard) emitCrash(this.particles, Math.random, e.x, e.y - 8, Math.min(1, e.impact / 520), 0xf2c200);
+        emitDust(this.particles, Math.random, this.biome, e.x, y, 0, hard ? 8 : 4);
+        if (hard) emitCrash(this.particles, Math.random, e.x, y - 8, Math.min(1, e.impact / 520), e.with === 'obstacle' ? 0x8c909a : 0xf2c200);
+        if (e.with === 'obstacle' && e.kind) this.popup(e.x, y - 50, e.kind.toUpperCase() + '!', '#ffb066');
         if (hard) {
           this.cameras.main.shake(140, Math.min(0.012, 0.004 + e.impact / 60000));
           for (const ev of this.run.hurt(e.damage)) this.onRunEvent(ev);
         }
         break;
       }
+      case 'rivalCrash': {
+        // A rival drove into something: bigger crashes get sparks and a crunch you can hear.
+        const y = this.liftY(e.x, e.y, e.lane);
+        emitDust(this.particles, Math.random, this.biome, e.x, y, 0, 6);
+        if (e.impact > 200) {
+          this.audio.thud(true);
+          emitCrash(this.particles, Math.random, e.x, y - 8, Math.min(1, e.impact / 520), 0x8c909a);
+          this.popup(e.x, y - 50, `#${e.number} CRASH`, '#ffb066');
+        }
+        break;
+      }
       case 'wrecked':
         this.audio.thud(true);
-        emitCrash(this.particles, Math.random, e.x, e.y - 10, 1, RIVAL_PAINT[Math.max(0, RIVAL_STYLES.findIndex((st) => st.number === e.number))].body);
+        emitCrash(this.particles, Math.random, e.x, this.liftY(e.x, e.y, e.lane) - 10, 1, RIVAL_PAINT[Math.max(0, RIVAL_STYLES.findIndex((st) => st.number === e.number))].body);
         break;
       case 'takedown': {
         const points = this.run.takedown();
         this.audio.takedown();
-        this.popup(e.x, e.y - 60, `TAKEDOWN #${e.number}  +${points}`, '#ff9f45');
+        this.popup(e.x, this.liftY(e.x, e.y, e.lane) - 60, `TAKEDOWN #${e.number}  +${points}`, '#ff9f45');
         this.toast.setText(`TAKEDOWN! +${points}`).setAlpha(1).setScale(1.3);
         this.tweens.killTweensOf(this.toast);
         this.tweens.add({ targets: this.toast, scale: 1, duration: 150 });
@@ -602,15 +713,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   private placeWreck(w: Wreck, sp: WreckSprite): void {
-    const far = w.far ? 1 : 0;
-    const scale = 1 - (1 - RIVALS.farScale) * far;
+    const scale = laneScale(w.lane);
     const gy = this.terrain.heightAt(w.x);
-    const lift = RIVALS.farOffset * far;
     // Upside down: the sprite's pivot is the chassis centre, so sit it a little above the roof line.
-    const y = gy + (w.y - 12 - gy) * scale - lift;
+    const y = laneProject(gy, w.y - 12, w.lane);
     const fade = w.solid ? 1 : Math.max(0, 1 - w.age / WRECKS.debrisLife);
-    const tint = far ? 0x555559 : 0x77777c;
-    const depth = far ? 1.55 : w.solid ? 2.4 : 4;
+    const dim = Math.round(0x77 * (laneShade(w.lane) / 255));
+    const tint = (dim << 16) | (dim << 8) | Math.min(255, dim + 5);
+    const depth = w.solid ? laneDepth(w.lane, 0.0) : 4;
     sp.body.setPosition(w.x, y).setRotation(w.angle).setScale(scale).setTint(tint).setAlpha(fade).setDepth(depth);
     const cos = Math.cos(w.angle);
     const sin = Math.sin(w.angle);
@@ -640,15 +750,16 @@ export class GameScene extends Phaser.Scene {
     if (!this.run.over && dmg >= 0.5 && this.smokeClock <= 0) {
       const cos = Math.cos(t.angle);
       const sin = Math.sin(t.angle);
-      this.puffSmoke(t.x + 44 * cos + 14 * sin, t.y + 44 * sin - 14 * cos, dmg >= 0.75 ? 0x1a1a1a : 0x6e6e72);
+      this.puffSmoke(
+        t.x + 44 * cos + 14 * sin,
+        laneProject(this.terrain.heightAt(t.x), t.y + 44 * sin - 14 * cos, this.lane.f),
+        dmg >= 0.75 ? 0x1a1a1a : 0x6e6e72,
+      );
     }
     if (this.smokeClock <= 0) this.smokeClock = dmg >= 0.75 ? 0.07 : 0.14;
 
-    this.wheelFx('p', t.wheelContacts, t.speed, dt, false);
-    for (const r of this.race.rivals) {
-      const far = r.laneBlend > 0.5;
-      this.wheelFx(`r${r.id}`, r.truck.wheelContacts, r.truck.speed, dt, far);
-    }
+    this.wheelFx('p', t.wheelContacts, t.speed, dt, this.lane.f);
+    for (const r of this.race.rivals) this.wheelFx(`r${r.id}`, r.truck.wheelContacts, r.truck.speed, dt, r.laneF);
 
     this.particles.update(dt, (x) => this.terrain.heightAt(x));
     const g = this.fx;
@@ -688,35 +799,37 @@ export class GameScene extends Phaser.Scene {
       g.lineStyle(3, 0xffffff, 0.55 * this.race.draft);
       for (let i = 0; i < 6; i++) {
         const along = (clock * 1400 + i * 97) % 260;
-        const y = t.y - 46 + i * 16;
+        const y = laneProject(this.terrain.heightAt(t.x), t.y - 46 + i * 16, this.lane.f);
         g.lineBetween(t.x + 120 - along, y, t.x + 160 - along + 40, y);
       }
     }
   }
 
-  /** Spray and tire tracks for the wheels of one vehicle. Far-lane trucks only kick up dust. */
+  /** Spray and tire tracks for the wheels of one vehicle in lane position `lane` (further lanes spray less). */
   private wheelFx(
     key: string,
     wheels: { inContact: boolean; x: number; y: number }[],
     speed: number,
     dt: number,
-    far: boolean,
+    lane: number,
   ): void {
     const biome = this.biome;
+    const lift = laneLift(lane);
+    const swerving = Math.abs(lane - Math.round(lane)) > 0.2;
+    const share = 1 - 0.25 * lane;
     wheels.forEach((c, i) => {
       const k = `${key}${i}`;
-      const rolling = c.inContact && Math.abs(speed) > FX.tracks.minSpeed && !this.run.over;
+      const rolling = c.inContact && Math.abs(speed) > FX.tracks.minSpeed && !this.run.over && !swerving;
       const gy = this.terrain.heightAt(c.x);
-      if (!far) this.tracks.add(k, c.x, rolling, biomeAtX(c.x, this.startX).track);
-      else this.tracks.forget(k);
+      this.tracks.add(k, c.x, rolling, biomeAtX(c.x, this.startX).track, laneLift(Math.round(lane)));
       if (!c.inContact) return;
-      const acc = (this.sprayAcc.get(k) ?? 0) + sprayRate(speed) * dt * (far ? 0.4 : 1);
+      const acc = (this.sprayAcc.get(k) ?? 0) + sprayRate(speed) * dt * Math.max(0.2, share);
       const n = Math.floor(acc);
       this.sprayAcc.set(k, acc - n);
       if (n <= 0) return;
-      const y = far ? gy - RIVALS.farOffset : gy;
-      emitMud(this.particles, Math.random, biome, c.x, y, speed, far ? 0 : n);
-      emitDust(this.particles, Math.random, biome, c.x, y, speed, Math.max(1, Math.round(n / 2)), far ? 0.7 : 1);
+      const y = gy - lift;
+      emitMud(this.particles, Math.random, biome, c.x, y, speed, lane > 1.5 ? 0 : n);
+      emitDust(this.particles, Math.random, biome, c.x, y, speed, Math.max(1, Math.round(n / 2)), Math.max(0.6, share));
     });
   }
 
@@ -851,53 +964,106 @@ export class GameScene extends Phaser.Scene {
     this.flippedTimer = 0;
   }
 
-  private restart(): void {
-    this.scene.restart();
+  private restart(daily = this.daily): void {
+    this.scene.restart({ daily });
   }
 
-  private showGameOver(): void {
+  /** Banks the finished run once: coins, lifetime stats, the score table and any achievements. */
+  private bankRun(): RunResult & { achievements: Achievement[] } {
+    if (this.banked) return this.banked;
+    const summary = this.run.summary(this.daily);
+    const result = recordRun(this.save, summary, this.day);
+    const achievements = unlockAchievements(this.save, summary, this.day);
+    writeSave(this.store, this.save);
+    this.banked = { ...result, achievements };
+    return this.banked;
+  }
+
+  /** While driving: unlock achievements as soon as their condition holds, with a toast. */
+  private checkAchievements(dt: number): void {
+    this.achClock += dt;
+    if (this.run.over || this.achClock < 0.5) return;
+    this.achClock = 0;
+    const fresh = unlockAchievements(this.save, this.run.summary(this.daily), this.day);
+    if (fresh.length === 0) return;
+    writeSave(this.store, this.save);
+    this.audio.reward();
+    this.tweens.killTweensOf(this.achToast);
+    this.achToast
+      .setText(fresh.map((a) => `ACHIEVEMENT: ${a.name}  +${a.reward} coins`))
+      .setAlpha(1);
+    this.tweens.add({ targets: this.achToast, alpha: 0, delay: 2200, duration: 600 });
+  }
+
+  private showGameOver(result: RunResult & { achievements: Achievement[] }): void {
     const s = this.run.score;
     this.tweens.killTweensOf(this.warn);
     this.warn.setAlpha(0);
     const cx = VIEW_W / 2;
-    const cy = 190;
+    const cy = 205;
     this.add
-      .rectangle(cx, cy, 540, 250, 0x0b1230, 0.88)
+      .rectangle(cx, cy, 760, 330, 0x0b1230, 0.9)
       .setStrokeStyle(3, 0x8fa4d6)
       .setScrollFactor(0)
       .setDepth(30);
-    const style = (size: number, color: string) => ({
+    const style = (size: number, color: string, align = 'center') => ({
       fontFamily: 'monospace',
       fontSize: `${size}px`,
       fontStyle: 'bold',
       color,
-      align: 'center',
+      align,
     });
-    this.add
-      .text(cx, cy - 90, TITLES[this.run.endReason ?? 'fuel'], style(34, '#ff5a4a'))
-      .setOrigin(0.5)
-      .setScrollFactor(0)
-      .setDepth(31);
-    this.add
-      .text(
+    const put = (x: number, y: number, text: string | string[], st: object, ox = 0.5) =>
+      this.add.text(x, y, text, st).setOrigin(ox, 0.5).setScrollFactor(0).setDepth(31);
+
+    const title = TITLES[this.run.endReason ?? 'fuel'] + (this.daily ? '  (DAILY)' : '');
+    put(cx, cy - 138, title, style(32, '#ff5a4a'));
+    const left = cx - 360;
+    const sm = this.run.summary(this.daily);
+    put(
+      left + 20,
+      cy - 58,
+      [
+        `SCORE ${s.total}${result.newBestScore ? '  NEW BEST!' : ''}`,
+        `${sm.meters} m${result.newBestMeters ? ' (best!)' : ''}   ${s.snacks} snacks`,
+        `best air ${this.bestAir.toFixed(2)}s   combo x${s.bestMultiplier} (${s.bestChain})`,
+        `checkpoints ${sm.checkpoints}   takedowns ${s.takedowns}`,
+        `lane changes ${sm.laneChanges}   close calls ${sm.nearMisses}`,
+        '',
+        `+${result.coins} COINS   bank ${this.save.coins}`,
+        result.dailyBest !== null ? `DAILY BEST ${result.dailyBest}${result.dailyFirst ? '  (+bonus)' : ''}` : '',
+      ],
+      { ...style(15, '#ffffff', 'left'), lineSpacing: 7 },
+      0,
+    );
+
+    // The high-score table, with this run's place highlighted.
+    const rx = cx + 130;
+    put(rx + 100, cy - 92, 'TOP SCORES', style(16, '#9be0ff'));
+    this.save.highScores.slice(0, 7).forEach((h, i) => {
+      const mine = result.rank === i + 1;
+      put(
+        rx,
+        cy - 64 + i * 22,
+        `${String(i + 1).padStart(2)}. ${String(h.score).padStart(7)}  ${String(h.meters).padStart(5)}m ${h.daily ? 'D' : ' '}`,
+        style(14, mine ? '#ffe066' : '#c9d3ee', 'left'),
+        0,
+      );
+    });
+    if (result.achievements.length) {
+      put(
         cx,
-        cy - 20,
-        [
-          `SCORE ${s.total}`,
-          `${Math.floor(this.run.meters)} m   ${s.snacks} snacks   best air ${this.bestAir.toFixed(2)}s`,
-          `best combo x${s.bestMultiplier}   (${s.bestChain} in a row)`,
-          `checkpoints ${this.run.checkpoints.reached}   takedowns ${s.takedowns}`,
-        ],
-        { ...style(18, '#ffffff'), lineSpacing: 8 },
-      )
-      .setOrigin(0.5)
-      .setScrollFactor(0)
-      .setDepth(31);
-    const again = this.add
-      .text(cx, cy + 90, 'SPACE / ENTER / tap to drive again', style(16, '#ffe066'))
-      .setOrigin(0.5)
-      .setScrollFactor(0)
-      .setDepth(31);
+        cy + 100,
+        result.achievements.map((a) => `ACHIEVEMENT: ${a.name}  +${a.reward} coins`),
+        style(14, '#ffd34d'),
+      );
+    }
+    const again = put(
+      cx,
+      cy + 140,
+      `SPACE / tap: drive again   G: garage   D: ${this.daily ? 'free run' : 'daily challenge'}`,
+      style(16, '#ffe066'),
+    );
     this.tweens.add({ targets: again, alpha: 0.3, yoyo: true, repeat: -1, duration: 600 });
     this.input.on('pointerdown', this.tapRestart, this);
   }
@@ -931,14 +1097,93 @@ export class GameScene extends Phaser.Scene {
     g.lineStyle(1, 0x30c0ff, 0.9); // collision circles: player, rivals, wrecks
     for (const c of truckCircles(t)) g.strokeCircle(c.x, c.y, c.r);
     for (const r of this.race.rivals) {
-      g.lineStyle(1, r.laneKey === 0 ? 0xff5a4a : 0x886666, 0.9);
+      g.lineStyle(1, r.inLane(this.lane.f) ? 0xff5a4a : 0x886666, 0.9);
       for (const c of truckCircles(r.truck)) g.strokeCircle(c.x, c.y, c.r);
     }
     g.lineStyle(1, 0xff9f45, 0.9);
     for (const w of this.run.wrecks.items) {
-      if (!w.solid || w.far) continue;
+      if (!w.solid || Math.abs(w.lane - this.lane.f) >= LANES.hitBand) continue;
       for (const c of wreckCircles(w)) g.strokeCircle(c.x, c.y, c.r);
     }
+    g.lineStyle(1, 0xc0c4cc, 0.9);
+    for (const o of this.run.obstacles.items) {
+      if (!o.solid || Math.abs(o.lane - this.lane.f) >= LANES.hitBand) continue;
+      for (const c of obstacleCircles(o)) g.strokeCircle(c.x, c.y, c.r);
+    }
+  }
+
+  /** Sprites for obstacles near the screen: placed in their lane; loose ones tumble and fade when hit. */
+  private syncObstacles(): void {
+    const cam = this.cameras.main;
+    const left = cam.scrollX - 250;
+    const right = cam.scrollX + VIEW_W + 250;
+    const live = new Set<number>();
+    for (const o of this.run.obstacles.items) {
+      if (o.x < left || o.x > right) continue;
+      live.add(o.id);
+      const key = obstacleKey(o.kind, o.variant);
+      let img = this.obstacleSprites.get(o.id);
+      if (!img) {
+        img = this.add.image(0, 0, key);
+        this.obstacleSprites.set(o.id, img);
+      }
+      const r = OBSTACLE_KINDS[o.kind].radius;
+      const h = img.height;
+      // At rest the sprite stands on the ground; once knocked loose it tumbles about its centre.
+      const cy = o.solid ? o.y + r - 1 - h / 2 : o.y;
+      const gy = this.terrain.heightAt(o.x);
+      const shadeV = laneShade(o.lane);
+      img
+        .setPosition(o.x, laneProject(gy, cy, o.lane))
+        .setRotation(o.angle)
+        .setScale(laneScale(o.lane))
+        .setTint(Phaser.Display.Color.GetColor(shadeV, shadeV, shadeV))
+        .setAlpha(o.solid ? 1 : Math.max(0, 1 - o.age / OBSTACLES.debrisLife))
+        .setDepth(o.solid ? laneDepth(o.lane, 0.02) : 4);
+    }
+    for (const [id, img] of this.obstacleSprites) {
+      if (!live.has(id)) {
+        img.destroy();
+        this.obstacleSprites.delete(id);
+      }
+    }
+  }
+
+  /** A little lane radar under the race position: where you are and what is ahead, lane by lane. */
+  private drawLaneHud(): void {
+    const g = this.laneHud;
+    g.clear();
+    const x0 = VIEW_W - 112;
+    const w = 100;
+    const rowH = 11;
+    const top = 66;
+    const yOf = (lane: number) => top + (LANES.count - 1 - lane) * rowH + rowH / 2 - 1;
+    const t = this.truck;
+    const xOf = (x: number) => x0 + 14 + Math.max(0, Math.min(1, (x - t.x) / 1500)) * (w - 18);
+    g.fillStyle(0x0b1230, 0.6);
+    g.fillRoundedRect(x0 - 4, top - 4, w + 8, LANES.count * rowH + 6, 4);
+    for (let l = 0; l < LANES.count; l++) {
+      g.fillStyle(l === this.lane.target ? 0x2a3f7a : 0x16224a, 0.95);
+      g.fillRect(x0, yOf(l) - rowH / 2 + 1, w, rowH - 2);
+    }
+    for (const o of this.run.obstacles.items) {
+      if (!o.solid || o.x < t.x - 60 || o.x > t.x + 1500) continue;
+      g.fillStyle(OBSTACLE_KINDS[o.kind].loose ? 0xaeb2bb : 0xe8e8ee, 1);
+      g.fillRect(xOf(o.x) - 2, yOf(o.lane) - 2, 4, 4);
+    }
+    for (const wr of this.run.wrecks.items) {
+      if (!wr.solid || wr.x < t.x - 60 || wr.x > t.x + 1500) continue;
+      g.fillStyle(0xff9f45, 1);
+      g.fillRect(xOf(wr.x) - 3, yOf(wr.lane) - 2, 6, 4);
+    }
+    for (const r of this.race.rivals) {
+      if (r.truck.x < t.x - 200 || r.truck.x > t.x + 1500) continue;
+      g.fillStyle(0xff5a4a, 1);
+      g.fillCircle(Math.max(x0 + 3, xOf(r.truck.x)), yOf(r.laneF), 3);
+    }
+    g.fillStyle(0xffe066, 1);
+    const py = yOf(this.lane.f);
+    g.fillTriangle(x0 + 2, py - 4, x0 + 2, py + 4, x0 + 11, py);
   }
 
   private updateHud(): void {
@@ -972,7 +1217,7 @@ export class GameScene extends Phaser.Scene {
         `angle ${t.angle.toFixed(2)}  vy ${t.vy.toFixed(0)}  grounded ${t.grounded}`,
         `wheels ${t.wheelContacts.map((c) => (c.inContact ? '■' : '□')).join('')}  body ${t.bodyContact}`,
         `fuel ${(r.fuel.level * 100).toFixed(1)}%  chain ${r.score.chain}  next cans ${r.pickups.fuelXs.slice(-2).map((x) => x.toFixed(0)).join(', ')}`,
-        `rivals ${this.race.rivals.map((r) => `#${r.number}${r.laneKey === 0 ? 'n' : r.laneKey === 1 ? 'f' : '~'}`).join(' ')}  draft ${this.race.draft.toFixed(2)}  wrecks ${this.run.wrecks.items.length}  wrench +${Math.round(WRENCH.restore * 100)}%`,
+        `lane ${this.lane.f.toFixed(2)}->${this.lane.target}  rivals ${this.race.rivals.map((r) => `#${r.number}@${r.laneF.toFixed(1)}`).join(' ')}  draft ${this.race.draft.toFixed(2)}  wrecks ${this.run.wrecks.items.length}  obstacles ${this.run.obstacles.items.length}  wrench +${Math.round(WRENCH.restore * 100)}%`,
         `seed ${this.seed}  terrain [${this.terrain.startX.toFixed(0)}, ${this.terrain.endX.toFixed(0)}]`,
       );
     }

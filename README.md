@@ -2,7 +2,7 @@
 
 An endless-runner redux of a classic Flash-era 4x4 racer. Muddy tracks, big trucks, ramps, snacks and fuel.
 
-**Status:** Phases 0 to 6 are done: setup, core driving, fuel/snacks/scoring, the HUD with checkpoints, rivals, collisions and wrecks, the art pass, and now audio (an adaptive original score plus synthesized SFX). That makes it a playable alpha with sound. See [`roadmap.md`](roadmap.md).
+**Status:** Phases 0 to 7 are done: setup, core driving, fuel/snacks/scoring, the HUD with checkpoints, rivals, collisions and wrecks, the art pass, audio, and now depth lanes with obstacles plus progression (a garage, high scores, a daily challenge and achievements). See [`roadmap.md`](roadmap.md).
 
 ## Quick start
 
@@ -23,11 +23,31 @@ npm run dev        # http://localhost:5173
 
 ## Controls
 
-←/A brake/reverse · ↑/W lean back · ↓/S lean forward · →/D gas · R reset upright · T toggle auto-gas · M mute all · N music on/off · H debug overlay · SPACE/ENTER/tap restart after game over
+←/A brake/reverse · ↑/W lean back · ↓/S lean forward · →/D gas · **Q/E change lane** (or Shift+↑/↓) · R reset upright · T toggle auto-gas · M mute all · N music on/off · H debug overlay · SPACE/ENTER/tap restart after game over · **G** garage and **D** daily challenge / free run (game-over screen)
 
 Auto-gas is **on** by default (endless-runner mode: the truck drives itself, you brake and lean). Flip `GAMEPLAY.autoGas` in `src/config.ts` or press T for manual throttle.
 
-Add `?seed=anything` to the URL for a repeatable course (used later for daily challenges).
+Add `?seed=anything` to the URL for a repeatable course, or `?daily` to start in the daily challenge.
+
+## What's in Phase 7 (and depth lanes)
+
+**Depth lanes and obstacles**
+
+- **Four lanes**, like the original's wide dirt field: lane 0 is nearest the camera, each lane further away is drawn 15 px higher, 6% smaller and darker, and the ground is a set of terraces stepping up and away. Jumps and hills are the same in every lane. You start in lane 1.
+- **Change lanes** with **Q** (further away) and **E** (nearer), or Shift+↑/↓. One lane per press (0.22 s), also in the air; press twice to cross two lanes. Only things in (nearly) the same lane touch, so cutting across a lane with a rival or an obstacle in it is a sideswipe. The lane radar under `POS` shows your lane, rivals, wrecks and obstacles ahead.
+- **Obstacles** (`src/game/Obstacles.ts`): **rocks** and **tire stacks** are knocked loose when hit (a rock hurts a little, tires only slow you); **logs** and **boulders** stay put: hit one at speed and you stop dead and take damage (a boulder up to 33%). Rows of obstacles never block more than 2 of the 4 lanes (wrecks included), they never sit just after a jump, and snacks, cans and wrenches stay off them. A fixed obstacle can always be passed by switching lanes, so nothing traps a run.
+- **Close calls:** swerve away from an obstacle at the last moment and drive past it clean for +50 BONUS.
+- **Rivals** use all four lanes: they dodge wrecks and obstacles with a chance that rises with skill (a careless rival just drives into the rock and may wreck itself), get out of the way when they are stuck, and only move into your lane (or the one you are heading for) when they are clear of your truck and, if ahead, far enough up the road to be seen.
+- **Pickups** sit in lanes: snack trails wander one lane at a time, so following one means a lane change now and then; fuel cans stay in the two middle lanes and can be grabbed from one lane over.
+
+**Progression** (`src/progress/`, all saved in `localStorage`; if it is blocked the game keeps progress in memory for the session)
+
+- **Coins ("snack bank"):** 2 per snack, 1 per 25 m, 15 per checkpoint, 10 per takedown, 2 per close call.
+- **Garage** (press **G** on the game-over screen): upgrade **tank size** (+20% capacity per level), **fuel efficiency** (-7% burn) and **damage resistance** (-8% damage), 5 levels each, and buy **paint** (5 skins). ←/→ switch tab, ↑/↓ pick, ENTER buys or equips, SPACE drives; clicks and taps work too.
+- **High scores:** a top-10 table (shown on the game-over screen and in the garage) plus lifetime stats (runs, distance, best air, best chain, ...).
+- **Daily challenge** (press **D** on the game-over screen, or open `?daily`): the UTC date is the seed, so everyone gets the same terrain, pickups, obstacles and wrecks (rivals still react to how you drive). Everyone drives the stock truck (upgrades are off); your best score per day is kept, and the first daily run of a day pays a 50-coin bonus.
+- **Achievements:** 15 of them with coin rewards (a 10-snack combo, hang time, 2 km without damage, 5 takedowns, 25 lane changes, 10 close calls, ...), unlocked with a toast mid-run and listed in the garage.
+- Tests cover save loading and sanitising (including corrupt data and a throwing store), upgrade pricing and perks, banking runs, the score table, daily seeds and determinism, and the achievements.
 
 ## What's in Phase 6
 
@@ -99,7 +119,10 @@ src/
     Terrain.ts         infinite heightfield + chunk generator (records pieces for spawners)
     TruckPhysics.ts    pure-TS rigid body (no Phaser), unit-tested
     TruckView.ts       player visuals (pre-rendered body frame + spinning wheels)
-    Fuel.ts            tank + drain model (pure TS)
+    Fuel.ts            tank + drain model, with capacity and burn upgrades (pure TS)
+    Lanes.ts           depth-lane geometry and the player's lane changes (pure TS)
+    Obstacles.ts       rocks, tires, logs, boulders: placement, hits, dodges (pure TS)
+    Perks.ts           what garage upgrades do to a run (pure TS)
     Score.ts           score, combo, air bonus (pure TS)
     Pickups.ts         snack and fuel-can placement (pure TS)
     Run.ts             one run: ties the above together, loss condition (pure TS)
@@ -121,17 +144,19 @@ src/
     Input.ts, Rng.ts
   audio/               Composition.ts (the theme), Sequencer.ts + Mix.ts (pure, tested), AudioSystem.ts (Web Audio: music, engine, SFX)
   art/                 procedural art: trucks.ts (6 bodies + rotation strips), backdrops.ts (per biome), props.ts, pixelFont.ts
+  progress/            Progress.ts (saves, coins, upgrades, scores), Achievements.ts, Skins.ts, Daily.ts, Storage.ts (all pure TS)
   scenes/
     BootScene.ts       builds every texture from src/art
     GameScene.ts       loop, camera, HUD, input
-tests/                 Vitest: audio, terrain, physics, fuel, score, pickups, run, HUD, checkpoints, race, biomes, particles, tracks
+    GarageScene.ts     the garage: upgrades, paint, scores, achievements
+tests/                 Vitest: audio, terrain, physics, fuel, score, pickups, run, HUD, checkpoints, race, biomes, particles, tracks, lanes and obstacles, progression
 docs/GDD.md            one-page design doc
 ASSETS.md              asset and licence register
 ```
 
 ## Tuning the feel
 
-Everything lives in `src/config.ts` (including `FUEL`, `SCORING`, `PICKUPS`, `CHECKPOINT`, `COLLISION`, `WRECKS`, `WRENCH` and `RIVALS`). The physics runs at a fixed 240 Hz (4 substeps per frame) so the stiff suspension stays stable. If you change `springK`/`springC`, run `npm test` to catch regressions.
+Everything lives in `src/config.ts` (including `FUEL`, `SCORING`, `PICKUPS`, `CHECKPOINT`, `COLLISION`, `WRECKS`, `WRENCH`, `RIVALS`, `LANES`, `OBSTACLES` and `PROGRESSION`). The physics runs at a fixed 240 Hz (4 substeps per frame) so the stiff suspension stays stable. If you change `springK`/`springC`, run `npm test` to catch regressions.
 
 ## Legal
 

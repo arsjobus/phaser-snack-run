@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { ART, PHYSICS, TRUCK } from '../config';
 import { PLAYER_TRUCK_KEY, atlasKey } from '../art/trucks';
+import { laneDepth, laneProject, laneScale, laneShade } from './Lanes';
 import { PLAYER_WHEEL } from './Rival';
 import { rotationFrame } from './Rotation';
 import type { Terrain } from './Terrain';
@@ -33,20 +34,39 @@ export class TruckView {
   private wheels: Phaser.GameObjects.Image[];
   private spin = 0;
 
-  constructor(scene: Phaser.Scene) {
-    this.wheels = TRUCK.wheels.map(() => scene.add.image(0, 0, 'wheel').setDepth(3.1).setScale(PLAYER_WHEEL));
+  /** `key` is the body texture of the chosen paint job (`playerTruckKey`). */
+  constructor(
+    scene: Phaser.Scene,
+    private key: string = PLAYER_TRUCK_KEY,
+  ) {
+    this.wheels = TRUCK.wheels.map(() => scene.add.image(0, 0, 'wheel').setScale(PLAYER_WHEEL));
     const [ox, oy] = bodyOrigin();
-    this.body = scene.add.image(0, 0, PLAYER_TRUCK_KEY).setOrigin(ox, oy).setDepth(3);
+    this.body = scene.add.image(0, 0, key).setOrigin(ox, oy);
   }
 
-  update(truck: TruckPhysics, terrain: Terrain, dt: number): void {
-    this.body.setPosition(truck.x, truck.y);
-    placeBody(this.body, PLAYER_TRUCK_KEY, truck.angle);
+  /** `lane` is the player's lane position: the truck is drawn higher, smaller and darker further away. */
+  update(truck: TruckPhysics, terrain: Terrain, dt: number, lane = 0): void {
+    const scale = laneScale(lane);
+    const shade = laneShade(lane);
+    const tint = Phaser.Display.Color.GetColor(shade, shade, shade);
+    const depth = laneDepth(lane, 0.1);
+    const gy = terrain.heightAt(truck.x);
+    this.body
+      .setPosition(truck.x, laneProject(gy, truck.y, lane))
+      .setScale(scale)
+      .setTint(tint)
+      .setDepth(depth);
+    placeBody(this.body, this.key, truck.angle);
     this.spin += (truck.speed * dt) / PHYSICS.wheelRadius;
     truck.wheelContacts.forEach((c, i) => {
       // Wheel sits on the ground when compressed; hangs at rest height otherwise.
       const groundY = terrain.heightAt(c.x) - PHYSICS.wheelRadius;
-      this.wheels[i].setPosition(c.x, Math.min(c.y, groundY)).setRotation(this.spin);
+      this.wheels[i]
+        .setPosition(c.x, laneProject(gy, Math.min(c.y, groundY), lane))
+        .setRotation(this.spin)
+        .setScale(scale * PLAYER_WHEEL)
+        .setTint(tint)
+        .setDepth(depth + 0.02);
     });
   }
 

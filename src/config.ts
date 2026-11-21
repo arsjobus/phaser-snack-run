@@ -81,6 +81,36 @@ export const GAMEPLAY = {
   autoGas: true,
 };
 
+/**
+ * Depth lanes, like the original's pseudo-3D dirt field: every vehicle, pickup and obstacle sits in
+ * one of `count` lanes. Lane 0 is nearest the camera (lowest, biggest); each lane further away is
+ * drawn `spacing` px higher, a little smaller and darker. The terrain is shared, so jumps and hills
+ * are the same in every lane; only things in (nearly) the same lane touch each other. The player
+ * switches lanes with Q/E (or Shift+Up/Down); lane changes take `changeTime` per lane and can be
+ * made in the air.
+ */
+export const LANES = {
+  count: 4,
+  /** The player starts here (1 = second from the camera), so there is room to dodge both ways. */
+  startLane: 1,
+  /** Pixels each lane sits higher on screen than the one below it. */
+  spacing: 15,
+  /** Scale lost per lane (lane 3 is drawn at 1 - 3 * 0.06 = 82%). */
+  scaleStep: 0.06,
+  /** Brightness lost per lane (0.09 = 9% darker each). */
+  tintStep: 0.09,
+  /** Draw order: lane f sits at depthBase - depthStep * f (+ a small per-entity offset). */
+  depthBase: 2.9,
+  depthStep: 0.4,
+  /** Two things collide only when their lane positions are closer than this (a swerve counts). */
+  hitBand: 0.55,
+  /** Seconds the player (and rivals) need to cross one lane. */
+  changeTime: 0.22,
+  /** Pickups are grabbed when the truck's lane is this close to theirs. Cans and wrenches are generous. */
+  snackBand: 0.75,
+  canBand: 1.1,
+} as const;
+
 /** Fuel tank. Fuel is the run's clock: it drains continuously and cans refill it. */
 export const FUEL = {
   start: 1,
@@ -145,6 +175,8 @@ export const SCORING = {
   airPoints: 50,
   /** BONUS for wrecking a rival that you rammed (see `RIVALS.takedownWindow`). */
   takedown: 500,
+  /** BONUS for dodging an obstacle by changing lanes at the last moment and passing it. */
+  nearMiss: 50,
 };
 
 export const PICKUPS = {
@@ -209,6 +241,10 @@ export const COLLISION = {
   wreckDrag: 0.45,
   /** Small hop given to a truck that ploughs through a wreck (px/s upward). */
   wreckHop: 140,
+  /** Bounce off a fixed obstacle (boulder, log). */
+  obstacleRestitution: 0.25,
+  /** Seconds a fixed obstacle that was just hit cannot hurt anyone again (it still pushes out). */
+  obstacleCooldown: 0.5,
 } as const;
 
 /** Wrecked vehicles lying on the course. */
@@ -227,6 +263,49 @@ export const WRECKS = {
   radius: 24,
   /** Debris (a wreck that was hit) is flung and fades out over this many seconds. */
   debrisLife: 1.4,
+} as const;
+
+/**
+ * Roadside obstacles in the lanes: rocks and tire stacks are knocked loose on contact (a rock
+ * hurts, a tire stack only slows you), logs and boulders stay put and are the real hazard: hit
+ * one at speed and you stop dead and take damage. Obstacles are placed per terrain chunk (never on
+ * a ramp or table, never just after a jump), and a row never blocks more than `maxBlocked` of the
+ * lanes together with wrecks, so there is always a way through. A fixed obstacle can be avoided by
+ * switching lanes, which always works, so nothing can trap a truck for good.
+ */
+export const OBSTACLE_KINDS = {
+  /** radius: collision circle (px); offsets: circle centres along the ground; damageScale: x the
+   *  normal bump damage; drag: share of the closing speed the hit takes off the truck. */
+  rock: { radius: 15, offsets: [0], damageScale: 0.6, drag: 0.35, loose: true, fromMeters: 150, weight: 5 },
+  tires: { radius: 17, offsets: [0], damageScale: 0, drag: 0.22, loose: true, fromMeters: 250, weight: 3 },
+  log: { radius: 13, offsets: [-23, 23], damageScale: 0.9, drag: 0.5, loose: false, fromMeters: 400, weight: 3 },
+  boulder: { radius: 27, offsets: [0], damageScale: 1.3, drag: 0.65, loose: false, fromMeters: 600, weight: 2 },
+} as const;
+
+export const OBSTACLES = {
+  /** No obstacles before this many metres. */
+  startMeters: 150,
+  /** Chance per eligible chunk: from `chanceMin` at the start up to `chanceMax` at `rampMeters`. */
+  chanceMin: 0.3,
+  chanceMax: 0.8,
+  rampMeters: 3000,
+  /** A chance for a second obstacle in the row, rising with distance (min, max). */
+  pairChance: [0.15, 0.5],
+  /** Obstacles and wrecks within this many px of each other (along the road) form one row. */
+  rowGap: 300,
+  /** Minimum distance between rows (px). */
+  rowSpacing: 420,
+  /** At most this many lanes of a row may be blocked (count - 2 keeps two lanes open). */
+  maxBlocked: 2,
+  /** Keep clear of a jump's landing (px). */
+  landingClear: 420,
+  /** Loose obstacles fly off and fade over this many seconds. */
+  debrisLife: 1.2,
+  /** A dodge is counted once the truck has driven this far (px) past the obstacle. */
+  passMargin: 40,
+  /** Switching lanes marks obstacles from this far behind to this far ahead (px) in the old lane. */
+  dodgeBehind: 40,
+  dodgeAhead: 380,
 } as const;
 
 /** Rival trucks. */
@@ -254,21 +333,23 @@ export const RIVALS = {
   /** Never target below this (px/s), or above the truck's top speed. */
   floorSpeed: 360,
   /**
-   * Depth lanes, like the original's pseudo-3D track: the near lane is the player's, rivals also
-   * use a far lane (drawn higher and smaller) where nothing collides with the player. Rivals hop
-   * between lanes with `laneSwitchTime`; a rival only drops into the player's lane when it is
-   * clear of the player's truck (`laneGap`) and, if it is ahead, far enough up the road to be seen
-   * coming (`warnGap`). Skilled rivals leave the near lane when a wreck lies within `wreckLook`.
+   * Rivals use the same depth lanes as the player (see `LANES`). Each re-decides its lane every few
+   * seconds, one lane at a time. Moving into the player's lane (or the one the player is heading
+   * for) needs a clear gap (`laneGap`) and, if the rival is ahead, enough road to be seen coming
+   * (`warnGap`). Rivals look `hazardLook` px ahead for wrecks and obstacles in their lane and
+   * dodge them with a chance that grows with skill (`noticeBase`, `noticeSkill`): a careless rival
+   * simply drives into the rock, which is how rivals crash on their own. A rival that has been
+   * crawling for `stuckTime` seconds swerves to a free lane.
    */
   laneSwitchTime: 0.5,
+  hazardLook: 520,
+  noticeBase: 0.15,
+  noticeSkill: 0.85,
+  stuckTime: 0.8,
   laneGap: 170,
   warnGap: 480,
   /** Seconds between lane decisions (min, max). */
   laneRethink: [2.5, 5],
-  wreckLook: 450,
-  /** Far-lane look: pixels higher on screen and scale. */
-  farOffset: 18,
-  farScale: 0.9,
   /** Flipped (or dead-slow upside down) for this long and the rival becomes a wreck. */
   flipWreckTime: 1.4,
   /** Rammed within this many seconds counts as your takedown. */
@@ -342,4 +423,32 @@ export const AUDIO = {
   lowFuelCutoff: { open: 18000, closed: 800 },
   /** Semitone shift of the whole theme per biome (forest, desert, snow, swamp), applied at a loop start. */
   biomeTranspose: [0, 2, -2, 3],
+} as const;
+
+/** Progression (Phase 7): coins, upgrades, high scores, the daily challenge. All saved locally. */
+export const PROGRESSION = {
+  saveKey: 'snack-run:save',
+  /** Entries kept in the high-score table. */
+  highScores: 10,
+  /** Coins (the "snack bank") earned by a run. */
+  coins: {
+    perSnack: 2,
+    /** One coin per this many metres. */
+    meters: 25,
+    perCheckpoint: 15,
+    perTakedown: 10,
+    perNearMiss: 2,
+    /** Flat bonus for finishing the daily challenge. */
+    daily: 50,
+  },
+  /**
+   * Garage upgrades. Level n costs `cost * growth^n` (n from 0); each level adds `perLevel`:
+   * tank = bigger capacity (a can or checkpoint then fills a smaller share of it, and you start
+   * with more fuel); efficiency = less fuel burned; armor = less damage taken.
+   */
+  upgrades: {
+    tank: { name: 'Tank size', blurb: '+20% capacity per level', max: 5, cost: 150, growth: 1.7, perLevel: 0.2 },
+    efficiency: { name: 'Fuel efficiency', blurb: '-7% fuel burned per level', max: 5, cost: 120, growth: 1.7, perLevel: 0.07 },
+    armor: { name: 'Damage resistance', blurb: '-8% damage taken per level', max: 5, cost: 140, growth: 1.7, perLevel: 0.08 },
+  },
 } as const;

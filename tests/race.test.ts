@@ -3,6 +3,7 @@ import {
   BASE_Y,
   COLLISION,
   GAMEPLAY,
+  LANES,
   PHYSICS,
   PX_PER_METER,
   RIVALS,
@@ -99,7 +100,7 @@ describe('Wrecks', () => {
   it('are hit once: the truck pays in speed, the wreck is flung off as debris and fades', () => {
     const t = new Terrain(1);
     const field = new WreckField(1, t, START);
-    const wreck = field.addFromRival(START + 300, 0, 0, 0, false);
+    const wreck = field.addFromRival(START + 300, 0, 0, 0, 0);
     const truck = new TruckPhysics(START + 300 - 90, BASE_Y - 42);
     truck.vx = 700;
     let hit = null;
@@ -119,7 +120,7 @@ describe('Wrecks', () => {
   it('can be creeped into without damage (a soft bump) and never trap the truck', () => {
     const t = new Terrain(1);
     const field = new WreckField(1, t, START);
-    field.addFromRival(START + 200, 0, 1, 0, false);
+    field.addFromRival(START + 200, 0, 1, 0, 0);
     const truck = new TruckPhysics(START + 60, BASE_Y - 42);
     let hit = null;
     for (let i = 0; i < 2400 && !hit; i++) {
@@ -132,15 +133,19 @@ describe('Wrecks', () => {
     expect(truck.x).toBeGreaterThan(START + 260); // drove on through
   });
 
-  it('far-lane wrecks are scenery only', () => {
+  it('wrecks in another lane are scenery to a truck in this one', () => {
     const t = new Terrain(1);
     const field = new WreckField(1, t, START);
-    const w = field.addFromRival(START + 100, 0, 0, 0, true);
+    const w = field.addFromRival(START + 100, 0, 0, 0, 2);
     const truck = new TruckPhysics(START + 100, BASE_Y - 42);
-    expect(field.collide(truck)).toBeNull();
+    expect(field.collide(truck, 0)).toBeNull();
+    expect(field.collide(truck, 1)).toBeNull();
     expect(w.solid).toBe(true);
-    expect(field.near(START + 100, 50)).toBeUndefined();
-    expect(field.ahead(START, 500)).toBeUndefined();
+    expect(field.near(START + 100, 50, 0)).toBeUndefined();
+    expect(field.near(START + 100, 50, 2)).toBe(w);
+    expect(field.ahead(START, 500, 0)).toBeUndefined();
+    expect(field.ahead(START, 500, 2)).toBe(w);
+    expect(field.collide(truck, 2)).not.toBeNull(); // the same lane does hit
   });
 });
 
@@ -168,7 +173,7 @@ describe('Wrenches', () => {
     f.ensure(START + 4000 * PX_PER_METER);
     expect(wrecks.items.length).toBeGreaterThan(5);
     for (const w of wrecks.items) {
-      const bad = f.items.filter((p) => p.kind !== 'wrench' && Math.abs(p.x - w.x) < 70 && t.heightAt(p.x) - p.y < 60);
+      const bad = f.items.filter((p) => p.kind !== 'wrench' && Math.abs(p.x - w.x) < 70 && Math.abs(p.lane - w.lane) < LANES.hitBand && t.heightAt(p.x) - p.y < 60);
       expect(bad).toEqual([]);
     }
   });
@@ -257,22 +262,23 @@ describe('Rivals and the race', () => {
     r.truck.reset(START + 100, BASE_Y - 42);
     s.player.vx = 600;
     r.lane = 1;
-    r.laneBlend = 1;
+    r.laneF = 1;
     r.laneTimer = 99;
     const far = s.race.update(1 / 60, s.player, 0);
     expect(far.some((e) => e.type === 'bump')).toBe(false);
 
     r.lane = 0;
-    r.laneBlend = 0;
+    r.laneF = 0;
     const near = s.race.update(1 / 60, s.player, 0);
     const bump = near.find((e) => e.type === 'bump');
     expect(bump).toBeTruthy();
     expect(bump!.type === 'bump' && bump!.damage).toBeGreaterThan(0);
   });
 
-  it('a rival never drops into the player\'s lane right in front of the truck', () => {
+  it('a rival never moves into the player\'s lane (or the one they are heading for) right in front of the truck', () => {
     for (const seed of [1, 2, 3]) {
       const s = setup(seed);
+      const pLane = 1;
       for (let f = 0; f < 60 * 120; f++) {
         for (let i = 0; i < PHYSICS.substeps; i++) {
           s.terrain.ensure(s.player.x + 3000);
@@ -280,9 +286,10 @@ describe('Rivals and the race', () => {
           s.race.stepPhysics(DT);
         }
         const before = new Map(s.race.rivals.map((r) => [r.id, r.lane]));
-        s.race.update(1 / 60, s.player, Math.max(0, (s.player.x - START) / PX_PER_METER));
+        s.race.update(1 / 60, s.player, Math.max(0, (s.player.x - START) / PX_PER_METER), true, pLane, pLane);
         for (const r of s.race.rivals) {
-          if (before.get(r.id) === 1 && r.lane === 0) {
+          const was = before.get(r.id);
+          if (was !== undefined && was !== r.lane && Math.abs(r.lane - pLane) < 1) {
             const dx = r.truck.x - s.player.x;
             expect(Math.abs(dx)).toBeGreaterThan(RIVALS.laneGap);
             if (dx > 0) expect(dx).toBeGreaterThan(RIVALS.warnGap);
@@ -299,7 +306,7 @@ describe('Rivals and the race', () => {
     s.race.rivals = [r];
     r.laneTimer = 99;
     r.lane = 0;
-    r.laneBlend = 0;
+    r.laneF = 0;
     r.truck.reset(START + 400, BASE_Y - 42);
     r.truck.vx = 600;
     s.player.reset(START + 150, BASE_Y - 42);
@@ -316,7 +323,7 @@ describe('Rivals and the race', () => {
     expect(s.race.draft).toBe(1);
     expect(s.player.boost).toBe(1);
     r.lane = 1;
-    r.laneBlend = 1;
+    r.laneF = 1;
     for (let i = 0; i < 60; i++) frame();
     expect(s.race.draft).toBe(0);
   });
