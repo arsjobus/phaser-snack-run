@@ -1,6 +1,6 @@
 import { FUEL, LANES, PICKUPS, PX_PER_METER, WRENCH } from '../config';
 import { fuelPerPx } from './Fuel';
-import { clampLane } from './Lanes';
+import { clampLane, sameLane } from './Lanes';
 import type { ObstacleField } from './Obstacles';
 import { Rng } from './Rng';
 import { JUMP_KINDS, type PieceKind, type Terrain, type TerrainPiece } from './Terrain';
@@ -105,9 +105,8 @@ export class PickupField {
   }
 
   /**
-   * Marks and returns the pickups within reach of (x, y). The depth lane does not matter: a pickup
-   * is grabbed by touching the truck from any lane or depth. (Pass a `lane` and `band` only to
-   * restrict the grab to nearby depths, as the old lane rules did.)
+   * Marks and returns the pickups within reach of (x, y). Snacks can be grabbed from any lane;
+   * fuel and wrenches also require the truck to be in the pickup's lane when `lane` is provided.
    */
   collect(x: number, y: number, lane?: number, band = Infinity): Pickup[] {
     const got: Pickup[] = [];
@@ -115,6 +114,7 @@ export class PickupField {
     for (const p of this.items) {
       if (p.taken || p.missed) continue;
       if (lane !== undefined && Math.abs(p.lane - lane) >= band) continue;
+      if (lane !== undefined && p.kind !== 'snack' && !sameLane(p.lane, lane)) continue;
       const dx = p.x - x;
       const dy = p.y - y;
       if (dx * dx + dy * dy <= r2) {

@@ -292,24 +292,40 @@ describe('Obstacle collisions', () => {
 });
 
 describe('Run with lanes', () => {
-  it('pickups are grabbed from ANY depth: touching the truck is enough', () => {
+  it('snacks are grabbed from any depth, while cans and wrenches require their lane', () => {
     const t = new Terrain(1);
     const f = new PickupField(1, t, START);
     f.ensure(START + 20000);
     const snack = f.items.find((p) => p.kind === 'snack' && p.lane === 1)!;
-    // The old rules refused a snack two lanes away; now the lane is not even asked.
-    expect(f.collect(snack.x, snack.y)).toContain(snack);
-    const can = f.items.find((p) => p.kind === 'fuel')!;
-    expect(f.collect(can.x, can.y)).toContain(can);
-    const wrench = f.items.find((p) => p.kind === 'wrench')!;
-    expect(f.collect(wrench.x, wrench.y)).toContain(wrench);
-    // The optional band still restricts when asked to.
-    const other = f.items.filter((p) => p.kind === 'snack' && !p.taken)[3];
-    expect(f.collect(other.x, other.y, other.lane + 3, 1)).not.toContain(other);
-    expect(f.collect(other.x, other.y, other.lane, 1)).toContain(other);
+    expect(f.collect(snack.x, snack.y, snack.lane + 2)).toContain(snack);
+
+    for (const kind of ['fuel', 'wrench'] as const) {
+      const run = new RunModel(1, new Terrain(1), START);
+      run.pickups.ensure(START + 20000);
+      const pickup = run.pickups.items.find((p) => p.kind === kind)!;
+      run.pickups.items = [pickup];
+      const otherLane = pickup.lane === 0 ? 1 : pickup.lane - 1;
+      const missedLane = run.update(1 / 60, {
+        x: pickup.x,
+        y: pickup.y,
+        speed: 400,
+        lane: otherLane,
+      });
+      expect(missedLane.some((event) => event.type === kind)).toBe(false);
+      expect(pickup.taken).toBe(false);
+
+      const matchingLane = run.update(1 / 60, {
+        x: pickup.x,
+        y: pickup.y,
+        speed: 400,
+        lane: pickup.lane,
+      });
+      expect(matchingLane.some((event) => event.type === kind)).toBe(true);
+      expect(pickup.taken).toBe(true);
+    }
   });
 
-  it('the run grabs a pickup whatever depth the truck is in', () => {
+  it('the run grabs snacks whatever depth the truck is in', () => {
     const run = new RunModel(1, new Terrain(1), START);
     for (const depth of [0, 1.37, 3]) {
       const snack = run.pickups.items.find((p) => p.kind === 'snack' && !p.taken)!;

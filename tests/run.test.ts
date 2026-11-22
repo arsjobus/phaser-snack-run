@@ -146,7 +146,8 @@ describe('RunModel', () => {
       x += speed * dt;
       // Chassis-centre height on flat ground; if not grabbing, drive far above everything.
       const y = grab ? terrain.heightAt(x) - PICKUPS.hover : BASE_Y - 5000;
-      run.update(dt, { x, y, speed });
+      const can = run.pickups.items.find((p) => p.kind === 'fuel' && !p.taken && p.x >= x);
+      run.update(dt, { x, y, speed, lane: can?.lane });
     }
     return { run, t, x };
   }
@@ -190,7 +191,7 @@ describe('RunModel', () => {
     run.fuel.level = 0.3;
     run.pickups.ensure(START + 20000);
     const can = run.pickups.items.find((p) => p.kind === 'fuel')!;
-    run.update(1 / 60, { x: can.x, y: can.y, speed: 400 });
+    run.update(1 / 60, { x: can.x, y: can.y, speed: 400, lane: can.lane });
     expect(run.fuel.level).toBeCloseTo(0.3 + FUEL.canRestore, 1);
   });
 });

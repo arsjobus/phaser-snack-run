@@ -19,6 +19,7 @@ export interface PadButtons {
   down: boolean;
   left: boolean;
   right: boolean;
+  start: boolean;
 }
 
 export const PAD_DEADZONE = 0.25;
@@ -58,7 +59,7 @@ export function padHeld(p: PadSnapshot | null): Held {
 
 /** Which one-shot buttons are down right now (edges are found by `PadEdges`). */
 export function padButtons(p: PadSnapshot | null): PadButtons {
-  const none = { confirm: false, garage: false, daily: false, settings: false, reset: false, music: false, back: false, up: false, down: false, left: false, right: false };
+  const none = { confirm: false, garage: false, daily: false, settings: false, reset: false, music: false, back: false, up: false, down: false, left: false, right: false, start: false };
   if (!p) return none;
   const on = (i: number) => btn(p, i) > 0.5;
   const ly = axis(p, 1);
@@ -75,6 +76,7 @@ export function padButtons(p: PadSnapshot | null): PadButtons {
     down: on(B.DOWN) || ly > PAD_STICK_PRESS,
     left: on(B.LEFT) || lx < -PAD_STICK_PRESS,
     right: on(B.RIGHT) || lx > PAD_STICK_PRESS,
+    start: on(B.START),
   };
 }
 

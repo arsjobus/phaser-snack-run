@@ -184,7 +184,7 @@ describe('Wrenches', () => {
     run.hurt(0.5);
     run.pickups.ensure(START + 600 * PX_PER_METER);
     const wrench = run.pickups.items.find((p) => p.kind === 'wrench')!;
-    const ev = run.update(1 / 60, { x: wrench.x, y: wrench.y, speed: 400 });
+    const ev = run.update(1 / 60, { x: wrench.x, y: wrench.y, speed: 400, lane: wrench.lane });
     const e = ev.find((v) => v.type === 'wrench');
     expect(e).toBeTruthy();
     expect(run.damage.level).toBeCloseTo(0.5 - WRENCH.restore, 6);

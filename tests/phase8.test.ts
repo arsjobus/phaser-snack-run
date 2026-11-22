@@ -201,7 +201,7 @@ describe('Phase 8: gamepad', () => {
     expect(padHeld(pad({ 7: 0.6 })).gas).toBeCloseTo(0.6); // right trigger
     expect(padHeld(pad({ 6: 1 })).brake).toBe(1); // left trigger
     expect(padHeld(pad({ 0: 1 })).gas).toBe(1); // A
-    expect(padHeld(pad({ 1: 1 })).brake).toBe(1); // B
+    expect(padHeld(pad({ 2: 1 })).brake).toBe(1); // X
     expect(padHeld(pad({ 15: 1 })).gas).toBe(1); // D-pad right
     expect(padHeld(pad({}, [0.8, 0, 0, 0])).gas).toBeCloseTo(0.8);
     expect(padHeld(pad({}, [-0.7, 0, 0, 0])).brake).toBeCloseTo(0.7);
@@ -219,7 +219,7 @@ describe('Phase 8: gamepad', () => {
     const e = new PadEdges();
     expect(e.update(padButtons(pad({ 9: 1 })))).toEqual({}); // already down when first seen: no edge
     expect(e.update(padButtons(pad({})))).toEqual({});
-    expect(e.update(padButtons(pad({ 9: 1, 3: 1 })))).toEqual({ confirm: true, garage: true });
+    expect(e.update(padButtons(pad({ 9: 1, 3: 1 })))).toEqual({ confirm: true, garage: true, start: true });
     expect(e.update(padButtons(pad({ 9: 1, 3: 1 })))).toEqual({}); // still held
     expect(padButtons(pad({ 8: 1 })).settings).toBe(true);
   });

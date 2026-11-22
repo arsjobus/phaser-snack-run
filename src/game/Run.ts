@@ -1,4 +1,4 @@
-import { CHECKPOINT, FUEL, PICKUPS, PX_PER_METER, SCORING, WRENCH } from '../config';
+import { CHECKPOINT, FUEL, LANES, PICKUPS, PX_PER_METER, SCORING, WRENCH } from '../config';
 import { CheckpointTrack } from './Checkpoint';
 import { DamageMeter } from './Damage';
 import { FuelTank } from './Fuel';
@@ -131,7 +131,7 @@ export class RunModel {
 
     this.pickups.ensure(truck.x + PICKUPS.spawnAhead);
 
-    for (const p of this.pickups.collect(truck.x, truck.y)) {
+    for (const p of this.pickups.collect(truck.x, truck.y, truck.lane ?? LANES.startLane)) {
       if (p.kind === 'snack') {
         const multiplier = this.score.multiplier;
         events.push({ type: 'snack', pickup: p, points: this.score.collectSnack(), multiplier });

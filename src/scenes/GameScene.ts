@@ -116,6 +116,8 @@ export class GameScene extends Phaser.Scene {
   private padEdges = new PadEdges();
   private touchView!: TouchView;
   private touchedOnce = false;
+  private paused = false;
+  private pauseLayer: Phaser.GameObjects.Container | null = null;
   private held: Held = { gas: 0, brake: 0, far: false, near: false };
   private settings!: Settings;
   private governor = new QualityGovernor();
@@ -149,6 +151,8 @@ export class GameScene extends Phaser.Scene {
     this.bestAir = 0;
     this.flippedTimer = 0;
     this.overAt = 0;
+    this.paused = false;
+    this.pauseLayer = null;
     this.sprites.clear();
     this.gates.clear();
     this.rivalViews.clear();
@@ -316,11 +320,13 @@ export class GameScene extends Phaser.Scene {
   private hintLines(): string[] {
     const k = (a: Action) => keyLabel(this.settings.bindings[a][0]);
     const touch = touchVisible(this.settings.touch, this.sys.game.device.input.touch, false);
+    const padHint = 'PAD A GAS · X BRAKE · UP/DOWN LANES · START / ESC PAUSE';
     return touch
-      ? ['HOLD GAS to drive   BRAKE   ▲ ▼ drift across the field', 'Drift sideways to dodge rocks, logs and boulders · you cannot slip through other cars']
+      ? ['HOLD GAS to drive   BRAKE   ▲ ▼ drift across the field', 'Drift sideways to dodge rocks, logs and boulders · you cannot slip through other cars', padHint]
       : [
           `HOLD ${k('gas')} to accelerate   ${k('brake')} brake   ${k('far')} / ${k('near')} drift across the field (hold)   ${k('reset')} reset   ${k('mute')} mute   ${k('music')} music   O settings`,
           'Drift sideways to dodge rocks, logs and boulders · you cannot slip through other cars',
+          padHint,
         ];
   }
 
@@ -358,6 +364,15 @@ export class GameScene extends Phaser.Scene {
     const pad = this.pollInput();
     const b = this.settings.bindings;
     const pressed = (a: Parameters<typeof actionPressed>[2]) => actionPressed(this.tracker, b, a);
+    if (this.paused) {
+      if (J(this.keys.ESC) || pad.start) {
+        this.paused = false;
+        this.pauseLayer?.destroy();
+        this.pauseLayer = null;
+      }
+      this.tracker.endFrame();
+      return;
+    }
     if (this.settings.effects === 'auto' && this.governor.update(dt)) this.applyQuality();
     if (this.run.over) {
       if (J(this.keys.G) || pad.garage) this.scene.start('Garage');
@@ -367,6 +382,11 @@ export class GameScene extends Phaser.Scene {
       else if (pressed('reset') || J(this.keys.SPACE) || J(this.keys.ENTER) || pad.confirm) this.restart();
     } else {
       if (pressed('reset') || pad.reset) this.recover();
+      if (J(this.keys.ESC) || pad.start) {
+        this.showPause();
+        this.tracker.endFrame();
+        return;
+      }
     }
     if (pressed('debug')) this.debug = !this.debug;
     if (pressed('mute')) {
@@ -1053,6 +1073,35 @@ export class GameScene extends Phaser.Scene {
     this.scene.restart({ daily });
   }
 
+  private showPause(): void {
+    this.paused = true;
+    const layer = this.add.container(0, 0).setScrollFactor(0).setDepth(30);
+    layer.add(this.add.rectangle(VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, 0x07121b, 0.72));
+    layer.add(
+      this.add
+        .text(VIEW_W / 2, VIEW_H / 2 - 18, 'PAUSED', {
+          fontFamily: FONT_DISPLAY,
+          fontSize: '42px',
+          color: INK.title,
+          stroke: '#000',
+          strokeThickness: 5,
+        })
+        .setOrigin(0.5),
+    );
+    layer.add(
+      this.add
+        .text(VIEW_W / 2, VIEW_H / 2 + 34, 'PRESS START OR ESC TO RESUME', {
+          fontFamily: FONT_BODY,
+          fontSize: '18px',
+          color: '#ffffff',
+          stroke: '#000',
+          strokeThickness: 3,
+        })
+        .setOrigin(0.5),
+    );
+    this.pauseLayer = layer;
+  }
+
   /** Banks the finished run once: coins, lifetime stats, the score table and any achievements. */
   private bankRun(): RunResult & { achievements: Achievement[] } {
     if (this.banked) return this.banked;
@@ -1259,7 +1308,7 @@ export class GameScene extends Phaser.Scene {
     g.clear();
     const x0 = VIEW_W - 112;
     const w = 100;
-    const rowH = 11;
+    const rowH = 13;
     const top = 66;
     const yOf = (lane: number) => top + (LANES.count - 1 - lane) * rowH + rowH / 2 - 1;
     const t = this.truck;
@@ -1284,6 +1333,25 @@ export class GameScene extends Phaser.Scene {
       if (r.truck.x < t.x - 200 || r.truck.x > t.x + 1500) continue;
       g.fillStyle(0xff5a4a, 1);
       g.fillCircle(Math.max(x0 + 3, xOf(r.truck.x)), yOf(r.laneF), 3);
+    }
+    for (const p of this.run.pickups.items) {
+      if (p.taken || p.kind === 'snack' || p.x < t.x - 60 || p.x > t.x + 1500) continue;
+      const px = xOf(p.x);
+      const py = yOf(p.lane);
+      if (p.kind === 'fuel') {
+        g.fillStyle(0x54d6e8, 1);
+        g.lineStyle(1.5, 0x07121b, 1);
+        g.fillRoundedRect(px - 4, py - 4, 7, 8, 1);
+        g.strokeRoundedRect(px - 4, py - 4, 7, 8, 1);
+        g.lineBetween(px + 3, py - 3, px + 5, py - 5);
+        g.lineBetween(px + 5, py - 5, px + 5, py - 2);
+      } else {
+        g.lineStyle(3, 0xffd34d, 1);
+        g.lineBetween(px - 3, py + 3, px + 2, py - 2);
+        g.lineStyle(2, 0x07121b, 1);
+        g.lineBetween(px - 4, py + 4, px - 2, py + 2);
+        g.lineBetween(px + 1, py - 3, px + 3, py - 1);
+      }
     }
     g.fillStyle(0xffe066, 1);
     const py = yOf(this.lane.f);
