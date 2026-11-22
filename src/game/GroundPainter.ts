@@ -4,12 +4,15 @@ import { shade } from '../art/trucks';
 import { biomeSegments, type Biome } from './Biomes';
 import {
   FIELD_DEPTH,
+  FLAT_FIELD,
+  FLAT_FOREGROUND,
   FOREGROUND_DEPTH,
   RUT_CELL,
   RUT_DEPTHS,
   RUT_PAIR,
   groundDetails,
   hash01,
+  lensOutline,
   ruttedAt,
   rutWobble,
   type Detail,
@@ -22,10 +25,11 @@ type G = Phaser.GameObjects.Graphics;
 const TUFT_SPACING = 72;
 /** The ground is drawn in steps of this many px (finer than the terrain samples: the track is a spline). */
 export const RENDER_STEP = 8;
-/** Slivers the dirt field is drawn from (a smooth gradient), and bands of the foreground. */
-const FIELD_BANDS = 16;
-const FOREGROUND_BANDS = 10;
+/** Hard-edged furrow bands in the field (flat colour steps, not a gradient). */
+const FURROWS = 3;
 const MUD_CELL = 130;
+/** The dark outline the rest of the art uses (trucks, props): ground edges get it too. */
+const OUTLINE = 0x1a120a;
 
 /** Blend two 0xRRGGBB colours (t = 0 gives a, 1 gives b). */
 export function mixColor(a: number, b: number, t: number): number {
@@ -34,10 +38,12 @@ export function mixColor(a: number, b: number, t: number): number {
 }
 
 /**
- * Paints the terrain: the cross-section of dirt, a wide dirt field behind the near lane that fades
- * into a haze at the tree line, the big foreground below the near lane, and on top of those long
- * meandering tire ruts, pebbles, stones, clods, cracks, puddles, ripples or sparkles (by biome),
- * mud patches and grass tufts. Everything is deterministic by world position (see `GroundDetail`),
+ * Paints the terrain in flat, outlined colour like the rest of the art (no gradients): the
+ * cross-section of dirt, a wide dirt field behind the near lane, the foreground below it, and on top
+ * of those long meandering tire ruts, pebbles, stones, clods, cracks, puddles, ripples or drifts (by
+ * biome), mud patches and grass tufts. Anything that lies flat (puddles, mud, ruts, cracks) is a
+ * shape that follows the terrain, so it bends over hills and stays inside the road.
+ * Everything is deterministic by world position (see `GroundDetail`),
  * so repainting every frame never shimmers. Heights are looked up once per frame on the render grid
  * (`RENDER_STEP`) instead of once per strip, which is most of the cost of this painter.
  */
@@ -98,78 +104,94 @@ export class GroundPainter {
     for (const seg of segments) {
       const c = seg.biome.ground;
       const { x0: xa, x1: xb } = seg;
-      // Foreground cross-section: lit crust, then bands that darken towards the bottom of the screen
-      // (the camera looks down on a big slab of dirt, not at two plain stripes).
-      strip(c.dirt, 0, null, xa, xb);
+      // Flat, cel-shaded like the rest of the art: every layer is ONE solid colour with a dark
+      // outline where it meets the next, and no gradients, vignettes, haze or glints.
+      //   cross-section (the slab of dirt under the near lane) -> dark outline -> foreground
+      //   -> the dirt field behind the near lane -> outline at the tree line.
+      strip(c.deep, 0, null, xa, xb); // the slab: one colour all the way down
       const fgBottom = -laneLift(-FOREGROUND_DEPTH - 1);
-      for (let j = 0; j < FOREGROUND_BANDS; j++) {
-        const t = j / (FOREGROUND_BANDS - 1);
-        const top = 15 + (fgBottom - 15) * (j / FOREGROUND_BANDS);
-        strip(mixColor(c.dirt, c.deep, Math.min(1, t * 1.15)), top, null, xa, xb);
+      strip(c.dirt, 15, null, xa, xb); // the foreground: a flat step in front of the lip
+      strip(shade(c.dirt, 0.82), 15 + (fgBottom - 15) * 0.55, null, xa, xb); // one hard step towards the HUD
+      // The field behind the near lane: a single flat colour, with three hard-edged furrow bands (no blend).
+      const far = -laneLift(FIELD_DEPTH);
+      strip(c.crust, far, 0, xa, xb);
+      for (let i = 0; i < FURROWS; i++) {
+        const fa = FIELD_DEPTH * ((i * 2 + 1) / (FURROWS * 2));
+        const fb = fa + FIELD_DEPTH / (FURROWS * 2) - 0.12;
+        strip(shade(c.crust, 0.94), -laneLift(fb), -laneLift(fa), xa, xb);
       }
-      // The dirt field behind the near lane: one wide, flat field, drawn from the far edge down in
-      // thin slivers that darken with distance and melt into the haze at the tree line.
-      for (let i = FIELD_BANDS; i >= 1; i--) {
-        const f = (FIELD_DEPTH * i) / FIELD_BANDS;
-        const nearer = (FIELD_DEPTH * (i - 1)) / FIELD_BANDS;
-        const far = f / FIELD_DEPTH;
-        let col = shade(c.crust, 1 - 0.05 * f);
-        col = mixColor(col, seg.biome.sky[1], 0.3 * far * far);
-        if (i % 2 === 0) col = shade(col, 0.985); // faint furrow banding
-        strip(col, -laneLift(f), -laneLift(nearer) + 1.5, xa, xb);
-      }
-      strip(shade(c.crust, 0.6), -laneLift(FIELD_DEPTH) - 2, -laneLift(FIELD_DEPTH) + 1, xa, xb); // contact line with the tree line
-      strip(mixColor(c.crust, 0xffffff, 0.18), -laneLift(FIELD_DEPTH) - 3, -laneLift(FIELD_DEPTH) - 2, xa, xb, 0.5); // rim light
-      strip(c.crust, 0, 10, xa, xb); // the near lane's sunlit crust
-      strip(mixColor(c.crust, 0xffffff, 0.22), 0, 1.5, xa, xb, 0.7); // its bright lip
-      strip(c.crustShadow, 10, 15, xa, xb);
-      strip(0x000000, 15, 19, xa, xb, 0.12); // soft shadow under the lip
+      strip(OUTLINE, far - 2, far + 1.5, xa, xb); // contact line with the tree line
+      strip(c.crust, 0, 10, xa, xb); // the near lane's crust
+      strip(c.crustShadow, 10, 15, xa, xb); // its shaded edge
+      strip(OUTLINE, -1.5, 1.5, xa, xb); // the lip outline
+      strip(OUTLINE, 15, 18, xa, xb); // outline under the slab's step
       this.mud(seg.biome, xa, xb);
       this.ruts(seg.biome, xa, xb);
       this.details(seg.biome, xa, xb);
       this.tufts(seg.biome, xa, xb);
     }
-    // A soft vignette towards the HUD: the foreground fades darker the nearer it gets to the camera.
-    const vx0 = x0;
-    const vx1 = x1;
-    for (let i = 0; i < 8; i++) strip(0x000000, 30 + i * 11, null, vx0, vx1, 0.035);
   }
 
-  /** Dark mud patches scattered over the whole field and foreground. */
-  private mud(biome: Biome, xa: number, xb: number): void {
+  /**
+   * A flat patch lying ON the ground: a lens whose top and bottom edges follow the track at depth `f`
+   * (so it bends with the hills and can never stick out of the ground the way an ellipse did), `hh`
+   * px tall in the middle (both scaled by the depth); `inset` (px) shrinks it from both ends for an inner layer.
+   */
+  private patch(color: number, alpha: number, x0: number, x1: number, f: number, hh: number, inset = 0): void {
     const g = this.g;
+    const sc = laneScale(f);
+    const a = x0 + inset;
+    const b = x1 - inset;
+    if (b - a < 2) return;
+    const steps = Math.max(3, Math.ceil((b - a) / RENDER_STEP));
+    const pts = lensOutline(a, b, steps, hh * sc);
+    g.fillStyle(color, alpha);
+    g.beginPath();
+    pts.top.forEach((p, i) => {
+      const y = this.h(p.x) - laneLift(f) + p.dy;
+      if (i === 0) g.moveTo(p.x, y);
+      else g.lineTo(p.x, y);
+    });
+    for (let i = pts.bottom.length - 1; i >= 0; i--) {
+      const p = pts.bottom[i];
+      g.lineTo(p.x, this.h(p.x) - laneLift(f) + p.dy);
+    }
+    g.closePath();
+    g.fillPath();
+  }
+
+  /** Dark mud patches scattered over the field and foreground, as flat lenses that follow the ground. */
+  private mud(biome: Biome, xa: number, xb: number): void {
     const c = biome.ground;
-    const patch = mixColor(c.crust, c.crustShadow, 0.75);
+    const patchColor = mixColor(c.crust, c.crustShadow, 0.7);
     for (let k = Math.floor(xa / MUD_CELL) - 1; k * MUD_CELL < xb; k++) {
       for (let j = 0; j < 3; j++) {
         if (hash01(k, 11 + j) > 0.55) continue;
         const x = k * MUD_CELL + hash01(k, 21 + j) * MUD_CELL;
         if (x < xa || x > xb) continue;
-        const f = -FOREGROUND_DEPTH * 0.7 * (j === 2 ? hash01(k, 61) : 0) + hash01(k, 31 + j) * (j === 2 ? 0 : FIELD_DEPTH - 0.1);
-        const sc = laneScale(f);
-        const y = this.h(x) - laneLift(f) + 3;
-        const w = (46 + hash01(k, 41 + j) * 80) * sc;
-        const hh = (6 + hash01(k, 51 + j) * 6) * sc;
-        g.fillStyle(patch, 0.45);
-        g.fillEllipse(x, y, w, hh);
-        g.fillStyle(mixColor(patch, 0xffffff, 0.12), 0.25); // damp sheen on the lower edge
-        g.fillEllipse(x + w * 0.05, y + hh * 0.2, w * 0.7, hh * 0.45);
+        // Field patches stay between the lip and the far edge; foreground patches stay well below the lip.
+        const f =
+          j === 2
+            ? -(FLAT_FOREGROUND + hash01(k, 61) * (FOREGROUND_DEPTH * 0.7 - FLAT_FOREGROUND))
+            : FLAT_FIELD[0] + hash01(k, 31 + j) * (FLAT_FIELD[1] - FLAT_FIELD[0]);
+        const w = 46 + hash01(k, 41 + j) * 80;
+        const hh = 6 + hash01(k, 51 + j) * 6;
+        this.patch(patchColor, 1, x - w / 2, x + w / 2, f, hh);
       }
     }
   }
 
   /**
    * Long tire ruts along the field and the foreground. Each is a vehicle's pair of tire tracks seen in
-   * perspective: two dark grooves a little apart in depth with a lit ridge of churned mud between
-   * them, tread blocks across the near ones, meandering, breaking off here and there with a berm of
-   * pushed-up dirt at each end.
+   * perspective: two dark grooves a little apart in depth, tread blocks across the near ones,
+   * meandering, breaking off here and there with a small berm of pushed-up dirt at each end. Flat
+   * colour only: a groove is a dark line, nothing is lit.
    */
   private ruts(biome: Biome, xa: number, xb: number): void {
     const g = this.g;
     const c = biome.ground;
-    const groove = shade(c.rut1, 0.6);
-    const ridge = mixColor(c.crust, 0xffffff, 0.22);
-    const lip = mixColor(c.crust, 0xffffff, 0.34);
+    const groove = shade(c.rut1, 0.7);
+    const berm = shade(c.crust, 0.9);
     RUT_DEPTHS.forEach((f, ri) => {
       for (let cell = Math.floor(xa / RUT_CELL) - 1; cell * RUT_CELL < xb; cell++) {
         const cellX0 = cell * RUT_CELL;
@@ -180,13 +202,13 @@ export class GroundPainter {
         const cx0 = Math.max(xa, rx0);
         const cx1 = Math.min(xb, rx1);
         if (cx1 <= cx0) continue;
-        const line = (color: number, alpha: number, w: number, depth: number, off: number, from: number, to: number) => {
+        const line = (color: number, alpha: number, w: number, depth: number, from: number, to: number) => {
           const sc = laneScale(depth);
           g.lineStyle(w * sc, color, alpha);
           g.beginPath();
           let first = true;
           for (let x = Math.ceil(from / RENDER_STEP) * RENDER_STEP; x <= to; x += RENDER_STEP) {
-            const y = this.h(x) - laneLift(depth) + rutWobble(ri, x) * sc + off * sc;
+            const y = this.h(x) - laneLift(depth) + rutWobble(ri, x) * sc;
             if (first) {
               g.moveTo(x, y);
               first = false;
@@ -195,15 +217,10 @@ export class GroundPainter {
           g.strokePath();
         };
         const f2 = f - RUT_PAIR;
-        // Ridge first (under both grooves), then grooves with a lit lip under each, then the tread.
-        line(ridge, 0.5, 2.6, (f + f2) / 2, 0, cx0, cx1);
-        for (const d of [f, f2]) {
-          line(groove, 0.55, 3.2, d, 0, cx0, cx1);
-          line(lip, 0.42, 1.2, d, 2.6, cx0, cx1);
-        }
+        for (const d of [f, f2]) line(groove, 0.8, 3.2, d, cx0, cx1);
         if (f < 0.8) {
           const sc = laneScale(f);
-          g.lineStyle(1.1 * sc, groove, 0.5);
+          g.lineStyle(1.1 * sc, groove, 0.7);
           g.beginPath();
           for (let x = Math.ceil(cx0 / 13) * 13; x <= cx1; x += 13) {
             const y = this.h(x) - laneLift(f) + rutWobble(ri, x) * sc;
@@ -212,16 +229,10 @@ export class GroundPainter {
           }
           g.strokePath();
         }
-        // Berms of pushed-up dirt where the tracks start and stop.
-        for (const [bx, on] of [
-          [rx0, rx0 >= xa && rx0 <= xb],
-          [rx1, rx1 >= xa && rx1 <= xb],
-        ] as const) {
-          if (!on) continue;
-          const sc = laneScale(f);
-          const by = this.h(bx) - laneLift(f) + rutWobble(ri, bx) * sc;
-          g.fillStyle(ridge, 0.55);
-          g.fillEllipse(bx, by - 0.6 * sc, 9 * sc, 5 * sc);
+        // Berms of pushed-up dirt where the tracks start and stop (flat lenses on the ground).
+        for (const bx of [rx0, rx1]) {
+          if (bx < xa || bx > xb) continue;
+          this.patch(berm, 1, bx - 6, bx + 6, f - RUT_PAIR / 2, 5);
         }
       }
     });
@@ -231,6 +242,19 @@ export class GroundPainter {
     for (const d of groundDetails(biome.id, xa, xb, this.detail)) this.detailOne(biome, d);
   }
 
+  /** A flat, outlined rock or clod: dark outline, one body colour, one lighter top facet (no highlights). */
+  private blob(x: number, y: number, w: number, h: number, body: number, top: number): void {
+    const g = this.g;
+    g.fillStyle(0x000000, 0.2); // contact shadow on the ground
+    g.fillEllipse(x + w * 0.1, y + 0.5, w * 1.15, Math.max(1.5, h * 0.35));
+    g.fillStyle(OUTLINE, 1);
+    g.fillEllipse(x, y - h * 0.4, w + 2, h + 2);
+    g.fillStyle(body, 1);
+    g.fillEllipse(x, y - h * 0.4, w, h);
+    g.fillStyle(top, 1);
+    g.fillEllipse(x - w * 0.08, y - h * 0.58, w * 0.6, h * 0.45);
+  }
+
   private detailOne(biome: Biome, d: Detail): void {
     const g = this.g;
     const c = biome.ground;
@@ -238,97 +262,74 @@ export class GroundPainter {
     const x = d.x;
     const y = this.h(x) - laneLift(d.f) + 2 * sc;
     const dark = shade(c.crust, 0.7);
-    const light = mixColor(c.crust, 0xffffff, 0.38);
+    const stone = mixColor(c.crust, 0x8f8a82, 0.6);
+    const stoneTop = mixColor(c.crust, 0xb9b4aa, 0.6);
     switch (d.kind) {
       case 'pebble': {
-        const w = (3.6 + d.seed * 3) * sc;
-        g.fillStyle(0x000000, 0.22);
-        g.fillEllipse(x + 1.2 * sc, y + 0.8 * sc, w * 1.5, w * 0.6);
-        g.fillStyle(mixColor(dark, 0x8f8a82, 0.45), 1);
-        g.fillEllipse(x, y - w * 0.3, w * 1.3, w * 0.9);
-        g.fillStyle(mixColor(light, 0xffffff, 0.2), 0.9);
-        g.fillEllipse(x - w * 0.22, y - w * 0.55, w * 0.5, w * 0.3);
+        const w = (4.4 + d.seed * 3) * sc;
+        this.blob(x, y, w, w * 0.75, shade(stone, 0.85), stone);
         break;
       }
       case 'gravel': {
-        // A little scatter of grit: five specks in dark and light.
+        // A little scatter of grit: five flat specks in two tones.
         for (let k = 0; k < 5; k++) {
           const gx = x + (hash01(Math.floor(d.seed * 9973), k) - 0.5) * 16 * sc;
           const gy = y + (hash01(Math.floor(d.seed * 9973), k + 9) - 0.5) * 4 * sc;
           const r = (1 + hash01(Math.floor(d.seed * 9973), k + 17) * 1.4) * sc;
-          g.fillStyle(k % 2 ? mixColor(dark, 0x8f8a82, 0.4) : mixColor(light, 0xc9c3b8, 0.3), 0.95);
+          g.fillStyle(k % 2 ? shade(stone, 0.8) : stone, 1);
           g.fillEllipse(gx, gy, r * 2, r * 1.4);
         }
         break;
       }
       case 'stone': {
-        const w = (8 + d.seed * 6) * sc;
-        g.fillStyle(0x000000, 0.26);
-        g.fillEllipse(x + 2 * sc, y + 1 * sc, w * 1.6, w * 0.5);
-        g.fillStyle(mixColor(dark, 0x7d7a74, 0.55), 1);
-        g.fillEllipse(x, y - w * 0.35, w * 1.35, w * 0.95);
-        g.fillStyle(mixColor(c.crust, 0xb9b4aa, 0.5), 1);
-        g.fillEllipse(x - w * 0.12, y - w * 0.5, w * 1.0, w * 0.6);
-        g.fillStyle(0xffffff, 0.4);
-        g.fillEllipse(x - w * 0.3, y - w * 0.68, w * 0.4, w * 0.2);
+        const w = (9 + d.seed * 6) * sc;
+        this.blob(x, y, w, w * 0.7, shade(stone, 0.9), stoneTop);
         break;
       }
       case 'clod': {
-        const w = (7 + d.seed * 6) * sc;
-        g.fillStyle(0x000000, 0.2);
-        g.fillEllipse(x + 1.5 * sc, y + 1 * sc, w * 1.7, w * 0.5);
+        const w = (8 + d.seed * 6) * sc;
         const mud = shade(mixColor(c.crust, c.crustShadow, 0.7), 0.9);
-        g.fillStyle(mud, 1);
-        g.fillEllipse(x - w * 0.3, y - w * 0.25, w * 0.9, w * 0.62);
-        g.fillEllipse(x + w * 0.3, y - w * 0.3, w * 0.8, w * 0.7);
-        g.fillEllipse(x, y - w * 0.5, w * 0.7, w * 0.55);
-        g.fillStyle(mixColor(mud, 0xffffff, 0.3), 0.8);
-        g.fillEllipse(x - w * 0.05, y - w * 0.62, w * 0.34, w * 0.2);
+        this.blob(x, y, w, w * 0.62, mud, mixColor(mud, c.crust, 0.35));
         break;
       }
       case 'crack': {
-        // Dried-mud cracks: a short zigzag with two branches.
-        g.lineStyle(1.3 * sc, shade(c.crustShadow, 0.8), 0.6);
+        // Dried-mud cracks: a short zigzag with two branches, lying on the ground at its depth.
+        g.lineStyle(1.4 * sc, shade(c.crustShadow, 0.8), 0.85);
         g.beginPath();
         const len = (16 + d.seed * 12) * sc;
-        g.moveTo(x - len, y);
-        g.lineTo(x - len * 0.5, y - 2 * sc);
-        g.lineTo(x - len * 0.1, y + 1.5 * sc);
-        g.lineTo(x + len * 0.4, y - 1.5 * sc);
-        g.lineTo(x + len, y + 1 * sc);
-        g.moveTo(x - len * 0.1, y + 1.5 * sc);
-        g.lineTo(x + len * 0.05, y + 4.5 * sc);
-        g.moveTo(x + len * 0.4, y - 1.5 * sc);
-        g.lineTo(x + len * 0.55, y - 4.5 * sc);
+        const yy = (dx: number, dy: number) => this.h(x + dx) - laneLift(d.f) + dy * sc;
+        g.moveTo(x - len, yy(-len, 0));
+        g.lineTo(x - len * 0.5, yy(-len * 0.5, -2));
+        g.lineTo(x - len * 0.1, yy(-len * 0.1, 1.5));
+        g.lineTo(x + len * 0.4, yy(len * 0.4, -1.5));
+        g.lineTo(x + len, yy(len, 1));
+        g.moveTo(x - len * 0.1, yy(-len * 0.1, 1.5));
+        g.lineTo(x + len * 0.05, yy(len * 0.05, 4.5));
+        g.moveTo(x + len * 0.4, yy(len * 0.4, -1.5));
+        g.lineTo(x + len * 0.55, yy(len * 0.55, -4.5));
         g.strokePath();
         break;
       }
       case 'puddle': {
-        const w = (40 + d.seed * 38) * sc;
-        const hh = (5 + d.seed * 4) * sc;
+        // A flat pool lying on the ground: a dark wet rim lens, a water lens and a paler band of
+        // reflected sky. All three follow the terrain, so the pool bends with the hill under it.
+        const w = (40 + d.seed * 38) * d.size * laneScale(d.f);
+        const hh = 5 + d.seed * 4;
         const water = mixColor(biome.sky[1], c.crustShadow, biome.id === 'swamp' ? 0.55 : biome.id === 'snow' ? 0.05 : 0.32);
-        g.fillStyle(shade(c.crustShadow, 0.85), 0.55); // wet, dark rim
-        g.fillEllipse(x, y, w + 5 * sc, hh + 3 * sc);
-        g.fillStyle(water, 0.9);
-        g.fillEllipse(x, y - 0.5 * sc, w, hh);
-        g.fillStyle(mixColor(biome.sky[0], water, 0.5), 0.6); // sky reflection, darker towards the far side
-        g.fillEllipse(x, y - hh * 0.2, w * 0.86, hh * 0.5);
-        g.fillStyle(0xffffff, 0.55); // glint
-        g.fillEllipse(x - w * 0.18, y - hh * 0.28, w * 0.26, hh * 0.18);
-        g.lineStyle(1 * sc, 0xffffff, 0.35); // ripple
-        g.strokeEllipse(x + w * 0.2, y, w * 0.2, hh * 0.45);
+        this.patch(OUTLINE, 0.6, x - w / 2 - 2, x + w / 2 + 2, d.f, hh + 3);
+        this.patch(water, 1, x - w / 2, x + w / 2, d.f, hh);
+        this.patch(mixColor(biome.sky[0], water, 0.5), 1, x - w / 2, x + w / 2, d.f, hh * 0.45, w * 0.12);
         break;
       }
       case 'ripple': {
-        // Wind ripples in sand (or a reed bed's water lines): two long soft arcs, light over dark.
+        // Wind ripples in sand (or a reed bed's water lines): two long arcs lying along the ground.
         const len = (30 + d.seed * 26) * sc;
         for (let k = 0; k < 2; k++) {
-          const off = k * 4 * sc;
-          g.lineStyle(1.4 * sc, k ? light : dark, k ? 0.45 : 0.35);
+          g.lineStyle(1.4 * sc, k ? shade(c.crust, 0.9) : dark, k ? 0.9 : 0.7);
           g.beginPath();
           for (let s = 0; s <= 6; s++) {
             const px = x - len / 2 + (len * s) / 6;
-            const py = y + off - Math.sin((s / 6) * Math.PI) * 2.2 * sc;
+            const py = this.h(px) - laneLift(d.f) + k * 4 * sc - Math.sin((s / 6) * Math.PI) * 2.2 * sc;
             if (s === 0) g.moveTo(px, py);
             else g.lineTo(px, py);
           }
@@ -337,13 +338,11 @@ export class GroundPainter {
         break;
       }
       case 'sparkle': {
-        // Snow glints and a blue-grey hollow beside them.
-        const r = (2 + d.seed * 2.2) * sc;
-        g.fillStyle(0x9fb4cf, 0.28);
-        g.fillEllipse(x + r, y + r * 0.4, r * 4.5, r * 1.1);
-        g.lineStyle(1 * sc, 0xffffff, 0.9);
-        g.lineBetween(x - r, y - r, x + r, y - r);
-        g.lineBetween(x, y - r * 2, x, y);
+        // Snow drift: a flat blue-grey patch lying on the ground, with a smaller darker core.
+        const w = (24 + d.seed * 26) * sc;
+        const drift = mixColor(c.crust, 0x9fb4cf, 0.55);
+        this.patch(drift, 1, x - w / 2, x + w / 2, d.f, 5 + d.seed * 3);
+        this.patch(shade(drift, 0.92), 1, x - w / 2, x + w / 2, d.f, 2.4, w * 0.18);
         break;
       }
     }

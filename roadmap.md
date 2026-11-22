@@ -1,6 +1,6 @@
 # 4x4 Snack Run: Redux Roadmap
 
-> **Status:** Phases 0 to 7.5 are complete and the code half of Phase 8 is done (see `README.md`): touch controls, gamepad, remappable keys, a settings screen, a performance pass, plus a road art pass and monster-truck-lifted vehicles. What is left is the human half of Phase 8: playtests and the itch.io release. All art is generated at runtime. All art is generated in code (`src/art/`); texture keys (`truck_body`, `rival_0..5`, `wheel`, `snack`, `fuel_can`, `wrench`, `start_gate`, `cp_gate`, and `sky_<biome>`, `trees_<biome>`, ...) are stable so real sprites can drop in.
+> **Status:** Phases 0 to 7.5, 8.5 and the code half of Phase 8 are done (see `README.md`): touch controls, gamepad, remappable keys, a settings screen, a performance pass, plus a road art pass and monster-truck-lifted vehicles. What is left is the human half of Phase 8: playtests and the itch.io release. All art is generated at runtime. All art is generated in code (`src/art/`); texture keys (`truck_body`, `rival_0..5`, `wheel`, `snack`, `fuel_can`, `wrench`, `start_gate`, `cp_gate`, and `sky_<biome>`, `trees_<biome>`, ...) are stable so real sprites can drop in.
 
 An endless-runner redux of a late-90s Flash/Shockwave-era 4x4 racing game. Same spirit (muddy tracks, big trucks, jumps, snack pickups), rebuilt for modern browsers.
 
@@ -212,13 +212,20 @@ The original was pseudo-3D: a wide dirt field with trucks driving at different d
 
 ### Phase 8.5: Change Requests and Feedback
 
-- [ ] The road artwork looks to glossy. No other artwork in the game uses a gradient like that.
-- [ ] The road has puddles and other circular ovals effects (not the rocks) placed at top it (some times oddly below ground) to give it detail but those details don't contour well with the road and sometimes overlay the road and clip out of it
-- [ ] The player's car should have the word CRUNCH move down a bit and centered nicely.
-- [ ] All vehicles have flat bottom chasis like they never used to have two cutout spots for their wheels.
-- [ ] There should be start screen with buttons to play, garage, settings, and credits to credit the game developers.
-- [ ] Plan a better UI artwork for the menus throughout the game (including highscore) that match a racing game like this.
-- [ ] Suggest to use a better free and public domain font for primary and secondary fonts
+- [x] The road artwork looks to glossy. No other artwork in the game uses a gradient like that.
+  - **Done:** `GroundPainter.paint` is flat now: one solid colour per layer with a dark outline where layers meet, three hard-edged furrow bands, and no gradients, haze, vignette, lit ridges or white glints. Rocks and clods are outlined with one flat lighter top facet.
+- [x] The road has puddles and other circular ovals effects (not the rocks) placed at top it (some times oddly below ground) to give it detail but those details don't contour well with the road and sometimes overlay the road and clip out of it
+  - **Done:** puddles, drifts, mud patches and rut berms are lens shapes whose edges follow the terrain (`lensOutline`, `GroundPainter.patch`), so they bend over hills. Flat details only live in safe zones (`FLAT_FIELD`, `FLAT_FOREGROUND`): never on the lip of the near lane and never near the far edge. Tests pin the zones.
+- [x] The player's car should have the word CRUNCH move down a bit and centered nicely.
+  - **Done:** the badge sits under the side windows, centred on them, clear of the glass and the stripe (`PLAYER_BADGE` in `src/art/chassis.ts`, tested).
+- [x] All vehicles have flat bottom chasis like they never used to have two cutout spots for their wheels.
+  - **Done:** every body gets a skirt that lowers its underside, and two wheel arches are cut up into it with a fender flare and a dark lining; tires now reach up into them (`src/art/chassis.ts`, tested for all 7 trucks). Physics is untouched.
+- [x] There should be start screen with buttons to play, garage, settings, and credits to credit the game developers.
+  - **Done:** `MenuScene` (first screen; `?play`, `?seed` or `?daily` skip it) and `CreditsScene` (text in `src/credits.ts`; edit the names there). Settings and garage return to where you came from; game over has a MENU button (Esc).
+- [x] Plan a better UI artwork for the menus throughout the game (including highscore) that match a racing game like this.
+  - **Done:** the plan is `docs/ui-art-plan.md`, and it is implemented as a shared kit (`src/ui/`) used by the start screen, garage, high scores, settings, credits and game over.
+- [x] Suggest to use a better free and public domain font for primary and secondary fonts
+  - **Done:** Russo One (primary) and Rajdhani (secondary), bundled in `public/fonts/` and used everywhere (menus, HUD, toasts). Both are SIL OFL, free but **not** public domain. For true public domain (CC0), Kenney Future is the best fit; swap it in `src/ui/Fonts.ts`.
 
 ---
 

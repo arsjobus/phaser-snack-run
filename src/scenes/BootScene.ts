@@ -47,8 +47,10 @@ export class BootScene extends Phaser.Scene {
       for (let v = 0; v < OBSTACLE_VARIANTS; v++) this.bake(obstacleKey(kind, v), art.w, art.h, (g) => art.draw(g, v));
     }
     const q = new URLSearchParams(window.location.search);
-    // Developer shortcuts: `?art` is the art preview, `?settings` opens the settings screen.
-    this.scene.start(q.has('art') ? 'Art' : q.has('settings') ? 'Settings' : 'Game');
+    // The start screen comes first. Developer shortcuts skip it: `?art` is the art preview,
+    // `?settings` opens the settings screen, and `?play`, `?seed=...` or `?daily` go straight to a run.
+    const straightToRun = q.has('play') || q.has('seed') || q.has('daily');
+    this.scene.start(q.has('art') ? 'Art' : q.has('settings') ? 'Settings' : straightToRun ? 'Game' : 'Menu');
   }
 
   private bake(key: string, w: number, h: number, draw: (g: Phaser.GameObjects.Graphics) => void): void {

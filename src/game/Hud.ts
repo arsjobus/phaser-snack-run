@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { CHECKPOINT, FUEL, VIEW_H, VIEW_W } from '../config';
+import { FONT_BODY, FONT_DISPLAY } from '../ui/Fonts';
 import { NeedleSpring, blinkLit, formatClock, needleAngle } from './HudModel';
 
 export const HUD_H = 72;
@@ -120,9 +121,10 @@ export class Hud {
   private label(x: number, y: number, text: string, color: string, size: number, bold = false) {
     return this.scene.add
       .text(x, y, text, {
-        fontFamily: 'monospace',
+        // Big readouts are the display face, small labels the body face.
+        fontFamily: size >= 20 ? FONT_DISPLAY : FONT_BODY,
         fontSize: `${size}px`,
-        fontStyle: bold ? 'bold' : 'normal',
+        fontStyle: size >= 20 ? 'normal' : bold ? 'bold' : 'normal',
         color,
       })
       .setOrigin(0.5)

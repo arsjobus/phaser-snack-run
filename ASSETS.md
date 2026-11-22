@@ -18,6 +18,9 @@ Every asset in the game must be listed here with its source and licence.
 | Road detail (ruts, pebbles, stones, clods, cracks, puddles, ripples, glints), monster-truck tires and undercarriage | Texture | Drawn in code (`src/game/GroundPainter.ts`, `src/art/props.ts`, `src/art/trucks.ts`) | Project licence | Original art |
 | Touch buttons, settings screen | UI | Drawn in code (`src/input/TouchView.ts`, `src/scenes/SettingsScene.ts`) | Project licence | No external assets |
 | Music (adaptive theme: pad, drums, bass, lead stems) | Audio | Composed for this project (`src/audio/Composition.ts`), synthesized at runtime | Project licence | Original composition (A minor, 132 bpm, Am-F-G-E). Not derived from the original game's music; no samples |
+| Russo One (display font) | Font | `public/fonts/russo-one-latin-400-normal.woff2` (Fontsource build of Google Fonts' Russo One, Jovanny Lemonad) | SIL OFL 1.1 | `public/fonts/OFL-RussoOne.txt` |
+| Rajdhani 600/700 (text font) | Font | `public/fonts/rajdhani-latin-*-normal.woff2` (Fontsource build, Indian Type Foundry) | SIL OFL 1.1 | `public/fonts/OFL-Rajdhani.txt` |
+| Menu kit: panels, buttons, hazard strip, checker strip, medals, logo plate | UI | Drawn in code (`src/ui/`) | Project licence | Plan in `docs/ui-art-plan.md` |
 
 ## Rules
 

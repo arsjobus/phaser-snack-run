@@ -55,6 +55,9 @@ import { unlockAchievements, type Achievement } from '../progress/Achievements';
 import { dailySeed, dayKey } from '../progress/Daily';
 import { loadSave, perksFor, recordRun, writeSave, type RunResult, type SaveData } from '../progress/Progress';
 import { defaultStore, type KeyValueStore } from '../progress/Storage';
+import { FONT_BODY, FONT_DISPLAY } from '../ui/Fonts';
+import { INK, UI } from '../ui/Theme';
+import { button, label, panel, rankBadge, type Layer } from '../ui/Ui';
 
 const FIXED_DT = 1 / 60 / PHYSICS.substeps;
 const GATE_X = GAMEPLAY.startX + 420;
@@ -171,7 +174,7 @@ export class GameScene extends Phaser.Scene {
     this.textPool = new Pool(
       () =>
         this.add
-          .text(0, 0, '', { fontFamily: 'monospace', fontSize: '20px', fontStyle: 'bold', color: '#fff', stroke: '#000', strokeThickness: 4 })
+          .text(0, 0, '', { fontFamily: FONT_DISPLAY, fontSize: '20px', fontStyle: 'normal', color: '#fff', stroke: '#000', strokeThickness: 4 })
           .setOrigin(0.5)
           .setDepth(8),
       (t) => t.setVisible(true).setActive(true).setAlpha(1),
@@ -222,8 +225,10 @@ export class GameScene extends Phaser.Scene {
       if (p.wasTouch) this.touchedOnce = true;
     });
 
+    // Big text (toasts, the position meter) is the display face, small text the body face.
     const text = (size: number, color: string) => ({
-      fontFamily: 'monospace',
+      fontFamily: size >= 20 ? FONT_DISPLAY : FONT_BODY,
+      fontStyle: size >= 20 ? 'normal' : 'bold',
       fontSize: `${size}px`,
       color,
       stroke: '#000',
@@ -285,7 +290,7 @@ export class GameScene extends Phaser.Scene {
       kb.off('keydown');
       kb.off('keyup');
     });
-    this.keys = kb.addKeys('G,D,O,SPACE,ENTER') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = kb.addKeys('G,D,O,SPACE,ENTER,ESC') as Record<string, Phaser.Input.Keyboard.Key>;
     this.applyQuality();
 
     this.terrain.ensure(this.startX + VIEW_W + 1500);
@@ -358,6 +363,7 @@ export class GameScene extends Phaser.Scene {
       if (J(this.keys.G) || pad.garage) this.scene.start('Garage');
       else if (J(this.keys.O) || pad.settings) this.scene.start('Settings', { from: 'Game' });
       else if (J(this.keys.D) || pad.daily) this.restart(!this.daily);
+      else if (J(this.keys.ESC) || (pad.back && this.time.now - this.overAt > 400)) this.scene.start('Menu');
       else if (pressed('reset') || J(this.keys.SPACE) || J(this.keys.ENTER) || pad.confirm) this.restart();
     } else {
       if (pressed('reset') || pad.reset) this.recover();
@@ -976,9 +982,9 @@ export class GameScene extends Phaser.Scene {
       .setDepth(0.5);
     const label = this.add
       .text(x, y - 212 + (zone ? 28 : 35), `CHECKPOINT ${index}`, {
-        fontFamily: 'monospace',
+        fontFamily: FONT_DISPLAY,
         fontSize: '18px',
-        fontStyle: 'bold',
+        fontStyle: 'normal',
         color: '#ffffff',
       })
       .setOrigin(0.5)
@@ -988,8 +994,8 @@ export class GameScene extends Phaser.Scene {
       objs.push(
         this.add
           .text(x, y - 212 + 47, `> ${zone.name.toUpperCase()}`, {
-            fontFamily: 'monospace',
-            fontSize: '12px',
+            fontFamily: FONT_BODY,
+            fontSize: '13px',
             fontStyle: 'bold',
             color: '#ffffff',
           })
@@ -1074,93 +1080,92 @@ export class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: this.achToast, alpha: 0, delay: 2200, duration: 600 });
   }
 
+  /**
+   * The game-over screen, drawn with the shared UI kit (`src/ui/`): a rimmed panel with the run's
+   * numbers on the left, the high-score table (medals for the podium, this run highlighted) on the
+   * right, and five buttons along the bottom (keys and pad buttons do the same). A tap anywhere
+   * else drives again.
+   */
   private showGameOver(result: RunResult & { achievements: Achievement[] }): void {
     const s = this.run.score;
     this.tweens.killTweensOf(this.warn);
     this.warn.setAlpha(0);
+    const layer: Layer = this.add.container(0, 0).setScrollFactor(0).setDepth(30);
     const cx = VIEW_W / 2;
-    const cy = 205;
-    this.add
-      .rectangle(cx, cy, 760, 330, 0x0b1230, 0.9)
-      .setStrokeStyle(3, 0x8fa4d6)
-      .setScrollFactor(0)
-      .setDepth(30);
-    const style = (size: number, color: string, align = 'center') => ({
-      fontFamily: 'monospace',
-      fontSize: `${size}px`,
-      fontStyle: 'bold',
-      color,
-      align,
-    });
-    const put = (x: number, y: number, text: string | string[], st: object, ox = 0.5) =>
-      this.add.text(x, y, text, st).setOrigin(ox, 0.5).setScrollFactor(0).setDepth(31);
+    panel(this, layer, 70, 26, 820, 368);
+    const put = (x: number, y: number, text: string | string[], kind: 'display' | 'body', size: number, color: string, ox = 0.5) =>
+      label(this, layer, x, y, text, kind, size, color, ox);
 
     const title = TITLES[this.run.endReason ?? 'fuel'] + (this.daily ? '  (DAILY)' : '');
-    put(cx, cy - 138, title, style(32, '#ff5a4a'));
-    const left = cx - 360;
+    put(cx, 62, title, 'display', 34, INK.red);
     const sm = this.run.summary(this.daily);
+    const left = 104;
+    put(left, 108, `SCORE ${s.total}${result.newBestScore ? '   NEW BEST!' : ''}`, 'display', 22, result.newBestScore ? INK.title : INK.text, 0);
     put(
-      left + 20,
-      cy - 58,
+      left,
+      200,
       [
-        `SCORE ${s.total}${result.newBestScore ? '  NEW BEST!' : ''}`,
         `${sm.meters} m${result.newBestMeters ? ' (best!)' : ''}   ${s.snacks} snacks`,
-        `best air ${this.bestAir.toFixed(2)}s   combo x${s.bestMultiplier} (${s.bestChain})`,
+        `best air ${this.bestAir.toFixed(2)} s   combo x${s.bestMultiplier} (${s.bestChain})`,
         `checkpoints ${sm.checkpoints}   takedowns ${s.takedowns}`,
         `lane changes ${sm.laneChanges}   close calls ${sm.nearMisses}`,
         '',
         `+${result.coins} COINS   bank ${this.save.coins}`,
         result.dailyBest !== null ? `DAILY BEST ${result.dailyBest}${result.dailyFirst ? '  (+bonus)' : ''}` : '',
       ],
-      { ...style(15, '#ffffff', 'left'), lineSpacing: 7 },
+      'body',
+      18,
+      INK.soft,
       0,
     );
 
-    // The high-score table, with this run's place highlighted.
-    const rx = cx + 130;
-    put(rx + 100, cy - 92, 'TOP SCORES', style(16, '#9be0ff'));
+    // The high-score table: a medal per row, columns for score and distance, this run in yellow.
+    const tx = 510;
+    put(tx + 190, 96, 'TOP SCORES', 'display', 15, INK.cyan);
     this.save.highScores.slice(0, 7).forEach((h, i) => {
+      const y = 126 + i * 27;
       const mine = result.rank === i + 1;
-      put(
-        rx,
-        cy - 64 + i * 22,
-        `${String(i + 1).padStart(2)}. ${String(h.score).padStart(7)}  ${String(h.meters).padStart(5)}m ${h.daily ? 'D' : ' '}`,
-        style(14, mine ? '#ffe066' : '#c9d3ee', 'left'),
-        0,
-      );
+      if (mine) {
+        const g = this.add.graphics();
+        g.fillStyle(UI.navy, 1);
+        g.fillRoundedRect(tx - 8, y - 12, 392, 25, 6);
+        layer.add(g);
+      }
+      const color = mine ? INK.title : INK.soft;
+      rankBadge(this, layer, tx + 8, y, i + 1, 10);
+      put(tx + 150, y, String(h.score), 'display', 16, color, 1);
+      put(tx + 250, y, `${h.meters} m`, 'body', 17, color, 1);
+      if (h.daily) put(tx + 340, y, 'DAILY', 'body', 14, INK.good, 1);
     });
     if (result.achievements.length) {
-      put(
-        cx,
-        cy + 100,
-        result.achievements.map((a) => `ACHIEVEMENT: ${a.name}  +${a.reward} coins`),
-        style(14, '#ffd34d'),
-      );
+      put(cx, 318, result.achievements.map((a) => `ACHIEVEMENT: ${a.name}  +${a.reward} coins`), 'body', 16, INK.title);
     }
-    // Four tappable buttons (keys and pad buttons do the same); a tap anywhere else drives again.
-    const buttons: [string, string, () => void][] = [
-      ['SPACE  DRIVE AGAIN', '#ffe066', () => this.restart()],
-      ['G  GARAGE', '#9be0ff', () => this.scene.start('Garage')],
-      [this.daily ? 'D  FREE RUN' : 'D  DAILY', '#7dff8a', () => this.restart(!this.daily)],
-      ['O  SETTINGS', '#c9d3ee', () => this.scene.start('Settings', { from: 'Game' })],
+    // Five tappable buttons; a tap on one does that button's job.
+    const buttons: [string, string, () => void, number][] = [
+      ['DRIVE AGAIN', 'SPACE', () => this.restart(), UI.yellow],
+      ['GARAGE', 'G', () => this.scene.start('Garage'), UI.cyan],
+      [this.daily ? 'FREE RUN' : 'DAILY', 'D', () => this.restart(!this.daily), UI.green],
+      ['SETTINGS', 'O', () => this.scene.start('Settings', { from: 'Game' }), UI.green],
+      ['MENU', 'ESC', () => this.scene.start('Menu'), UI.yellowLight],
     ];
-    const widths = [220, 150, 150, 170];
-    let bx = cx - widths.reduce((a, w) => a + w, 0) / 2 - 12;
-    buttons.forEach(([label, color, go], i) => {
-      const w = widths[i];
-      const x = bx + w / 2 + 8;
-      bx += w + 8;
-      const box = this.add
-        .rectangle(x + 4, cy + 142, w, 34, 0x16224a)
-        .setStrokeStyle(2, 0x44558a)
-        .setScrollFactor(0)
-        .setDepth(31)
-        .setInteractive({ useHandCursor: true });
-      box.on('pointerdown', () => {
-        if (this.time.now - this.overAt > 400) go();
+    const w = 144;
+    const gap = 12;
+    const x0 = cx - (buttons.length * w + (buttons.length - 1) * gap) / 2 + w / 2;
+    buttons.forEach(([text, hint, go, accent], i) => {
+      put(x0 + i * (w + gap), 382, hint, 'body', 13, INK.dim);
+      button(this, layer, {
+        x: x0 + i * (w + gap),
+        y: 354,
+        w,
+        h: 40,
+        text,
+        size: 14,
+        selected: i === 0,
+        accent,
+        onClick: () => {
+          if (this.time.now - this.overAt > 400) go();
+        },
       });
-      const t = put(x + 4, cy + 142, label, style(15, color));
-      if (i === 0) this.tweens.add({ targets: t, alpha: 0.4, yoyo: true, repeat: -1, duration: 600 });
     });
     this.input.on('pointerdown', this.tapRestart, this);
   }

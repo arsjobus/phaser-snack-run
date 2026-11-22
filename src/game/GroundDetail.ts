@@ -12,6 +12,7 @@ import type { BiomeId } from './Biomes';
 export const FIELD_DEPTH = LANES.count - 1 + 0.7;
 export const FOREGROUND_DEPTH = 7;
 
+/** `sparkle` is the snow biome's drift: a flat blue-grey patch (the name is kept; nothing glints any more). */
 export type DetailKind = 'pebble' | 'gravel' | 'stone' | 'clod' | 'crack' | 'puddle' | 'ripple' | 'sparkle';
 
 export interface Detail {
@@ -46,7 +47,44 @@ export const DETAIL_WEIGHTS: Record<BiomeId, Partial<Record<DetailKind, number>>
 };
 
 /** Puddles and cracks only look right on the big foreground dirt or the near field. */
-const FAR_KINDS: ReadonlySet<DetailKind> = new Set(['pebble', 'gravel', 'clod', 'sparkle', 'stone']);
+const FAR_KINDS: ReadonlySet<DetailKind> = new Set(['pebble', 'gravel', 'clod', 'stone']);
+
+/**
+ * Details that LIE on the ground (patches, cracks, ripples) rather than standing on it. They are drawn
+ * as shapes that follow the terrain, and kept clear of the lip of the near lane and of the far edge
+ * of the field, so none of them can overlay the road's edge or poke out of it:
+ *  - in the field they live between `FLAT_FIELD[0]` and `FLAT_FIELD[1]` lanes behind the near lane,
+ *  - in the foreground they live at least `FLAT_FOREGROUND` lanes in front of it.
+ */
+export const FLAT_KINDS: ReadonlySet<DetailKind> = new Set(['crack', 'puddle', 'ripple', 'sparkle']);
+export const FLAT_FIELD: readonly [number, number] = [0.5, 1.6];
+export const FLAT_FOREGROUND = 1.7;
+/** Standing details (rocks, clods) stay this far (lanes) inside the field's far edge. */
+export const FAR_MARGIN = 0.5;
+
+/**
+ * The outline of a flat lens lying on the ground between x0 and x1: `steps + 1` points along the top
+ * and along the bottom edge, as offsets `dy` (px, y-down) from the ground line the lens follows.
+ * The lens is `height` px tall in the middle and closes to a point at both ends. Pure geometry, so
+ * the painter can bend it over the terrain and the tests can check it never leaves its bounds.
+ */
+export function lensOutline(
+  x0: number,
+  x1: number,
+  steps: number,
+  height: number,
+): { top: { x: number; dy: number }[]; bottom: { x: number; dy: number }[] } {
+  const top: { x: number; dy: number }[] = [];
+  const bottom: { x: number; dy: number }[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const x = x0 + (x1 - x0) * t;
+    const half = (height / 2) * Math.pow(Math.sin(Math.PI * t), 0.6);
+    top.push({ x, dy: -half });
+    bottom.push({ x, dy: half });
+  }
+  return { top, bottom };
+}
 
 function pickKind(biome: BiomeId, r: number, far: boolean): DetailKind {
   const w = DETAIL_WEIGHTS[biome];
@@ -77,10 +115,16 @@ export function groundDetails(biome: BiomeId, xa: number, xb: number, density = 
       if (x < xa || x >= xb) continue;
       // The foreground is a much bigger area than the field, so most details land there.
       const fg = hash01(k, b + 3) < 0.62;
-      const f = fg ? -hash01(k, b + 4) * FOREGROUND_DEPTH : hash01(k, b + 4) * (FIELD_DEPTH - 0.15);
+      const r = hash01(k, b + 4);
+      let f = fg ? -r * FOREGROUND_DEPTH : r * (FIELD_DEPTH - FAR_MARGIN);
       const far = !fg && f > 1.6;
+      const kind = pickKind(biome, hash01(k, b + 5), far);
+      if (FLAT_KINDS.has(kind)) {
+        // Remap onto the zones where a flat detail sits well on the ground (same random number).
+        f = fg ? -(FLAT_FOREGROUND + r * (FOREGROUND_DEPTH - FLAT_FOREGROUND)) : FLAT_FIELD[0] + r * (FLAT_FIELD[1] - FLAT_FIELD[0]);
+      }
       out.push({
-        kind: pickKind(biome, hash01(k, b + 5), far),
+        kind,
         x,
         f,
         size: 0.6 + 0.8 * hash01(k, b + 6),

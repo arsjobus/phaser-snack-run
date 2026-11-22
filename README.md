@@ -31,6 +31,13 @@ There is no air control and no lean: the arrow keys steer through the field inst
 
 Add `?seed=anything` to the URL for a repeatable course, or `?daily` to start in the daily challenge.
 
+## What's in Phase 8.5 (feedback)
+
+- **Flat road:** no gradients; puddles, mud and berms are shapes that follow the terrain and stay on the road.
+- **Trucks** have wheel arches cut into a lowered underside; the player's **CRUNCH** badge is centred under the windows.
+- **Start screen** (Play, Garage, Settings, Credits) and a credits screen (`src/credits.ts`); a restyled garage, high scores, settings and game over built from one UI kit (`src/ui/`, plan in `docs/ui-art-plan.md`). `?play` skips the start screen.
+- **Fonts:** Russo One and Rajdhani (SIL OFL), bundled.
+
 ## What's in Phase 8 (platform and polish) and the art pass
 
 - **Controls everywhere:** keyboard (rebindable), gamepad and touch all feed one control state (`src/input/`); they can be mixed. Touch buttons are multi-touch and forgiving (a finger counts a little beyond a button's edge, sliding between buttons works). Nothing held means no throttle on every device.

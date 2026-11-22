@@ -10,6 +10,7 @@ import { PLAYER_WHEEL, RIVAL_STYLES } from '../game/Rival';
 import { tireRise } from '../game/Tires';
 import { Terrain } from '../game/Terrain';
 import { bodyOrigin } from '../game/TruckView';
+import { FONT_BODY } from '../ui/Fonts';
 
 /**
  * Developer art preview (open `/?art`, or `/?art=desert` for a biome): the whole truck set standing
@@ -65,7 +66,7 @@ export class ArtScene extends Phaser.Scene {
         .setDepth(laneDepth(lane, 0.1));
     });
     this.add
-      .text(VIEW_W / 2, 12, `ART PREVIEW: ${biome.name}`, { fontFamily: 'monospace', fontSize: '16px', color: '#fff', stroke: '#000', strokeThickness: 3 })
+      .text(VIEW_W / 2, 12, `ART PREVIEW: ${biome.name}`, { fontFamily: FONT_BODY, fontStyle: 'bold', fontSize: '18px', color: '#fff', stroke: '#000', strokeThickness: 3 })
       .setOrigin(0.5, 0)
       .setScrollFactor(0)
       .setDepth(10);

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { TOUCH_BUTTONS, TOUCH_LAYOUT, type TouchButton } from './Touch';
 import type { Held } from './Controls';
+import { FONT_DISPLAY } from '../ui/Fonts';
 
 const LABELS: Record<TouchButton, string> = { gas: 'GAS', brake: 'BRAKE', far: '▲', near: '▼' };
 const COLORS: Record<TouchButton, number> = { gas: 0x2f9e4a, brake: 0xd2392b, far: 0x2f6fd6, near: 0x2f6fd6 };
@@ -18,9 +19,9 @@ export class TouchView {
       this.labels.push(
         scene.add
           .text(r.x + r.w / 2, r.y + r.h / 2, LABELS[b], {
-            fontFamily: 'monospace',
+            fontFamily: FONT_DISPLAY,
             fontSize: b === 'gas' || b === 'brake' ? '26px' : '34px',
-            fontStyle: 'bold',
+            fontStyle: 'normal',
             color: '#ffffff',
             stroke: '#000',
             strokeThickness: 4,

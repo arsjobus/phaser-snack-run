@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
-import { VIEW_H, VIEW_W } from '../config';
 import { PadEdges, firstPad, padButtons } from '../input/Gamepad';
+import { INK, UI, wrapIndex } from '../ui/Theme';
+import { bottomBar, flatBackdrop, label, rowPlate, topBar, type Layer } from '../ui/Ui';
 import { defaultStore, type KeyValueStore } from '../progress/Storage';
 import {
   ACTIONS,
@@ -15,6 +16,9 @@ import {
   type Settings,
 } from '../settings/Settings';
 
+/** How many rows sit in the left column of the settings screen. */
+const LEFT_ROWS = 8;
+
 type Row =
   | { kind: 'slider'; label: string; get: () => number; set: (v: number) => void }
   | { kind: 'toggle'; label: string; get: () => boolean; set: (v: boolean) => void }
@@ -27,7 +31,9 @@ type Row =
  * Settings (Phase 8): volumes, screen shake, reduced motion, colour-blind pickups, effects quality,
  * touch controls and remappable keys. Reached with O from the game-over screen or the garage (or
  * the pad's Back button). Keyboard: Up/Down pick, Left/Right change, Enter changes or rebinds,
- * Esc goes back. Clicks and taps work on every row (a slider is set where you tap it).
+ * Esc goes back to where you came from (the start screen, the garage or the game-over screen).
+ * Clicks and taps work on every row (a slider is set where you tap it). Drawn with the shared UI
+ * kit (`src/ui/`) in two columns: sound and screen on the left, the keys on the right.
  */
 export class SettingsScene extends Phaser.Scene {
   private store: KeyValueStore = defaultStore();
@@ -35,7 +41,7 @@ export class SettingsScene extends Phaser.Scene {
   private from = 'Game';
   private row = 0;
   private rebinding: Action | null = null;
-  private layer!: Phaser.GameObjects.Container;
+  private layer!: Layer;
   private rows: Row[] = [];
   private edges = new PadEdges();
 
@@ -52,7 +58,7 @@ export class SettingsScene extends Phaser.Scene {
     this.row = 0;
     this.rebinding = null;
     this.edges = new PadEdges();
-    this.cameras.main.setBackgroundColor('#0b1230');
+    flatBackdrop(this);
     this.layer = this.add.container(0, 0);
     const s = this.settings;
     this.rows = [
@@ -127,7 +133,7 @@ export class SettingsScene extends Phaser.Scene {
   }
 
   private move(d: number): void {
-    this.row = (this.row + d + this.rows.length) % this.rows.length;
+    this.row = wrapIndex(this.row, d, this.rows.length);
     this.draw();
   }
 
@@ -165,76 +171,79 @@ export class SettingsScene extends Phaser.Scene {
 
   private back(): void {
     this.input.keyboard?.off('keydown');
-    this.scene.start(this.from === 'Garage' ? 'Garage' : 'Game', { daily: false });
+    if (this.from === 'Menu') this.scene.start('Menu');
+    else if (this.from === 'Garage') this.scene.start('Garage');
+    else this.scene.start('Game', { daily: false });
   }
 
-  private text(x: number, y: number, str: string, size: number, color: string, ox = 0): Phaser.GameObjects.Text {
-    const t = this.add.text(x, y, str, { fontFamily: 'monospace', fontSize: `${size}px`, fontStyle: 'bold', color }).setOrigin(ox, 0.5);
-    this.layer.add(t);
-    return t;
+  /** Rows 0 to `LEFT_ROWS - 1` are the left column (sound and screen), the rest the right column (keys). */
+  private text(x: number, y: number, str: string, size: number, color: string, ox = 0, display = false): Phaser.GameObjects.Text {
+    return label(this, this.layer, x, y, str, display ? 'display' : 'body', size, color, ox);
   }
 
   private draw(): void {
     this.layer.removeAll(true);
-    this.text(VIEW_W / 2, 26, 'SETTINGS', 28, '#ffe066', 0.5);
-    const top = 62;
-    const step = 22.5;
+    topBar(this, this.layer, 'SETTINGS');
+    this.text(40, 90, 'SOUND AND SCREEN', 14, INK.cyan, 0, true);
+    this.text(500, 90, 'KEYS', 14, INK.cyan, 0, true);
     this.rows.forEach((r, i) => {
-      const y = top + i * step;
+      const left = i < LEFT_ROWS;
+      const j = left ? i : i - LEFT_ROWS;
+      const cx = left ? 250 : 712;
+      const w = 430;
+      const step = left ? 44 : 36;
+      const y = 120 + j * step;
       const on = i === this.row;
-      const box = this.add
-        .rectangle(VIEW_W / 2, y, 820, step - 2, on ? 0x2a3f7a : 0x111a3c)
-        .setStrokeStyle(on ? 2 : 1, on ? 0x9be0ff : 0x2a3668)
-        .setInteractive({ useHandCursor: true });
-      box.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      const lx = cx - w / 2 + 16;
+      const vx = cx + 30; // where the value starts
+      rowPlate(this, this.layer, cx, y, w, step - 6, on);
+      const zone = this.add.zone(cx, y, w, step - 6).setInteractive({ useHandCursor: true });
+      zone.on('pointerdown', (p: Phaser.Input.Pointer) => {
         this.row = i;
-        if (r.kind === 'slider' && p.x >= 640 && p.x <= 840) {
-          r.set(Math.round(((p.x - 640) / 200) * 10) / 10);
+        if (r.kind === 'slider' && p.x >= vx && p.x <= vx + 130) {
+          r.set(Math.round(((p.x - vx) / 130) * 10) / 10);
           this.commit();
         } else this.activate();
       });
-      this.layer.add(box);
-      const col = on ? '#ffffff' : '#c9d3ee';
-      const lx = 70;
+      this.layer.add(zone);
+      const col = on ? INK.text : INK.soft;
       switch (r.kind) {
         case 'slider': {
-          this.text(lx, y, r.label, 15, col);
+          this.text(lx, y, r.label, 17, col);
           const v = r.get();
-          const bar = this.add.rectangle(640, y, 200, 8, 0x0b1230).setOrigin(0, 0.5).setStrokeStyle(1, 0x44558a);
-          const fill = this.add.rectangle(640, y, 200 * v, 8, 0x4cd964).setOrigin(0, 0.5);
-          this.layer.add([bar, fill]);
-          this.text(860, y, `${Math.round(v * 100)}%`, 15, col, 0);
+          const g = this.add.graphics();
+          g.fillStyle(UI.outline, 1);
+          g.fillRect(vx - 2, y - 8, 134, 16);
+          g.fillStyle(UI.panelLight, 1);
+          g.fillRect(vx, y - 6, 130, 12);
+          g.fillStyle(UI.green, 1);
+          g.fillRect(vx, y - 6, 130 * v, 12);
+          this.layer.add(g);
+          this.text(cx + w / 2 - 14, y, `${Math.round(v * 100)}%`, 16, col, 1);
           break;
         }
         case 'toggle':
-          this.text(lx, y, r.label, 15, col);
-          this.text(640, y, r.get() ? 'ON' : 'OFF', 15, r.get() ? '#7dff8a' : '#9aa7cf');
+          this.text(lx, y, r.label, 17, col);
+          this.text(vx, y, r.get() ? 'ON' : 'OFF', 16, r.get() ? INK.good : INK.dim, 0, true);
           break;
         case 'choice':
-          this.text(lx, y, r.label, 15, col);
-          this.text(640, y, r.get().toUpperCase(), 15, '#9be0ff');
+          this.text(lx, y, r.label, 17, col);
+          this.text(vx, y, r.get().toUpperCase(), 16, INK.cyan, 0, true);
           break;
         case 'bind': {
-          this.text(lx, y, `Key: ${ACTION_LABELS[r.action]}`, 15, col);
+          this.text(lx, y, ACTION_LABELS[r.action], 16, col);
           const waiting = this.rebinding === r.action;
-          this.text(640, y, waiting ? 'PRESS A KEY (Esc cancels)' : bindingText(this.settings.bindings, r.action), 15, waiting ? '#ffe066' : '#9be0ff');
+          this.text(cx + w / 2 - 14, y, waiting ? 'PRESS A KEY' : bindingText(this.settings.bindings, r.action), 14, waiting ? INK.title : INK.cyan, 1, true);
           break;
         }
         case 'reset':
-          this.text(lx, y, 'Reset keys to defaults', 15, col);
+          this.text(lx, y, 'Reset keys to defaults', 16, col);
           break;
         case 'back':
-          this.text(lx, y, 'Back', 15, '#ffe066');
+          this.text(lx, y, 'BACK', 16, on ? INK.title : INK.soft, 0, true);
           break;
       }
     });
-    this.text(
-      VIEW_W / 2,
-      VIEW_H - 22,
-      '↑↓ pick   ←→ change   ENTER change / rebind   ESC back   (pad: stick/D-pad, A, B)   saved automatically',
-      13,
-      '#9aa7cf',
-      0.5,
-    );
+    bottomBar(this, this.layer, this.rebinding ? 'PRESS THE NEW KEY   ESC cancels' : 'UP/DOWN pick   LEFT/RIGHT change   ENTER change / rebind   ESC back   saved automatically');
   }
 }

@@ -5,6 +5,7 @@ import { Rng } from '../game/Rng';
 import { axleY, tireRadius } from '../game/Tires';
 import { SKINS } from '../progress/Skins';
 import { drawPixelText, drawPixelTextCentered } from './pixelFont';
+import { ARCH_GAP, BODY_BOTTOM, BODY_HALF, PLAYER_BADGE, undersideY } from './chassis';
 
 export interface Paint {
   body: number;
@@ -59,16 +60,13 @@ export const playerTruckKey = (skinId: string): string =>
 /** Key of the pre-rendered rotation strip made from a body texture. */
 export const atlasKey = (key: string): string => `${key}_rot`;
 
-/** Chassis-local y (in the body's own, un-lifted frame) of each body's underside. */
-const BODY_BOTTOM: Record<BodyKind, number> = { suv: 24, pickup: 24, monster: 10, jeep: 24, van: 24, buggy: 22 };
-/** The body's half length: wheel arches are cut off at the bumpers. */
-const BODY_HALF = 63;
-
 /**
  * Draws one truck facing right into `g`, its chassis centre at (ART.truckCx, ART.truckCy). The
  * truck is monster-truck lifted: the body is drawn `TRUCK.lift` px higher (more for bigger tires)
  * on a visible frame rail, axles, driveshaft, shocks and radius arms, and the tires (separate
- * images, `TRUCK.tireRadius * wheel` big) sit in arches cut into the underside of the body.
+ * images, `TRUCK.tireRadius * wheel` big) sit in wheel arches cut up into the underside of the body
+ * (the body's underside is lowered by a skirt so the arches have something to cut into; see
+ * `src/art/chassis.ts`).
  */
 export function drawTruck(
   g: Phaser.GameObjects.Graphics,
@@ -83,7 +81,7 @@ export function drawTruck(
   const oy = ART.truckCy - lift; // the body's frame: everything below is drawn in the old coordinates
   const R = tireRadius(wheel);
   const axle = ART.truckCy + axleY(wheel); // where the axles (and the tire centres) are
-  const bb = oy + BODY_BOTTOM[kind]; // underside of the body
+  const bb = oy + undersideY(kind, wheel); // underside of the body (after the skirt)
   const body = paint.body;
   const dark = shade(body, 0.72);
 
@@ -120,16 +118,24 @@ export function drawTruck(
     g.fillStyle(color, 1);
     g.fillPoints(pts, true);
   };
-  const well = (wx: number, extra = 3): void => arch(0x0d0d0d, wx, R + extra);
+  /** A wheel arch cut up into the body: a darker fender flare, the outline, then the dark well the tire sits in. */
+  const well = (wx: number): void => {
+    arch(shade(body, 0.62), wx, R + ARCH_GAP + 6);
+    arch(OUT, wx, R + ARCH_GAP + 2);
+    arch(0x120d0a, wx, R + ARCH_GAP);
+    arch(0x2a1d14, wx, R + ARCH_GAP - 5); // a lighter mud-caked lining high in the arch
+    arch(0x120d0a, wx, R + ARCH_GAP - 8);
+  };
   /**
    * Number roundel on the door. The player's truck has no number: it wears a CRUNCH badge (the
    * snack's name, like the van's side panel) in a roundel-sized spot on the door instead.
    */
   const roundel = (cx: number, cy: number, r: number): void => {
     if (number === null) {
-      round(OUT, cx - 26, cy - 8, 52, 16, 3);
-      round(paint.plate, cx - 25, cy - 7, 50, 14, 2);
-      drawPixelTextCentered(g, 'CRUNCH', ox + cx, oy + cy, 2, OUT);
+      const b = PLAYER_BADGE;
+      round(OUT, b.cx - b.w / 2, b.cy - b.h / 2, b.w, b.h, 3);
+      round(paint.plate, b.cx - b.w / 2 + 1, b.cy - b.h / 2 + 1, b.w - 2, b.h - 2, 2);
+      drawPixelTextCentered(g, 'CRUNCH', ox + b.cx, oy + b.cy, 2, OUT);
       return;
     }
     disc(OUT, cx, cy, r + 1.5);
@@ -197,6 +203,14 @@ export function drawTruck(
     }
   }
 
+  // Skirt: lowers the body's underside so the arches below have metal to cut into (no flat bottoms).
+  {
+    const top = BODY_BOTTOM[kind] - 8;
+    const x0 = kind === 'buggy' ? -48 : -BODY_HALF + 3;
+    const w = kind === 'buggy' ? 98 : (BODY_HALF - 3) * 2;
+    solid([{ x: x0, y: top, w, h: undersideY(kind, wheel) - top, r: 5, color: dark }]);
+  }
+
   switch (kind) {
     case 'suv': {
       solid([
@@ -211,9 +225,9 @@ export function drawTruck(
       round(GLASS, -9, -27, 21, 16, 3);
       rect(GLARE, -36, -25, 9, 4);
       rect(GLARE, -7, -25, 8, 4);
-      well(-42, 1);
-      well(42, 1);
-      roundel(number === null ? -12 : -22, number === null ? -7 : 3, 9);
+      well(-42);
+      well(42);
+      roundel(number === null ? PLAYER_BADGE.cx : -22, number === null ? PLAYER_BADGE.cy : 3, 9);
       rect(DARK, -42, -36, 56, 3); // roof rack and spotlights
       rect(LAMP, -36, -40, 6, 4);
       rect(LAMP, -20, -40, 6, 4);
@@ -239,8 +253,8 @@ export function drawTruck(
       round(GLASS, 22, -25, 16, 17, 3);
       rect(GLARE, 7, -23, 6, 4);
       rect(GLARE, 24, -23, 6, 4);
-      well(-42, 1);
-      well(42, 1);
+      well(-42);
+      well(42);
       roundel(14, 8, 8);
       rect(DARK, 2, -34, 36, 4); // light bar
       rect(LAMP, 6, -35, 5, 3);
@@ -268,8 +282,8 @@ export function drawTruck(
       round(GLASS, 3, -43, 20, 16, 3);
       rect(GLARE, -20, -41, 8, 4);
       rect(GLARE, 5, -41, 7, 4);
-      well(-42, 5);
-      well(42, 5);
+      well(-42);
+      well(42);
       roundel(0, -9, 8);
       rect(0x8a8f99, -38, -58, 4, 18); // exhaust stacks
       rect(0x8a8f99, -31, -58, 4, 18);
@@ -299,8 +313,8 @@ export function drawTruck(
       rect(shade(body, 0.8), -58, 16, 118, 7);
       rect(paint.stripe, -60, 9, 122, 4);
       rect(paint.light, 18, -12, 42, 3);
-      well(-42, 3);
-      well(42, 3);
+      well(-42);
+      well(42);
       roundel(-14, 12, 7);
       disc(OUT, -64, 4, 10); // spare tire
       disc(0x2a2a2a, -64, 4, 8);
@@ -322,8 +336,8 @@ export function drawTruck(
       rect(GLARE, 38, -26, 8, 4);
       line(2, OUT, 33, -30, 33, 8); // door line
       line(2, OUT, -14, -6, -14, 12); // sliding door
-      well(-42, 1);
-      well(42, 1);
+      well(-42);
+      well(42);
       roundel(-34, 1, 8);
       rect(DARK, -30, -39, 24, 4); // roof vent
       rect(DARK, 62, 0, 4, 18); // front bumper
