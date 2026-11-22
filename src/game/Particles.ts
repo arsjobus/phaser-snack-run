@@ -30,10 +30,13 @@ const HEAVY: readonly ParticleKind[] = ['mud', 'chunk'];
 /** A capped pool of particles. When it is full the oldest particle is dropped. */
 export class ParticleSystem {
   items: Particle[] = [];
+  /** Share (0..1) of emitted particles that are kept: the effects quality and reduced motion thin the spray. */
+  density = 1;
 
   constructor(readonly max: number = FX.maxParticles) {}
 
   emit(p: Particle): void {
+    if (this.density < 1 && Math.random() >= this.density) return;
     if (this.items.length >= this.max) this.items.shift();
     this.items.push(p);
   }
@@ -65,7 +68,10 @@ export class ParticleSystem {
         }
       }
     }
-    this.items = this.items.filter((p) => p.age < p.life);
+    // Drop the dead in place (no new array every frame).
+    let n = 0;
+    for (const p of this.items) if (p.age < p.life) this.items[n++] = p;
+    this.items.length = n;
   }
 }
 

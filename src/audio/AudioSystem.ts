@@ -30,6 +30,7 @@ export class AudioSystem {
   private ctx: AudioContext | null = null;
   private stopped = false;
   private musicOn = true;
+  private musicVol: number = AUDIO.musicVolume;
   private noise: AudioBuffer | null = null;
   private bgm: (Phaser.Sound.BaseSound & { setVolume(value: number): void }) | null = null;
 
@@ -57,10 +58,17 @@ export class AudioSystem {
     return this.ctx !== null && this.ctx.state === 'running' && !this.stopped;
   }
 
+  /** The player's music and SFX volume settings (0..1 each, on top of the mix in `AUDIO`). */
+  setLevels(music: number, sfx: number): void {
+    this.musicVol = AUDIO.musicVolume * music;
+    if (this.sfx) this.sfx.gain.value = AUDIO.sfxVolume * sfx;
+    this.bgm?.setVolume(this.musicOn ? this.musicVol : 0);
+  }
+
   /** M-independent switch for just the music (N key). Returns the new state. */
   toggleMusic(): boolean {
     this.musicOn = !this.musicOn;
-    this.bgm?.setVolume(this.musicOn ? AUDIO.musicVolume : 0);
+    this.bgm?.setVolume(this.musicOn ? this.musicVol : 0);
     return this.musicOn;
   }
 
@@ -71,7 +79,7 @@ export class AudioSystem {
     const now = ctx.currentTime;
 
     if (this.bgm && !this.bgm.isPlaying) {
-      this.bgm.play({ loop: true, volume: this.musicOn ? AUDIO.musicVolume : 0 });
+      this.bgm.play({ loop: true, volume: this.musicOn ? this.musicVol : 0 });
     }
 
     this.updateEngine(s, now);

@@ -48,7 +48,7 @@ export class GarageScene extends Phaser.Scene {
     this.layer = this.add.container(0, 0);
     const kb = this.input.keyboard!;
     this.cursors = kb.createCursorKeys();
-    this.keys = kb.addKeys('SPACE,ENTER,ESC,G,D,A,W,S') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = kb.addKeys('SPACE,ENTER,ESC,G,D,A,W,S,O') as Record<string, Phaser.Input.Keyboard.Key>;
     this.draw();
   }
 
@@ -60,6 +60,7 @@ export class GarageScene extends Phaser.Scene {
     if (J(c.down) || J(this.keys.S)) this.move(1);
     if (J(c.up) || J(this.keys.W)) this.move(-1);
     if (J(this.keys.ENTER)) this.activate();
+    if (J(this.keys.O)) this.scene.start('Settings', { from: 'Garage' });
     if (J(this.keys.D)) this.scene.start('Game', { daily: true });
     if (J(this.keys.SPACE) || J(this.keys.ESC) || J(this.keys.G)) this.scene.start('Game', { daily: false });
   }
@@ -148,7 +149,7 @@ export class GarageScene extends Phaser.Scene {
     this.text(
       cx,
       VIEW_H - 24,
-      '←/→ tab   ↑/↓ pick   ENTER buy/equip   SPACE drive   D daily challenge',
+      '←/→ tab   ↑/↓ pick   ENTER buy/equip   SPACE drive   D daily challenge   O settings',
       14,
       '#c9d3ee',
       0.5,

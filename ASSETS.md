@@ -15,6 +15,8 @@ Every asset in the game must be listed here with its source and licence.
 | Lane-change swish and reward chime | Audio | Synthesized at runtime (`src/audio/AudioSystem.ts`) | Project licence | Filtered noise and oscillator tones, no samples |
 | Checkpoint gates (normal and biome-change) | Texture | Generated in code (`src/art/props.ts`) | Project licence | Original design |
 | Warning beeps, checkpoint chime and stinger | Audio | Synthesized at runtime (`src/audio/AudioSystem.ts`) | Project licence | Oscillator tones, no samples |
+| Road detail (ruts, pebbles, stones, clods, cracks, puddles, ripples, glints), monster-truck tires and undercarriage | Texture | Drawn in code (`src/game/GroundPainter.ts`, `src/art/props.ts`, `src/art/trucks.ts`) | Project licence | Original art |
+| Touch buttons, settings screen | UI | Drawn in code (`src/input/TouchView.ts`, `src/scenes/SettingsScene.ts`) | Project licence | No external assets |
 | Music (adaptive theme: pad, drums, bass, lead stems) | Audio | Composed for this project (`src/audio/Composition.ts`), synthesized at runtime | Project licence | Original composition (A minor, 132 bpm, Am-F-G-E). Not derived from the original game's music; no samples |
 
 ## Rules

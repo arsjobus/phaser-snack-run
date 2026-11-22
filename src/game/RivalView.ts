@@ -4,6 +4,7 @@ import { rivalTruckKey } from '../art/trucks';
 import { laneDepth, laneProject, laneScale, laneShade } from './Lanes';
 import { RIVAL_STYLES, type Rival } from './Rival';
 import type { Terrain } from './Terrain';
+import { tireRise, tireSpin } from './Tires';
 import { bodyOrigin, placeBody } from './TruckView';
 
 /**
@@ -42,9 +43,9 @@ export class RivalView {
     const bp = place(t.x, t.y);
     this.body.setPosition(bp.x, bp.y).setScale(scale).setDepth(depth).setTint(tint);
     placeBody(this.body, this.key, t.angle);
-    this.spin += (t.speed * dt) / PHYSICS.wheelRadius;
-    // Bigger tires stay on the ground: lift their centre by the extra radius.
-    const rise = PHYSICS.wheelRadius * (this.tire - 1);
+    this.spin += tireSpin(t.speed * dt, this.tire);
+    // Big tires stay on the ground: lift their centre by the extra radius.
+    const rise = tireRise(this.tire);
     t.wheelContacts.forEach((c, i) => {
       const groundY = terrain.heightAt(c.x) - PHYSICS.wheelRadius;
       const p = place(c.x, Math.min(c.y, groundY) - rise);

@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
-import { ART } from '../config';
+import { ART, TRUCK } from '../config';
 import { PLAYER_WHEEL, RIVAL_STYLES, type BodyKind } from '../game/Rival';
 import { Rng } from '../game/Rng';
+import { axleY, tireRadius } from '../game/Tires';
 import { SKINS } from '../progress/Skins';
 import { drawPixelText, drawPixelTextCentered } from './pixelFont';
 
@@ -58,9 +59,16 @@ export const playerTruckKey = (skinId: string): string =>
 /** Key of the pre-rendered rotation strip made from a body texture. */
 export const atlasKey = (key: string): string => `${key}_rot`;
 
+/** Chassis-local y (in the body's own, un-lifted frame) of each body's underside. */
+const BODY_BOTTOM: Record<BodyKind, number> = { suv: 24, pickup: 24, monster: 10, jeep: 24, van: 24, buggy: 22 };
+/** The body's half length: wheel arches are cut off at the bumpers. */
+const BODY_HALF = 63;
+
 /**
- * Draws one truck facing right into `g`, its chassis centre at (ART.truckCx, ART.truckCy).
- * Every shape keeps its tires' wells where the wheels are (x +/-42, y 22 minus the extra tire radius).
+ * Draws one truck facing right into `g`, its chassis centre at (ART.truckCx, ART.truckCy). The
+ * truck is monster-truck lifted: the body is drawn `TRUCK.lift` px higher (more for bigger tires)
+ * on a visible frame rail, axles, driveshaft, shocks and radius arms, and the tires (separate
+ * images, `TRUCK.tireRadius * wheel` big) sit in arches cut into the underside of the body.
  */
 export function drawTruck(
   g: Phaser.GameObjects.Graphics,
@@ -70,8 +78,12 @@ export function drawTruck(
   wheel: number,
   seed: number,
 ): void {
+  const lift = TRUCK.lift + (tireRadius(wheel) - tireRadius(1));
   const ox = ART.truckCx;
-  const oy = ART.truckCy;
+  const oy = ART.truckCy - lift; // the body's frame: everything below is drawn in the old coordinates
+  const R = tireRadius(wheel);
+  const axle = ART.truckCy + axleY(wheel); // where the axles (and the tire centres) are
+  const bb = oy + BODY_BOTTOM[kind]; // underside of the body
   const body = paint.body;
   const dark = shade(body, 0.72);
 
@@ -95,13 +107,20 @@ export function drawTruck(
     g.fillStyle(color, 1);
     g.fillCircle(ox + x, oy + y, r);
   };
-  /** Wheel well: the upper half of a disc around a wheel centre, in the tire's own size. */
-  const well = (wx: number, extra = 3): void => {
-    const cy = 22 - 20 * (wheel - 1);
-    g.fillStyle(0x0d0d0d, 1);
-    g.slice(ox + wx, oy + cy, 20 * wheel + extra, Math.PI, Math.PI * 2, false);
-    g.fillPath();
+  /** A wheel arch: the upper half of a disc around an axle, cut off at the bumpers and the body's underside. */
+  const arch = (color: number, wx: number, r: number): void => {
+    const pts: { x: number; y: number }[] = [];
+    for (let i = 0; i <= 18; i++) {
+      const a = Math.PI + (i / 18) * Math.PI;
+      pts.push({
+        x: ox + Math.max(-BODY_HALF, Math.min(BODY_HALF, wx + Math.cos(a) * r)),
+        y: Math.min(bb, axle + Math.sin(a) * r),
+      });
+    }
+    g.fillStyle(color, 1);
+    g.fillPoints(pts, true);
   };
+  const well = (wx: number, extra = 3): void => arch(0x0d0d0d, wx, R + extra);
   /**
    * Number roundel on the door. The player's truck has no number: it wears a CRUNCH badge (the
    * snack's name, like the van's side panel) in a roundel-sized spot on the door instead.
@@ -121,6 +140,62 @@ export function drawTruck(
     rect(LAMP, x, y, 6, 8);
     rect(0xffffff, x + 1, y + 1, 2, 3);
   };
+
+  // Undercarriage (drawn first, so the body covers the tops of the mounts): frame rail, skid plate,
+  // driveshaft, radius arms, coil-over shocks and axle housings, all visible in the lift gap.
+  {
+    const steel = 0x555a63;
+    const coil = 0xe8a020;
+    const rail = (x: number, y: number, w: number, h: number, color: number): void => {
+      g.fillStyle(OUT, 1);
+      g.fillRect(ox + x - 1.5, y - 1.5, w + 3, h + 3);
+      g.fillStyle(color, 1);
+      g.fillRect(ox + x, y, w, h);
+    };
+    rail(-56, bb - 3, 112, 8, 0x2a2a2d); // frame rail
+    rail(-52, bb + 4, 104, 2, 0x3c3c40);
+    rail(-16, bb + 3, 32, 6, steel); // transfer case skid plate
+    // Driveshaft between the two diffs, with U-joints.
+    g.lineStyle(5, OUT, 1);
+    g.lineBetween(ox - 42, axle, ox + 42, axle);
+    g.lineStyle(3, 0x8a8f99, 1);
+    g.lineBetween(ox - 42, axle, ox + 42, axle);
+    g.fillStyle(OUT, 1);
+    g.fillCircle(ox - 16, axle, 4.5);
+    g.fillCircle(ox + 16, axle, 4.5);
+    g.fillStyle(steel, 1);
+    g.fillCircle(ox - 16, axle, 2.8);
+    g.fillCircle(ox + 16, axle, 2.8);
+    for (const wx of [-42, 42]) {
+      const inward = wx < 0 ? 1 : -1; // towards the middle of the truck
+      // Radius arm: from the axle diagonally up to the frame.
+      g.lineStyle(7, OUT, 1);
+      g.lineBetween(ox + wx, axle, ox + wx + inward * 30, bb + 1);
+      g.lineStyle(4, 0x3c3c40, 1);
+      g.lineBetween(ox + wx, axle, ox + wx + inward * 30, bb + 1);
+      // Coil-over shock leaning outwards, with a bright spring.
+      const x0 = ox + wx - inward * 12;
+      const x1 = ox + wx - inward * 4;
+      g.lineStyle(6, OUT, 1);
+      g.lineBetween(x0, bb - 2, x1, axle - 4);
+      g.lineStyle(2, 0xc9ccd2, 1);
+      g.lineBetween(x0, bb - 2, x1, axle - 4);
+      g.lineStyle(4, coil, 1);
+      const steps = 7;
+      for (let i = 0; i < steps; i++) {
+        const t0 = 0.12 + (i / steps) * 0.7;
+        const t1 = t0 + 0.07;
+        g.lineBetween(x0 + (x1 - x0) * t0, bb - 2 + (axle - 4 - (bb - 2)) * t0, x0 + (x1 - x0) * t1, bb - 2 + (axle - 4 - (bb - 2)) * t1);
+      }
+      // Axle housing and diff pumpkin behind the tire.
+      g.fillStyle(OUT, 1);
+      g.fillCircle(ox + wx, axle, 9);
+      g.fillStyle(steel, 1);
+      g.fillCircle(ox + wx, axle, 7);
+      g.fillStyle(0x777b84, 1);
+      g.fillCircle(ox + wx - 2, axle - 2, 2.4);
+    }
+  }
 
   switch (kind) {
     case 'suv': {
@@ -179,22 +254,13 @@ export function drawTruck(
     }
     case 'monster': {
       // Fenders hug the big tires; the body rides high above them.
-      const fenderY = 22 - 20 * (wheel - 1);
-      const fr = 20 * wheel + 5;
-      for (const wx of [-42, 42]) {
-        g.fillStyle(OUT, 1);
-        g.slice(ox + wx, oy + fenderY, fr + 2, Math.PI, Math.PI * 2, false);
-        g.fillPath();
-      }
+      const fr = R + 5;
+      for (const wx of [-42, 42]) arch(OUT, wx, fr + 2);
       solid([
         { x: -58, y: -24, w: 116, h: 34, r: 8, color: body },
         { x: -28, y: -48, w: 54, h: 28, r: 8, color: body },
       ]);
-      for (const wx of [-42, 42]) {
-        g.fillStyle(body, 1);
-        g.slice(ox + wx, oy + fenderY, fr, Math.PI, Math.PI * 2, false);
-        g.fillPath();
-      }
+      for (const wx of [-42, 42]) arch(body, wx, fr);
       rect(shade(body, 1.35), -56, -23, 112, 3);
       rect(paint.stripe, -58, -8, 116, 5); // flame stripe base
       for (let i = 0; i < 7; i++) g.fillTriangle(ox - 58 + i * 17, oy - 3, ox - 46 + i * 17, oy - 3, ox - 54 + i * 17, oy + 6);

@@ -18,9 +18,9 @@ import {
   WRENCH,
 } from '../config';
 import { obstacleKey } from '../art/props';
-import { RIVAL_PAINT, playerTruckKey, rivalTruckKey, shade } from '../art/trucks';
+import { RIVAL_PAINT, playerTruckKey, rivalTruckKey } from '../art/trucks';
 import { AudioSystem, biomeIndex } from '../audio/AudioSystem';
-import { biomeAtX, biomeChangesAt, biomeSegments, type Biome } from '../game/Biomes';
+import { biomeAtX, biomeChangesAt, type Biome } from '../game/Biomes';
 import { checkpointMeters } from '../game/Checkpoint';
 import { truckCircles } from '../game/Collision';
 import { PlayerLane, laneDepth, laneLift, laneProject, laneScale, laneShade } from '../game/Lanes';
@@ -37,40 +37,26 @@ import { RivalView } from '../game/RivalView';
 import { hashSeed } from '../game/Rng';
 import { Parallax } from '../game/Parallax';
 import { RunModel, type RunEvent } from '../game/Run';
+import { GroundPainter } from '../game/GroundPainter';
 import { Terrain } from '../game/Terrain';
 import { TruckPhysics } from '../game/TruckPhysics';
+import { axleY } from '../game/Tires';
 import { TruckView } from '../game/TruckView';
 import { wreckCircles, type Wreck } from '../game/Wrecks';
 import { playerInput, type InputState } from '../game/Input';
+import { Pool } from '../game/Pool';
+import { QualityGovernor, effectsQuality } from '../game/Quality';
+import { KeyTracker, actionPressed, heldFromKeys, laneDirOf, mergeHeld, type Held } from '../input/Controls';
+import { PadEdges, firstPad, padButtons, padHeld } from '../input/Gamepad';
+import { touchHeld, touchVisible } from '../input/Touch';
+import { TouchView } from '../input/TouchView';
+import { keyLabel, loadSettings, particleScale, pickupMark, shakeScale, type Action, type Settings } from '../settings/Settings';
 import { unlockAchievements, type Achievement } from '../progress/Achievements';
 import { dailySeed, dayKey } from '../progress/Daily';
 import { loadSave, perksFor, recordRun, writeSave, type RunResult, type SaveData } from '../progress/Progress';
 import { defaultStore, type KeyValueStore } from '../progress/Storage';
 
 const FIXED_DT = 1 / 60 / PHYSICS.substeps;
-const TUFT_SPACING = 72;
-/** The ground is drawn in steps of this many px (finer than the terrain samples: the track is a spline). */
-const RENDER_STEP = 8;
-/** Depth of the far edge of the dirt field, and how many slivers it is drawn from (a smooth gradient). */
-const FIELD_DEPTH = LANES.count - 1 + 0.7;
-const FIELD_BANDS = 14;
-const MUD_CELL = 130;
-
-/** Deterministic hash of two integers into [0, 1): scatters tufts and mud patches by world position. */
-function hash01(a: number, b: number): number {
-  let h = Math.imul(a | 0, 0x9e3779b1) ^ Math.imul((b | 0) + 0x7f4a7c15, 0x85ebca6b);
-  h ^= h >>> 15;
-  h = Math.imul(h, 0x2c1b3c6d);
-  h ^= h >>> 12;
-  return (h >>> 0) / 4294967296;
-}
-
-/** Blend two 0xRRGGBB colours (t = 0 gives a, 1 gives b). */
-function mixColor(a: number, b: number, t: number): number {
-  const ch = (sh: number) => Math.round(((a >> sh) & 255) * (1 - t) + ((b >> sh) & 255) * t);
-  return (ch(16) << 16) | (ch(8) << 8) | ch(0);
-}
-
 const GATE_X = GAMEPLAY.startX + 420;
 interface WreckSprite {
   body: Phaser.GameObjects.Image;
@@ -88,6 +74,7 @@ export class GameScene extends Phaser.Scene {
   private run!: RunModel;
   private hudBar!: Hud;
   private ground!: Phaser.GameObjects.Graphics;
+  private groundPainter!: GroundPainter;
   private debugGfx!: Phaser.GameObjects.Graphics;
   private hud!: Phaser.GameObjects.Text;
   private hint!: Phaser.GameObjects.Text;
@@ -122,7 +109,17 @@ export class GameScene extends Phaser.Scene {
   private gates = new Map<number, Phaser.GameObjects.GameObject[]>();
 
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
-  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
+  private tracker = new KeyTracker();
+  private padEdges = new PadEdges();
+  private touchView!: TouchView;
+  private touchedOnce = false;
+  private held: Held = { gas: 0, brake: 0, far: false, near: false };
+  private settings!: Settings;
+  private governor = new QualityGovernor();
+  private quality = 1;
+  private imagePool!: Pool<Phaser.GameObjects.Image>;
+  private textPool!: Pool<Phaser.GameObjects.Text>;
+  private marks!: Phaser.GameObjects.Graphics;
 
   private acc = 0;
   private seed = 0;
@@ -159,6 +156,29 @@ export class GameScene extends Phaser.Scene {
     this.achClock = 0;
     this.day = dayKey();
     this.save = loadSave(this.store);
+    this.settings = loadSettings(this.store);
+    this.governor = new QualityGovernor();
+    this.quality = 1;
+    this.padEdges = new PadEdges();
+    this.touchedOnce = false;
+    this.imagePool = new Pool(
+      () => this.add.image(0, 0, 'snack'),
+      (im) => im.setVisible(true).setActive(true).setAlpha(1).setScale(1).setRotation(0).clearTint(),
+      (im) => im.setVisible(false).setActive(false),
+      80,
+      (im) => im.destroy(),
+    );
+    this.textPool = new Pool(
+      () =>
+        this.add
+          .text(0, 0, '', { fontFamily: 'monospace', fontSize: '20px', fontStyle: 'bold', color: '#fff', stroke: '#000', strokeThickness: 4 })
+          .setOrigin(0.5)
+          .setDepth(8),
+      (t) => t.setVisible(true).setActive(true).setAlpha(1),
+      (t) => t.setVisible(false).setActive(false),
+      24,
+      (t) => t.destroy(),
+    );
     this.particles = new ParticleSystem();
     this.tracks = new TrackMarks();
     this.sprayAcc.clear();
@@ -167,6 +187,8 @@ export class GameScene extends Phaser.Scene {
     this.audio?.dispose(); // a restart reuses the scene: silence the previous run's score and engine
     this.audio = new AudioSystem(this.sound);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.audio.dispose());
+    this.sound.volume = this.settings.master;
+    this.audio.setLevels(this.settings.music, this.settings.sfx);
 
     const param = new URLSearchParams(window.location.search).get('seed');
     this.seed = this.daily
@@ -182,6 +204,7 @@ export class GameScene extends Phaser.Scene {
     this.biome = biomeAtX(this.startX, this.startX);
     this.parallax = new Parallax(this, this.biome.id);
     this.ground = this.add.graphics().setDepth(1);
+    this.groundPainter = new GroundPainter(this.ground, this.terrain, this.startX);
     this.decals = this.add.graphics().setDepth(1.2);
     this.shadows = this.add.graphics().setDepth(1.5);
     this.addStartGate();
@@ -192,6 +215,12 @@ export class GameScene extends Phaser.Scene {
     this.debugGfx = this.add.graphics().setDepth(5);
     this.hudBar = new Hud(this);
     this.laneHud = this.add.graphics().setScrollFactor(0).setDepth(10);
+    this.marks = this.add.graphics().setDepth(1.6);
+    this.touchView = new TouchView(this);
+    this.input.addPointer(3);
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      if (p.wasTouch) this.touchedOnce = true;
+    });
 
     const text = (size: number, color: string) => ({
       fontFamily: 'monospace',
@@ -205,10 +234,7 @@ export class GameScene extends Phaser.Scene {
       .text(
         VIEW_W / 2,
         VIEW_H - HUD_H - 30,
-        [
-          'HOLD →/D to accelerate   ←/A brake   ↑/W and ↓/S drift across the field (hold)   R reset   M mute   N music   H debug',
-          'Drift sideways to dodge rocks, logs and boulders · you cannot slip through other cars · tuck in behind a rival to draft',
-        ],
+        this.hintLines(),
         { ...text(13, '#ffffff'), align: 'center' },
       )
       .setOrigin(0.5)
@@ -247,8 +273,20 @@ export class GameScene extends Phaser.Scene {
     if (this.daily) this.flash('DAILY CHALLENGE  ' + this.day);
 
     const kb = this.input.keyboard!;
-    this.cursors = kb.createCursorKeys();
-    this.keys = kb.addKeys('W,A,S,D,Q,E,G,R,T,H,M,N,SPACE,ENTER') as Record<string, Phaser.Input.Keyboard.Key>;
+    // Driving keys are rebindable, so they are tracked by key code (see src/input); the menu keys are fixed.
+    this.tracker = new KeyTracker();
+    kb.addCapture('UP,DOWN,LEFT,RIGHT,SPACE');
+    kb.on('keydown', (e: KeyboardEvent) => this.tracker.press(e.code));
+    kb.on('keyup', (e: KeyboardEvent) => this.tracker.release(e.code));
+    const onBlur = () => this.tracker.clear();
+    this.game.events.on(Phaser.Core.Events.BLUR, onBlur);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.game.events.off(Phaser.Core.Events.BLUR, onBlur);
+      kb.off('keydown');
+      kb.off('keyup');
+    });
+    this.keys = kb.addKeys('G,D,O,SPACE,ENTER') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.applyQuality();
 
     this.terrain.ensure(this.startX + VIEW_W + 1500);
     const cam = this.cameras.main;
@@ -260,43 +298,76 @@ export class GameScene extends Phaser.Scene {
     this.add.image(GATE_X, y, 'start_gate').setOrigin(0.5, 1).setDepth(0.5);
   }
 
-  /** No auto-gas and no air control: the truck only drives while the gas is held. */
+  /** No auto-gas and no air control: the truck only drives while the gas is held (keys, touch or pad). */
   private readInput(): InputState {
     if (this.run.over) return { throttle: 0, brake: 0, lean: 0 };
-    const k = this.keys;
-    const c = this.cursors;
     return playerInput(
-      { gas: c.right.isDown || k.D.isDown, brake: c.left.isDown || k.A.isDown },
+      { gas: this.held.gas, brake: this.held.brake },
       this.run.engineOn, // a dry tank means no throttle and no brake torque
     );
   }
 
-  /** Up/W (or Q): away from the camera, Down/S (or E): towards it. Held, so the drift is smooth. */
+  /** The control reminder under the action: the player's own keys, or the touch buttons. */
+  private hintLines(): string[] {
+    const k = (a: Action) => keyLabel(this.settings.bindings[a][0]);
+    const touch = touchVisible(this.settings.touch, this.sys.game.device.input.touch, false);
+    return touch
+      ? ['HOLD GAS to drive   BRAKE   ▲ ▼ drift across the field', 'Drift sideways to dodge rocks, logs and boulders · you cannot slip through other cars']
+      : [
+          `HOLD ${k('gas')} to accelerate   ${k('brake')} brake   ${k('far')} / ${k('near')} drift across the field (hold)   ${k('reset')} reset   ${k('mute')} mute   ${k('music')} music   O settings`,
+          'Drift sideways to dodge rocks, logs and boulders · you cannot slip through other cars',
+        ];
+  }
+
+  /** Away from the camera / towards it. Held, so the drift is smooth. */
   private readLaneDir(): -1 | 0 | 1 {
-    if (this.run.over) return 0;
-    const c = this.cursors;
-    const k = this.keys;
-    const far = c.up.isDown || k.W.isDown || k.Q.isDown;
-    const near = c.down.isDown || k.S.isDown || k.E.isDown;
-    return far === near ? 0 : far ? 1 : -1;
+    return this.run.over ? 0 : laneDirOf(this.held);
+  }
+
+  /** Pushes the effects quality (ground detail, particle density) into the systems that use it. */
+  private applyQuality(): void {
+    this.quality = effectsQuality(this.settings.effects, this.governor.quality);
+    this.groundPainter.detail = this.quality;
+    this.parallax.calm = this.settings.reducedMotion;
+    this.particles.density = particleScale(this.settings, this.quality);
+  }
+
+  /** Reads keyboard, pad and touch into one `held` state and returns the pad's one-shot buttons. */
+  private pollInput(): ReturnType<PadEdges['update']> {
+    const pad = firstPad();
+    const fingers = this.input.manager.pointers.filter((p) => p.isDown).map((p) => ({ x: p.x, y: p.y }));
+    const showTouch = touchVisible(this.settings.touch, this.sys.game.device.input.touch, this.touchedOnce) && !this.run.over;
+    this.touchView.setVisible(showTouch);
+    this.held = mergeHeld(
+      heldFromKeys(this.tracker, this.settings.bindings),
+      padHeld(pad),
+      showTouch ? touchHeld(fingers) : { gas: 0, brake: 0, far: false, near: false },
+    );
+    this.touchView.draw(this.held);
+    return this.padEdges.update(padButtons(pad));
   }
 
   update(time: number, delta: number): void {
     const dt = Math.min(delta / 1000, 1 / 20);
     const J = Phaser.Input.Keyboard.JustDown;
+    const pad = this.pollInput();
+    const b = this.settings.bindings;
+    const pressed = (a: Parameters<typeof actionPressed>[2]) => actionPressed(this.tracker, b, a);
+    if (this.settings.effects === 'auto' && this.governor.update(dt)) this.applyQuality();
     if (this.run.over) {
-      if (J(this.keys.G)) this.scene.start('Garage');
-      else if (J(this.keys.D)) this.restart(!this.daily);
-      else if (J(this.keys.R) || J(this.keys.SPACE) || J(this.keys.ENTER)) this.restart();
+      if (J(this.keys.G) || pad.garage) this.scene.start('Garage');
+      else if (J(this.keys.O) || pad.settings) this.scene.start('Settings', { from: 'Game' });
+      else if (J(this.keys.D) || pad.daily) this.restart(!this.daily);
+      else if (pressed('reset') || J(this.keys.SPACE) || J(this.keys.ENTER) || pad.confirm) this.restart();
     } else {
-      if (J(this.keys.R)) this.recover();
+      if (pressed('reset') || pad.reset) this.recover();
     }
-    if (J(this.keys.H)) this.debug = !this.debug;
-    if (J(this.keys.M)) {
+    if (pressed('debug')) this.debug = !this.debug;
+    if (pressed('mute')) {
       this.sound.mute = !this.sound.mute;
       this.flash(this.sound.mute ? 'SOUND OFF' : 'SOUND ON');
     }
-    if (J(this.keys.N)) this.flash(this.audio.toggleMusic() ? 'MUSIC ON' : 'MUSIC OFF');
+    if (pressed('music') || pad.music) this.flash(this.audio.toggleMusic() ? 'MUSIC ON' : 'MUSIC OFF');
 
     // Fixed-step physics (substeps keep the stiff suspension stable)
     const input = this.readInput();
@@ -362,6 +433,7 @@ export class GameScene extends Phaser.Scene {
     this.drawDebug();
     this.updateHud();
     this.drawLaneHud();
+    this.tracker.endFrame();
   }
 
   /** The player drifted across a lane boundary: score the dodge, whoosh, kick up a little mud. */
@@ -390,124 +462,7 @@ export class GameScene extends Phaser.Scene {
 
   private drawGround(): void {
     const cam = this.cameras.main;
-    const g = this.ground;
-    const x0 = Math.floor(cam.scrollX / RENDER_STEP) * RENDER_STEP - RENDER_STEP;
-    const x1 = cam.scrollX + VIEW_W + RENDER_STEP * 2;
-    const bottom = cam.scrollY + VIEW_H + 80;
-    g.clear();
-
-    // Paint one strip of terrain between xa and xb, in steps of RENDER_STEP (the track is a smooth
-    // spline, so the strips follow it without visible corners). Segment borders are clipped to the
-    // step grid, so neighbouring biomes meet exactly at the checkpoint gate.
-    const strip = (color: number, topOffset: number, bottomOffset: number | null, xa: number, xb: number) => {
-      g.fillStyle(color, 1);
-      g.beginPath();
-      g.moveTo(xa, this.terrain.heightAt(xa) + topOffset);
-      for (let x = Math.ceil(xa / RENDER_STEP) * RENDER_STEP; x < xb; x += RENDER_STEP) {
-        if (x > xa) g.lineTo(x, this.terrain.heightAt(x) + topOffset);
-      }
-      g.lineTo(xb, this.terrain.heightAt(xb) + topOffset);
-      if (bottomOffset === null) {
-        g.lineTo(xb, bottom);
-        g.lineTo(xa, bottom);
-      } else {
-        g.lineTo(xb, this.terrain.heightAt(xb) + bottomOffset);
-        for (let x = Math.floor(xb / RENDER_STEP) * RENDER_STEP; x > xa; x -= RENDER_STEP) {
-          if (x < xb) g.lineTo(x, this.terrain.heightAt(x) + bottomOffset);
-        }
-        g.lineTo(xa, this.terrain.heightAt(xa) + bottomOffset);
-      }
-      g.closePath();
-      g.fillPath();
-    };
-
-    for (const seg of biomeSegments(x0, x1, this.startX)) {
-      const c = seg.biome.ground;
-      const { x0: xa, x1: xb } = seg;
-      strip(c.dirt, 0, null, xa, xb);
-      strip(c.deep, 44, null, xa, xb);
-      // The dirt field behind the near lane: one wide, flat field like the reference's, drawn from
-      // the far edge down in thin slivers that darken a little with distance. There are no steps or
-      // lips, so it reads as open ground rather than a staircase of troughs.
-      for (let i = FIELD_BANDS; i >= 1; i--) {
-        const f = (FIELD_DEPTH * i) / FIELD_BANDS;
-        const nearer = (FIELD_DEPTH * (i - 1)) / FIELD_BANDS;
-        strip(shade(c.crust, 1 - 0.05 * f), -laneLift(f), -laneLift(nearer) + 1.5, xa, xb);
-      }
-      strip(shade(c.crust, 0.6), -laneLift(FIELD_DEPTH) - 2, -laneLift(FIELD_DEPTH) + 1, xa, xb); // contact line with the tree line
-      strip(c.crust, 0, 10, xa, xb); // the near lane's sunlit crust
-      strip(c.crustShadow, 10, 15, xa, xb);
-      strip(c.rut1, 22, 26, xa, xb); // tire ruts in the foreground, like the reference's rutted mud
-      strip(c.rut2, 33, 36, xa, xb);
-      this.drawMud(seg.biome, xa, xb);
-      this.drawTufts(seg.biome, xa, xb);
-    }
-  }
-
-  /** Dark mud patches scattered over the whole field (deterministic by world position). */
-  private drawMud(biome: Biome, xa: number, xb: number): void {
-    const g = this.ground;
-    const c = biome.ground;
-    const patch = mixColor(c.crust, c.crustShadow, 0.75);
-    for (let k = Math.floor(xa / MUD_CELL) - 1; k * MUD_CELL < xb; k++) {
-      for (let j = 0; j < 2; j++) {
-        if (hash01(k, 11 + j) > 0.55) continue;
-        const x = k * MUD_CELL + hash01(k, 21 + j) * MUD_CELL;
-        if (x < xa || x > xb) continue;
-        const f = hash01(k, 31 + j) * (FIELD_DEPTH - 0.1);
-        const sc = laneScale(f);
-        const y = this.terrain.heightAt(x) - laneLift(f) + 3;
-        g.fillStyle(patch, 0.45);
-        g.fillEllipse(x, y, (46 + hash01(k, 41 + j) * 80) * sc, (6 + hash01(k, 51 + j) * 6) * sc);
-      }
-    }
-  }
-
-  /**
-   * Verge tufts (grass, dry scrub, frost or reeds), scattered by world position over EVERY lane of
-   * the field, drawn from the far rows to the near ones so nearer tufts cover farther ones.
-   */
-  private drawTufts(biome: Biome, xa: number, xb: number): void {
-    const g = this.ground;
-    const { color, shape } = biome.tuft;
-    const rows = 5;
-    for (let row = rows - 1; row >= 0; row--) {
-      for (let k = Math.floor(xa / TUFT_SPACING) - 1; k * TUFT_SPACING < xb; k++) {
-        if (hash01(k, 100 + row) > 0.17) continue;
-        const x = k * TUFT_SPACING + hash01(k, 200 + row) * TUFT_SPACING;
-        if (x < xa || x > xb) continue;
-        const f = -0.1 + ((row + hash01(k, 300 + row)) * (LANES.count - 0.7)) / rows;
-        this.tuft(g, shape, shade(color, 1 - 0.07 * f), x, this.terrain.heightAt(x) - laneLift(f) + 1, laneScale(f));
-      }
-    }
-  }
-
-  /** One tuft standing at (x, y), `s` times its full size. */
-  private tuft(g: Phaser.GameObjects.Graphics, shape: Biome['tuft']['shape'], color: number, x: number, y: number, s: number): void {
-    g.fillStyle(color, 1);
-    switch (shape) {
-      case 'grass':
-        g.fillTriangle(x - 5 * s, y, x - 1 * s, y, x - 4 * s, y - 9 * s);
-        g.fillTriangle(x - 2 * s, y, x + 2 * s, y, x, y - 12 * s);
-        g.fillTriangle(x + 1 * s, y, x + 5 * s, y, x + 4 * s, y - 8 * s);
-        break;
-      case 'scrub': // low, wide dry bush with a woody centre
-        g.fillTriangle(x - 9 * s, y, x - 2 * s, y, x - 7 * s, y - 7 * s);
-        g.fillTriangle(x - 4 * s, y, x + 5 * s, y, x + 1 * s, y - 10 * s);
-        g.fillTriangle(x + 2 * s, y, x + 9 * s, y, x + 7 * s, y - 6 * s);
-        break;
-      case 'frost': // snow clumps with an icy crystal
-        g.fillEllipse(x, y - 2 * s, 16 * s, 6 * s);
-        g.fillTriangle(x - 2 * s, y - 3 * s, x + 2 * s, y - 3 * s, x, y - 11 * s);
-        break;
-      case 'reed': // tall thin blades with a cattail
-        g.fillRect(x - 4 * s, y - 16 * s, 1.5 * s, 16 * s);
-        g.fillRect(x, y - 20 * s, 1.5 * s, 20 * s);
-        g.fillRect(x + 4 * s, y - 14 * s, 1.5 * s, 14 * s);
-        g.fillStyle(0x5b3a1e, 1);
-        g.fillRect(x - 0.5 * s, y - 26 * s, 3 * s, 7 * s);
-        break;
-    }
+    this.groundPainter.paint(cam.scrollX, cam.scrollY);
   }
 
   /**
@@ -584,12 +539,14 @@ export class GameScene extends Phaser.Scene {
     const cam = this.cameras.main;
     const left = cam.scrollX - 60;
     const right = cam.scrollX + VIEW_W + 60;
+    const marks = this.marks;
+    marks.clear();
     for (const p of this.run.pickups.items) {
       const visible = !p.taken && p.x > left && p.x < right;
       let sprite = this.sprites.get(p.id);
       if (visible && !sprite) {
         const key = p.kind === 'fuel' ? 'fuel_can' : p.kind === 'wrench' ? 'wrench' : 'snack';
-        sprite = this.add.image(p.x, p.y, key);
+        sprite = this.imagePool.acquire().setTexture(key);
         if (p.kind === 'wrench') sprite.setAngle(-14);
         this.sprites.set(p.id, sprite);
       }
@@ -597,38 +554,52 @@ export class GameScene extends Phaser.Scene {
       if (visible) {
         // Placed in the pickup's lane: higher, smaller and darker further away.
         const gy = this.terrain.heightAt(p.x);
-        const bob = p.kind !== 'wrench' ? Math.sin(seconds * 4 + p.id) * 3 : 0;
+        const bob = p.kind !== 'wrench' && !this.settings.reducedMotion ? Math.sin(seconds * 4 + p.id) * 3 : 0;
         const shadeV = laneShade(p.lane);
+        const sy = laneProject(gy, p.y + bob, p.lane);
         sprite
-          .setPosition(p.x, laneProject(gy, p.y + bob, p.lane))
+          .setPosition(p.x, sy)
           .setScale(laneScale(p.lane))
           .setTint(Phaser.Display.Color.GetColor(shadeV, shadeV, shadeV))
           .setDepth(laneDepth(p.lane, 0.04));
+        if (this.settings.colorblind) this.drawPickupMark(marks, p.kind, p.x, sy, laneScale(p.lane));
       } else if (!p.taken) {
-        sprite.destroy();
+        this.imagePool.release(sprite);
         this.sprites.delete(p.id);
       }
     }
   }
 
+  /**
+   * Colour-blind mode: a badge behind each pickup with its own shape (circle snack, diamond can,
+   * square wrench) in colour-blind-safe colours, so the kind never depends on colour alone.
+   */
+  private drawPickupMark(g: Phaser.GameObjects.Graphics, kind: 'snack' | 'fuel' | 'wrench', x: number, y: number, sc: number): void {
+    const m = pickupMark(kind);
+    const r = 25 * sc;
+    g.fillStyle(m.fill, 0.9);
+    g.lineStyle(3, m.ring, 1);
+    if (m.shape === 'circle') {
+      g.fillCircle(x, y, r);
+      g.strokeCircle(x, y, r);
+    } else if (m.shape === 'diamond') {
+      const pts = [new Phaser.Geom.Point(x, y - r * 1.2), new Phaser.Geom.Point(x + r * 1.2, y), new Phaser.Geom.Point(x, y + r * 1.2), new Phaser.Geom.Point(x - r * 1.2, y)];
+      g.fillPoints(pts, true);
+      g.strokePoints(pts, true);
+    } else {
+      g.fillRect(x - r, y - r, r * 2, r * 2);
+      g.strokeRect(x - r, y - r, r * 2, r * 2);
+    }
+  }
+
   private popup(x: number, y: number, text: string, color: string): void {
-    const t = this.add
-      .text(x, y, text, {
-        fontFamily: 'monospace',
-        fontSize: '20px',
-        fontStyle: 'bold',
-        color,
-        stroke: '#000',
-        strokeThickness: 4,
-      })
-      .setOrigin(0.5)
-      .setDepth(8);
+    const t = this.textPool.acquire().setText(text).setColor(color).setPosition(x, y);
     this.tweens.add({
       targets: t,
       y: y - 46,
       alpha: 0,
       duration: 700,
-      onComplete: () => t.destroy(),
+      onComplete: () => this.textPool.release(t),
     });
   }
 
@@ -652,7 +623,7 @@ export class GameScene extends Phaser.Scene {
             scale: 1.9,
             alpha: 0,
             duration: 180,
-            onComplete: () => sprite.destroy(),
+            onComplete: () => this.imagePool.release(sprite),
           });
         }
         if (e.type === 'wrench') {
@@ -715,7 +686,8 @@ export class GameScene extends Phaser.Scene {
         if (hard) emitCrash(this.particles, Math.random, e.x, y - 8, Math.min(1, e.impact / 520), e.with === 'obstacle' ? 0x8c909a : 0xf2c200);
         if (e.with === 'obstacle' && e.kind) this.popup(e.x, y - 50, e.kind.toUpperCase() + '!', '#ffb066');
         if (hard) {
-          this.cameras.main.shake(140, Math.min(0.012, 0.004 + e.impact / 60000));
+          const k = shakeScale(this.settings);
+          if (k > 0) this.cameras.main.shake(140, Math.min(0.012, 0.004 + e.impact / 60000) * k);
           for (const ev of this.run.hurt(e.damage)) this.onRunEvent(ev);
         }
         break;
@@ -797,7 +769,7 @@ export class GameScene extends Phaser.Scene {
         sp.smokeClock -= dt;
         if (sp.smokeClock <= 0) {
           sp.smokeClock = w.fresh ? 0.12 : 0.3;
-          this.puffSmoke(sp.body.x - 6, sp.body.y - 26, w.fresh ? 0x333333 : 0x8a8a8f);
+          this.puffSmoke(sp.body.x - 6, sp.body.y - 48, w.fresh ? 0x333333 : 0x8a8a8f);
         }
       }
     }
@@ -814,7 +786,7 @@ export class GameScene extends Phaser.Scene {
     const scale = laneScale(w.lane);
     const gy = this.terrain.heightAt(w.x);
     // Upside down: the sprite's pivot is the chassis centre, so sit it a little above the roof line.
-    const y = laneProject(gy, w.y - 12, w.lane);
+    const y = laneProject(gy, w.y - 12 - TRUCK.lift, w.lane);
     const fade = w.solid ? 1 : Math.max(0, 1 - w.age / WRECKS.debrisLife);
     const dim = Math.round(0x77 * (laneShade(w.lane) / 255));
     const tint = (dim << 16) | (dim << 8) | Math.min(255, dim + 5);
@@ -822,14 +794,15 @@ export class GameScene extends Phaser.Scene {
     sp.body.setPosition(w.x, y).setRotation(w.angle).setScale(scale).setTint(tint).setAlpha(fade).setDepth(depth);
     const cos = Math.cos(w.angle);
     const sin = Math.sin(w.angle);
+    const tire = RIVAL_STYLES[w.style % RIVAL_STYLES.length].wheel;
     TRUCK.wheels.forEach((wh, i) => {
-      // Wheels are mirrored to the top of the flipped body.
+      // Wheels are mirrored to the top of the flipped body, on their (lifted) axles.
       const lx = wh.x * scale;
-      const ly = -(wh.y + 6) * scale;
+      const ly = -axleY(tire) * scale;
       sp.wheels[i]
         .setPosition(w.x + lx * cos - ly * sin, y + lx * sin + ly * cos)
         .setRotation(w.angle + i)
-        .setScale(scale * RIVAL_STYLES[w.style % RIVAL_STYLES.length].wheel)
+        .setScale(scale * tire)
         .setTint(tint)
         .setAlpha(fade)
         .setDepth(depth - 0.1);
@@ -1164,17 +1137,36 @@ export class GameScene extends Phaser.Scene {
         style(14, '#ffd34d'),
       );
     }
-    const again = put(
-      cx,
-      cy + 140,
-      `SPACE / tap: drive again   G: garage   D: ${this.daily ? 'free run' : 'daily challenge'}`,
-      style(16, '#ffe066'),
-    );
-    this.tweens.add({ targets: again, alpha: 0.3, yoyo: true, repeat: -1, duration: 600 });
+    // Four tappable buttons (keys and pad buttons do the same); a tap anywhere else drives again.
+    const buttons: [string, string, () => void][] = [
+      ['SPACE  DRIVE AGAIN', '#ffe066', () => this.restart()],
+      ['G  GARAGE', '#9be0ff', () => this.scene.start('Garage')],
+      [this.daily ? 'D  FREE RUN' : 'D  DAILY', '#7dff8a', () => this.restart(!this.daily)],
+      ['O  SETTINGS', '#c9d3ee', () => this.scene.start('Settings', { from: 'Game' })],
+    ];
+    const widths = [220, 150, 150, 170];
+    let bx = cx - widths.reduce((a, w) => a + w, 0) / 2 - 12;
+    buttons.forEach(([label, color, go], i) => {
+      const w = widths[i];
+      const x = bx + w / 2 + 8;
+      bx += w + 8;
+      const box = this.add
+        .rectangle(x + 4, cy + 142, w, 34, 0x16224a)
+        .setStrokeStyle(2, 0x44558a)
+        .setScrollFactor(0)
+        .setDepth(31)
+        .setInteractive({ useHandCursor: true });
+      box.on('pointerdown', () => {
+        if (this.time.now - this.overAt > 400) go();
+      });
+      const t = put(x + 4, cy + 142, label, style(15, color));
+      if (i === 0) this.tweens.add({ targets: t, alpha: 0.4, yoyo: true, repeat: -1, duration: 600 });
+    });
     this.input.on('pointerdown', this.tapRestart, this);
   }
 
-  private tapRestart(): void {
+  private tapRestart(_pointer?: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[] = []): void {
+    if (over.length > 0) return; // a tap on one of the buttons does that button's job
     if (this.run.over && this.time.now - this.overAt > 400) {
       this.input.off('pointerdown', this.tapRestart, this);
       this.restart();
@@ -1230,9 +1222,10 @@ export class GameScene extends Phaser.Scene {
       const key = obstacleKey(o.kind, o.variant);
       let img = this.obstacleSprites.get(o.id);
       if (!img) {
-        img = this.add.image(0, 0, key);
+        img = this.imagePool.acquire();
         this.obstacleSprites.set(o.id, img);
       }
+      if (img.texture.key !== key) img.setTexture(key);
       const r = OBSTACLE_KINDS[o.kind].radius;
       const h = img.height;
       // At rest the sprite stands on the ground; once knocked loose it tumbles about its centre.
@@ -1249,7 +1242,7 @@ export class GameScene extends Phaser.Scene {
     }
     for (const [id, img] of this.obstacleSprites) {
       if (!live.has(id)) {
-        img.destroy();
+        this.imagePool.release(img);
         this.obstacleSprites.delete(id);
       }
     }

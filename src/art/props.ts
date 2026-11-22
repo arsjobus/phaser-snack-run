@@ -1,4 +1,5 @@
 import type Phaser from 'phaser';
+import { TRUCK } from '../config';
 import { drawPixelText, pixelTextWidth } from './pixelFont';
 
 type G = Phaser.GameObjects.Graphics;
@@ -12,36 +13,54 @@ function poly(g: G, color: number, pts: [number, number][]): void {
   );
 }
 
-/** Knobby tire with a five-slot rim; the tread knobs and mud blobs make the spin readable. */
-export function drawWheel(g: G): void {
-  g.fillStyle(0x161616, 1);
-  g.fillCircle(20, 20, 20);
-  g.fillStyle(0x30302f, 1);
-  for (let i = 0; i < 12; i++) {
-    const a = (i * Math.PI * 2) / 12;
-    g.fillCircle(20 + Math.cos(a) * 18, 20 + Math.sin(a) * 18, 2.6);
+/**
+ * Big knobby off-road tire with a five-slot beadlock rim, drawn in a square of 2 * `radius`. The
+ * lugs, sidewall ring and mud blobs make the spin readable. Default size is the standard tire.
+ */
+export function drawWheel(g: G, radius: number = TRUCK.tireRadius): void {
+  const R = radius;
+  const k = R / 20; // everything below is designed on a 20 px radius
+  const c = R;
+  g.fillStyle(0x0f0f0f, 1);
+  g.fillCircle(c, c, R);
+  // Tread lugs: chunky blocks around the rim of the tire.
+  const lugs = 18;
+  for (let i = 0; i < lugs; i++) {
+    const a = (i * Math.PI * 2) / lugs;
+    g.fillStyle(i % 2 ? 0x2c2c2b : 0x383837, 1);
+    g.fillCircle(c + Math.cos(a) * 17.6 * k, c + Math.sin(a) * 17.6 * k, 3.1 * k);
   }
-  g.fillStyle(0x262626, 1);
-  g.fillCircle(20, 20, 15);
+  g.fillStyle(0x1d1d1d, 1);
+  g.fillCircle(c, c, 15.5 * k);
+  g.lineStyle(1.2 * k, 0x3a3a3a, 1); // sidewall ring
+  g.strokeCircle(c, c, 12.8 * k);
   g.fillStyle(0x6b4423, 0.85); // caked mud
-  for (const [a, r] of [
-    [0.4, 16.5],
-    [2.3, 17],
-    [4.1, 16],
+  for (const [a, r, s] of [
+    [0.4, 16.5, 2.8],
+    [1.3, 17.6, 2],
+    [2.3, 17, 3],
+    [3.4, 16.4, 2.2],
+    [4.1, 16, 2.8],
+    [5.3, 17.2, 2.1],
   ]) {
-    g.fillCircle(20 + Math.cos(a) * r, 20 + Math.sin(a) * r, 2.4);
+    g.fillCircle(c + Math.cos(a) * r * k, c + Math.sin(a) * r * k, s * k);
   }
+  g.fillStyle(0x4a2f17, 0.7);
+  g.fillCircle(c + Math.cos(0.9) * 14 * k, c + Math.sin(0.9) * 14 * k, 1.6 * k);
+  // Rim: bright steel face, five dark slots, hub cap, one bright spoke so rotation shows.
+  g.fillStyle(0x8a8f99, 1);
+  g.fillCircle(c, c, 10.4 * k);
   g.fillStyle(0xb8bcc4, 1);
-  g.fillCircle(20, 20, 9.5);
+  g.fillCircle(c, c, 9.4 * k);
   g.fillStyle(0x3a3d44, 1);
   for (let i = 0; i < 5; i++) {
     const a = (i * Math.PI * 2) / 5;
-    g.fillCircle(20 + Math.cos(a) * 5.5, 20 + Math.sin(a) * 5.5, 2);
+    g.fillCircle(c + Math.cos(a) * 5.6 * k, c + Math.sin(a) * 5.6 * k, 2.1 * k);
   }
   g.fillStyle(0x777b84, 1);
-  g.fillCircle(20, 20, 2.5);
-  g.lineStyle(2, 0x8a8f99, 1);
-  g.lineBetween(20, 20, 20 + 13, 20); // one bright spoke so rotation shows
+  g.fillCircle(c, c, 2.6 * k);
+  g.lineStyle(2 * k, 0x8a8f99, 1);
+  g.lineBetween(c, c, c + 13 * k, c);
 }
 
 /** Snack box of the original brand "Crunch Crackers": a little 3D cracker carton. 36x44. */

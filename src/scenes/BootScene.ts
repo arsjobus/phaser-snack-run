@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ART } from '../config';
+import { ART, TRUCK } from '../config';
 import { makeBackdrops } from '../art/backdrops';
 import {
   OBSTACLE_ART,
@@ -35,7 +35,7 @@ export class BootScene extends Phaser.Scene {
     } else {
       makeTruckTextures(this);
     }
-    this.bake('wheel', 40, 40, drawWheel);
+    this.bake('wheel', TRUCK.tireRadius * 2, TRUCK.tireRadius * 2, (g) => drawWheel(g, TRUCK.tireRadius));
     this.bake('snack', 36, 46, drawSnack);
     this.bake('fuel_can', 38, 46, drawFuelCan);
     this.bake('wrench', 52, 44, drawWrench);
@@ -46,7 +46,9 @@ export class BootScene extends Phaser.Scene {
       const art = OBSTACLE_ART[kind];
       for (let v = 0; v < OBSTACLE_VARIANTS; v++) this.bake(obstacleKey(kind, v), art.w, art.h, (g) => art.draw(g, v));
     }
-    this.scene.start('Game');
+    const q = new URLSearchParams(window.location.search);
+    // Developer shortcuts: `?art` is the art preview, `?settings` opens the settings screen.
+    this.scene.start(q.has('art') ? 'Art' : q.has('settings') ? 'Settings' : 'Game');
   }
 
   private bake(key: string, w: number, h: number, draw: (g: Phaser.GameObjects.Graphics) => void): void {

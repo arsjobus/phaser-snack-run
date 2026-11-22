@@ -33,6 +33,8 @@ export class Parallax {
   private previous: BiomeId | null = null;
   private fade = 1;
   private t = 0;
+  /** Reduced motion: the clouds stand still. */
+  calm = false;
 
   constructor(scene: Phaser.Scene, start: BiomeId = 'forest') {
     this.current = start;
@@ -73,7 +75,7 @@ export class Parallax {
   }
 
   update(scrollX: number, scrollY: number, dt: number): void {
-    this.t += dt;
+    if (!this.calm) this.t += dt;
     if (this.previous) {
       this.fade = Math.min(1, this.fade + dt / BIOMES.fadeSeconds);
       this.each(this.current, (sp) => sp.setAlpha(this.fade));

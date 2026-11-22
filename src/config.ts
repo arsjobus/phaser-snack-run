@@ -27,7 +27,7 @@ export const PHYSICS = {
   bodyC: 28,
 
   // Drivetrain (4WD: both wheels drive)
-  engineForce: 380, // per wheel
+  engineForce: 1140, // per wheel
   topSpeed: 900, // px/s along the ground
   brakeForce: 420, // per wheel
   reverseForce: 160,
@@ -47,19 +47,32 @@ export const PHYSICS = {
   maxAngularVelocity: 7,
 } as const;
 
-/** Truck contact layout in chassis-local px (x forward, y down). */
+/** How far (px) every truck's body is hoisted above its axles: they are monster-truck lifted. */
+const LIFT = 32;
+
+/**
+ * Truck contact layout in chassis-local px (x forward, y down). The physics wheel (`wheelRadius`)
+ * is unchanged, but the tires are DRAWN `tireRadius` big and the body is drawn `lift` px higher on
+ * visible axles and shocks, so the roof contact points ride up with it (a flipped truck must rest
+ * on its drawn roof); the tail and nose points stay inside the tires' outlines, where they were, so
+ * landings and flips behave as they did before the lift. The collision circles (`COLLISION.circles`) keep covering the tires
+ * and lower body, which is what rocks and other trucks actually hit.
+ */
 export const TRUCK = {
   wheels: [
     { x: -42, y: 22 }, // rear
     { x: 42, y: 22 }, // front
   ],
   body: [
-    { x: -30, y: -30 }, // cab roof rear
-    { x: 8, y: -30 }, // cab roof front
-    { x: -58, y: -6 }, // tail
-    { x: 58, y: -2 }, // nose
+    { x: -30, y: -30 - LIFT }, // cab roof rear
+    { x: 8, y: -30 - LIFT }, // cab roof front
+    { x: -58, y: -6 }, // tail: inside the rear tire's outline, so it stays where it was
+    { x: 58, y: -2 }, // nose: same, inside the front tire
   ],
   bodyRadius: 4,
+  /** Drawn radius (px) of a standard tire; a style's `wheel` factor scales it. */
+  tireRadius: 24,
+  lift: LIFT,
 };
 
 export const CAMERA = {
@@ -390,11 +403,11 @@ export const ART = {
   rotationFrames: 0,
   /** Un-rotated truck sprite (px) and where the chassis centre sits in it. */
   truckW: 144,
-  truckH: 92,
+  truckH: 136,
   truckCx: 72,
-  truckCy: 56,
+  truckCy: 88,
   /** Side (px) of one square rotation frame; must hold the sprite turned to any angle. */
-  frame: 176,
+  frame: 200,
 } as const;
 
 /** Biomes rotate with the checkpoints: forest, desert, snow, swamp, then round again. */

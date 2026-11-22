@@ -2,7 +2,7 @@
 
 An endless-runner redux of a classic Flash-era 4x4 racer. Muddy tracks, big trucks, ramps, snacks and fuel.
 
-**Status:** Phases 0 to 7 are done: setup, core driving, fuel/snacks/scoring, the HUD with checkpoints, rivals, collisions and wrecks, the art pass, audio, and now depth lanes with obstacles plus progression (a garage, high scores, a daily challenge and achievements). See [`roadmap.md`](roadmap.md).
+**Status:** Phases 0 to 7.5 and the code half of Phase 8 are done (touch, gamepad, remappable keys, settings, performance, a road art pass and lifted monster trucks); playtests and the itch.io release remain. Phases 0 to 7 were: setup, core driving, fuel/snacks/scoring, the HUD with checkpoints, rivals, collisions and wrecks, the art pass, audio, and now depth lanes with obstacles plus progression (a garage, high scores, a daily challenge and achievements). See [`roadmap.md`](roadmap.md).
 
 ## Quick start
 
@@ -25,9 +25,20 @@ npm run dev        # http://localhost:5173
 
 →/D gas (**hold it: there is no auto-gas**; let go and engine braking slows you down) · ←/A brake/reverse · **↑/W and ↓/S: hold to drift away from / towards the camera through the depth field** (Q/E also work) · R reset upright · M mute all · N music on/off · H debug overlay · SPACE/ENTER/tap restart after game over · **G** garage and **D** daily challenge / free run (game-over screen)
 
+**Gamepad:** RT/A/stick right gas (triggers are analog) · LT/B/X/stick left brake · stick or D-pad up/down drift · Start/A restart · Y garage · X daily · Back settings · LB reset · RB music. **Touch:** GAS, BRAKE and ▲/▼ buttons appear on touch devices. **O** opens the settings (also from the garage) where every driving key can be rebound.
+
 There is no air control and no lean: the arrow keys steer through the field instead, and a gentle passive assist levels the truck in the air so it lands on its wheels.
 
 Add `?seed=anything` to the URL for a repeatable course, or `?daily` to start in the daily challenge.
+
+## What's in Phase 8 (platform and polish) and the art pass
+
+- **Controls everywhere:** keyboard (rebindable), gamepad and touch all feed one control state (`src/input/`); they can be mixed. Touch buttons are multi-touch and forgiving (a finger counts a little beyond a button's edge, sliding between buttons works). Nothing held means no throttle on every device.
+- **Settings** (`src/scenes/SettingsScene.ts`, saved automatically): volumes, screen shake, reduced motion, colour-blind pickups, effects quality, touch controls, key bindings. Dev shortcuts: `/?settings`, `/?art=forest|desert|snow|swamp` (a review page with the whole truck set and pickups on one road).
+- **Performance:** pooled sprites and popups, one height lookup per ground column per frame, in-place particle culling, and an adaptive effects governor (below 45 fps for 2.5 s lowers ground detail and particles one step; set Effects quality to Full or Reduced to override it).
+- **Road:** a detailed foreground slab, a hazy far field, meandering paired tire ruts with tread, and per-biome pebbles, grit, stones, clods, cracks, puddles, sand ripples and snow glints.
+- **Monster trucks:** every vehicle has big tires and a body hoisted on visible axles, shocks and a driveshaft. Driving and flipping feel the same as before.
+- Not done (needs people, not code): the 5 to 10 person playtest and the itch.io release.
 
 ## What's in Phase 7.5 (playtest feedback)
 

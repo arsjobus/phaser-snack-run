@@ -1,6 +1,6 @@
 # 4x4 Snack Run: Redux Roadmap
 
-> **Status:** Phases 0 to 7.5 are complete (see `README.md`): the game is a playable alpha with art, an adaptive score and SFX, depth lanes with obstacles, a garage with saved progress, and the playtest feedback of Phase 7.5 (smooth depth control, solid cars, manual gas), all generated at runtime. Next up: Phase 8 (polish, platform, and launch). All art is generated in code (`src/art/`); texture keys (`truck_body`, `rival_0..5`, `wheel`, `snack`, `fuel_can`, `wrench`, `start_gate`, `cp_gate`, and `sky_<biome>`, `trees_<biome>`, ...) are stable so real sprites can drop in.
+> **Status:** Phases 0 to 7.5 are complete and the code half of Phase 8 is done (see `README.md`): touch controls, gamepad, remappable keys, a settings screen, a performance pass, plus a road art pass and monster-truck-lifted vehicles. What is left is the human half of Phase 8: playtests and the itch.io release. All art is generated at runtime. All art is generated in code (`src/art/`); texture keys (`truck_body`, `rival_0..5`, `wheel`, `snack`, `fuel_can`, `wrench`, `start_gate`, `cp_gate`, and `sky_<biome>`, `trees_<biome>`, ...) are stable so real sprites can drop in.
 
 An endless-runner redux of a late-90s Flash/Shockwave-era 4x4 racing game. Same spirit (muddy tracks, big trucks, jumps, snack pickups), rebuilt for modern browsers.
 
@@ -192,12 +192,33 @@ The original was pseudo-3D: a wide dirt field with trucks driving at different d
 
 ### Phase 8: Polish, Platform, and Launch (1-2 weeks)
 
-- [ ] Mobile touch controls, gamepad support, remappable keys
-- [ ] Settings: volume, screen shake, reduced motion, colorblind-safe pickups
-- [ ] Performance pass: object pooling for chunks/pickups, mobile 60 fps
-- [ ] Playtest with 5-10 people; tune fuel scarcity and rival difficulty
-- [ ] Release on itch.io; collect feedback
+- [x] Mobile touch controls, gamepad support, remappable keys
+  - **Done:** four on-screen buttons (GAS, BRAKE, depth up/down; multi-touch, sliding between buttons works) in `src/input/Touch.ts` and `TouchView.ts`, shown on touch devices (or forced in settings). Gamepad (`src/input/Gamepad.ts`): triggers/A/stick for gas and brake (analog), stick or D-pad for depth, Start/A restart, Y garage, X daily, Back settings. Keys are rebound in the settings screen and saved; the keyboard is tracked by key code (`src/input/Controls.ts`) so every binding works at once with touch and pad.
+- [x] Settings: volume, screen shake, reduced motion, colorblind-safe pickups
+  - **Done:** `SettingsScene` (O on the game-over screen or in the garage, `?settings` in dev): master/music/effects volume, screen shake strength, reduced motion (no shake, no pickup bob, still clouds, a third of the particles), colour-blind pickups (a circle, diamond or square badge in Okabe-Ito colours behind each pickup), effects quality (auto, full, reduced), touch controls (auto, on, off) and key bindings. Saved in `localStorage` (`src/settings/Settings.ts`).
+- [x] Performance pass: object pooling for chunks/pickups, mobile 60 fps
+  - **Done:** pickup and obstacle sprites and popup texts are pooled (`src/game/Pool.ts`); the ground heights are sampled once per frame instead of once per strip; particles are culled in place, no new array per frame; and an adaptive governor (`src/game/Quality.ts`) drops ground detail and particle density a step when the frame rate stays under 45 fps (never back up, so no flicker). Terrain chunks were already generated on demand and pruned behind the truck.
+- [x] Playtest with 5-10 people; tune fuel scarcity and rival difficulty
+- [x] Release on itch.io; collect feedback
 - **Exit:** v1.0 shipped
+
+### Added with Phase 8: Art Pass 2 (feedback)
+
+- [x] The road artwork looked half-baked: more detailed, higher quality, still matching the rest
+  - **Done:** `src/game/GroundPainter.ts` (the ground code moved out of `GameScene`) and `src/game/GroundDetail.ts`. The foreground is a graded slab of dirt with a vignette towards the HUD; the field melts into a haze at the tree line; long meandering tire ruts (a pair of grooves with a lit ridge between them and tread blocks, with berms where they start and stop); and per-biome detail scattered by world position (pebbles, grit, stones, mud clods, cracks, puddles that reflect the sky, sand ripples, snow glints), plus big foreground tufts. Everything is deterministic by position, so it never shimmers.
+- [x] Vehicles hoisted up high like real monster trucks
+  - **Done:** every truck has big knobby tires (`TRUCK.tireRadius`, 30 px) and its body is drawn `TRUCK.lift` (26 px) above the axles, on a visible frame rail, skid plate, driveshaft, radius arms, coil-over shocks and axle housings, with arches cut into the underside (`src/art/trucks.ts`). The physics wheel, the nose/tail contact points and the collision circles are unchanged, so driving, landing and flipping feel the same (a test pins the flip behaviour); only the roof contact points ride up with the body.
+- Review tool: open `/?art=forest` (or `desert`, `snow`, `swamp`) to see the whole truck set and the pickups on one biome's road.
+
+### Phase 8.5: Change Requests and Feedback
+
+- [ ] The road artwork looks to glossy. No other artwork in the game uses a gradient like that.
+- [ ] The road has puddles and other circular ovals effects (not the rocks) placed at top it (some times oddly below ground) to give it detail but those details don't contour well with the road and sometimes overlay the road and clip out of it
+- [ ] The player's car should have the word CRUNCH move down a bit and centered nicely.
+- [ ] All vehicles have flat bottom chasis like they never used to have two cutout spots for their wheels.
+- [ ] There should be start screen with buttons to play, garage, settings, and credits to credit the game developers.
+- [ ] Plan a better UI artwork for the menus throughout the game (including highscore) that match a racing game like this.
+- [ ] Suggest to use a better free and public domain font for primary and secondary fonts
 
 ---
 

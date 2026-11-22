@@ -3,6 +3,7 @@ import { ART, PHYSICS, TRUCK } from '../config';
 import { PLAYER_TRUCK_KEY, atlasKey } from '../art/trucks';
 import { laneDepth, laneProject, laneScale, laneShade } from './Lanes';
 import { PLAYER_WHEEL } from './Rival';
+import { tireRise, tireSpin } from './Tires';
 import { rotationFrame } from './Rotation';
 import type { Terrain } from './Terrain';
 import type { TruckPhysics } from './TruckPhysics';
@@ -57,12 +58,13 @@ export class TruckView {
       .setTint(tint)
       .setDepth(depth);
     placeBody(this.body, this.key, truck.angle);
-    this.spin += (truck.speed * dt) / PHYSICS.wheelRadius;
+    this.spin += tireSpin(truck.speed * dt, PLAYER_WHEEL);
+    const rise = tireRise(PLAYER_WHEEL); // big tires: the centre sits higher than the physics wheel's
     truck.wheelContacts.forEach((c, i) => {
       // Wheel sits on the ground when compressed; hangs at rest height otherwise.
       const groundY = terrain.heightAt(c.x) - PHYSICS.wheelRadius;
       this.wheels[i]
-        .setPosition(c.x, laneProject(gy, Math.min(c.y, groundY), lane))
+        .setPosition(c.x, laneProject(gy, Math.min(c.y, groundY) - rise, lane))
         .setRotation(this.spin)
         .setScale(scale * PLAYER_WHEEL)
         .setTint(tint)
