@@ -227,6 +227,14 @@ The original was pseudo-3D: a wide dirt field with trucks driving at different d
 - [x] Suggest to use a better free and public domain font for primary and secondary fonts
   - **Done:** Russo One (primary) and Rajdhani (secondary), bundled in `public/fonts/` and used everywhere (menus, HUD, toasts). Both are SIL OFL, free but **not** public domain. For true public domain (CC0), Kenney Future is the best fit; swap it in `src/ui/Fonts.ts`.
 
+### Phase 9: Over the top gimimic
+
+- [ ] At the last 10% of the 2nd checkpoint (every 2nd check point) then there will be a series of boost pads that once the vehicle touches it cannot brake on flat ground so it's not possible for a vehicle to flip and no obstacles 
+- [ ] Upon touching the boost pad then the vehicle will boost very fast and it'll keep hitting boost pads and boosting while coming up to a big ramp
+- [ ] The vehicles will go up the big ramp and they'll keep boosting up it and they'll launch off over a below line up of cars like a monster truck rally show and there will be pyrotechnics that go off at the top of the ramps both starting and landing ramps
+- [ ] At the end of the jump then vehicles will land and go into the next biome / area and go back to their normal topspeed
+- [ ] The vehicles should be able to flip over accidentally while jumping over the cars below. This is meant to be a fun reward / treat for the player so CRUNCH should be written by firework in the sky over the cars below. Make it exciting.
+
 ---
 
 ## 6. Balance Cheat Sheet (starting values to tune)
