@@ -181,6 +181,14 @@ export class RunModel {
     return events;
   }
 
+  /** The truck rolled over: end the run as a wreck. */
+  wreck(): RunEvent[] {
+    const events: RunEvent[] = [];
+    if (this.over) return events;
+    this.finish('wreck', events);
+    return events;
+  }
+
   /** Repairs damage (wrench). Returns the amount actually repaired. */
   repair(amount: number): number {
     return this.over ? 0 : this.damage.repair(amount);

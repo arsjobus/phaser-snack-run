@@ -162,7 +162,7 @@ export class MenuScene extends Phaser.Scene {
 
   private draw(): void {
     this.layer.removeAll(true);
-    logoPlate(this, this.layer, VIEW_W / 2, 92, 460, 92, 'SNACK RUN');
+    logoPlate(this, this.layer, VIEW_W / 2, 92, 460, 92, 'OFF-ROAD RACING');
     const w = 200;
     const gap = 22;
     const x0 = VIEW_W / 2 - (MENU_ITEMS.length * w + (MENU_ITEMS.length - 1) * gap) / 2 + w / 2;
@@ -186,6 +186,5 @@ export class MenuScene extends Phaser.Scene {
         onClick: () => this.go(m.id),
       });
     });
-    label(this, this.layer, VIEW_W / 2, 518, 'LEFT / RIGHT pick   ENTER go   or press P  G  O  C', 'body', 14, INK.soft, 0.5, 4);
   }
 }

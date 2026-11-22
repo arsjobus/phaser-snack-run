@@ -61,6 +61,7 @@ import { button, label, panel, rankBadge, type Layer } from '../ui/Ui';
 
 const FIXED_DT = 1 / 60 / PHYSICS.substeps;
 const GATE_X = GAMEPLAY.startX + 420;
+type GameOverOption = [string, string, () => void, number];
 interface WreckSprite {
   body: Phaser.GameObjects.Image;
   wheels: Phaser.GameObjects.Image[];
@@ -118,6 +119,9 @@ export class GameScene extends Phaser.Scene {
   private touchedOnce = false;
   private paused = false;
   private pauseLayer: Phaser.GameObjects.Container | null = null;
+  private gameOverButtonLayer: Layer | null = null;
+  private gameOverOptions: GameOverOption[] = [];
+  private gameOverSelection = 0;
   private held: Held = { gas: 0, brake: 0, far: false, near: false };
   private settings!: Settings;
   private governor = new QualityGovernor();
@@ -153,6 +157,9 @@ export class GameScene extends Phaser.Scene {
     this.overAt = 0;
     this.paused = false;
     this.pauseLayer = null;
+    this.gameOverButtonLayer = null;
+    this.gameOverOptions = [];
+    this.gameOverSelection = 0;
     this.sprites.clear();
     this.gates.clear();
     this.rivalViews.clear();
@@ -375,11 +382,14 @@ export class GameScene extends Phaser.Scene {
     }
     if (this.settings.effects === 'auto' && this.governor.update(dt)) this.applyQuality();
     if (this.run.over) {
-      if (J(this.keys.G) || pad.garage) this.scene.start('Garage');
+      if (pad.left || pad.up) this.moveGameOverSelection(-1);
+      else if (pad.right || pad.down) this.moveGameOverSelection(1);
+      else if (J(this.keys.G) || pad.garage) this.scene.start('Garage');
       else if (J(this.keys.O) || pad.settings) this.scene.start('Settings', { from: 'Game' });
       else if (J(this.keys.D) || pad.daily) this.restart(!this.daily);
       else if (J(this.keys.ESC) || (pad.back && this.time.now - this.overAt > 400)) this.scene.start('Menu');
-      else if (pressed('reset') || J(this.keys.SPACE) || J(this.keys.ENTER) || pad.confirm) this.restart();
+      else if (pressed('reset') || J(this.keys.SPACE) || J(this.keys.ENTER)) this.restart();
+      else if (pad.confirm) this.activateGameOverSelection();
     } else {
       if (pressed('reset') || pad.reset) this.recover();
       if (J(this.keys.ESC) || pad.start) {
@@ -438,10 +448,13 @@ export class GameScene extends Phaser.Scene {
       biome: biomeIndex(this.biome.id),
     });
 
-    // Auto-recover when stuck upside down
+    // A player truck stuck on its roof/side becomes a wreck instead of auto-recovering.
     this.flippedTimer =
       !this.run.over && this.truck.flipped && this.truck.speed < 80 ? this.flippedTimer + dt : 0;
-    if (this.flippedTimer > GAMEPLAY.flipRecoverTime) this.recover();
+    if (this.flippedTimer > GAMEPLAY.flipRecoverTime) {
+      for (const e of this.run.wreck()) this.onRunEvent(e);
+      this.flippedTimer = 0;
+    }
 
     this.updateCamera(dt);
     this.view.update(this.truck, this.terrain, dt, this.lane.f);
@@ -1132,8 +1145,8 @@ export class GameScene extends Phaser.Scene {
   /**
    * The game-over screen, drawn with the shared UI kit (`src/ui/`): a rimmed panel with the run's
    * numbers on the left, the high-score table (medals for the podium, this run highlighted) on the
-   * right, and five buttons along the bottom (keys and pad buttons do the same). A tap anywhere
-   * else drives again.
+   * right, and five buttons along the bottom. Keyboard shortcuts and gamepad menu navigation work
+   * alongside pointer input; a tap anywhere else drives again.
    */
   private showGameOver(result: RunResult & { achievements: Achievement[] }): void {
     const s = this.run.score;
@@ -1189,18 +1202,32 @@ export class GameScene extends Phaser.Scene {
     if (result.achievements.length) {
       put(cx, 318, result.achievements.map((a) => `ACHIEVEMENT: ${a.name}  +${a.reward} coins`), 'body', 16, INK.title);
     }
+    put(cx, 414, 'D-PAD / STICK SELECT   A / START CONFIRM   B BACK', 'body', 14, INK.dim);
     // Five tappable buttons; a tap on one does that button's job.
-    const buttons: [string, string, () => void, number][] = [
+    const buttons: GameOverOption[] = [
       ['DRIVE AGAIN', 'SPACE', () => this.restart(), UI.yellow],
       ['GARAGE', 'G', () => this.scene.start('Garage'), UI.cyan],
       [this.daily ? 'FREE RUN' : 'DAILY', 'D', () => this.restart(!this.daily), UI.green],
       ['SETTINGS', 'O', () => this.scene.start('Settings', { from: 'Game' }), UI.green],
       ['MENU', 'ESC', () => this.scene.start('Menu'), UI.yellowLight],
     ];
+    this.gameOverSelection = 0;
+    this.gameOverOptions = buttons;
+    this.gameOverButtonLayer = this.add.container(0, 0).setScrollFactor(0).setDepth(31);
+    this.drawGameOverButtons();
+    this.input.on('pointerdown', this.tapRestart, this);
+  }
+
+  private drawGameOverButtons(): void {
+    const layer = this.gameOverButtonLayer;
+    if (!layer) return;
+    layer.removeAll(true);
+    const put = (x: number, y: number, text: string, kind: 'display' | 'body', size: number, color: string) =>
+      label(this, layer, x, y, text, kind, size, color);
     const w = 144;
     const gap = 12;
-    const x0 = cx - (buttons.length * w + (buttons.length - 1) * gap) / 2 + w / 2;
-    buttons.forEach(([text, hint, go, accent], i) => {
+    const x0 = VIEW_W / 2 - (this.gameOverOptions.length * w + (this.gameOverOptions.length - 1) * gap) / 2 + w / 2;
+    this.gameOverOptions.forEach(([text, hint, go, accent], i) => {
       put(x0 + i * (w + gap), 382, hint, 'body', 13, INK.dim);
       button(this, layer, {
         x: x0 + i * (w + gap),
@@ -1209,14 +1236,25 @@ export class GameScene extends Phaser.Scene {
         h: 40,
         text,
         size: 14,
-        selected: i === 0,
+        selected: i === this.gameOverSelection,
         accent,
         onClick: () => {
           if (this.time.now - this.overAt > 400) go();
         },
       });
     });
-    this.input.on('pointerdown', this.tapRestart, this);
+  }
+
+  private moveGameOverSelection(direction: number): void {
+    const count = this.gameOverOptions.length;
+    if (count === 0) return;
+    this.gameOverSelection = (this.gameOverSelection + direction + count) % count;
+    this.drawGameOverButtons();
+  }
+
+  private activateGameOverSelection(): void {
+    if (this.time.now - this.overAt <= 400) return;
+    this.gameOverOptions[this.gameOverSelection]?.[2]();
   }
 
   private tapRestart(_pointer?: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[] = []): void {

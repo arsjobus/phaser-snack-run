@@ -11,7 +11,7 @@ export const GAME_TITLE = 'CRUNCH 4x4 SNACK RUN';
 
 /** The people who made the game. */
 export const TEAM: readonly CreditLine[] = [
-  { role: 'GAME DESIGN AND CODE', names: ['arsjobus'] },
+  { role: 'GAME DESIGN AND CODE', names: ['Alexander Shepherd'] },
   { role: 'ART, MUSIC AND SOUND', names: ['Made in code for this project'] },
 ];
 

@@ -168,6 +168,15 @@ describe('RunModel', () => {
     expect(run.engineOn).toBe(false);
   });
 
+  it('ends the run as a wreck when the player rolls over', () => {
+    const terrain = new Terrain(1);
+    const run = new RunModel(1, terrain, START);
+    const events = run.wreck();
+    expect(run.over).toBe(true);
+    expect(run.endReason).toBe('wreck');
+    expect(events).toContainEqual({ type: 'over', reason: 'wreck' });
+  });
+
   it('lets a coasting truck be saved by a can, and ends the run after the coast timeout', () => {
     const terrain = new Terrain(2);
     const run = new RunModel(2, terrain, START);

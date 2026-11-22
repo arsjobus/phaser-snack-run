@@ -90,7 +90,7 @@ export const SCROLL_Y0 = BASE_Y - 40 - VIEW_H * CAMERA.yAnchor;
 export const GAMEPLAY = {
   /** Airtime (s) below which a landing is not announced. */
   minAirToast: 0.35,
-  /** Seconds stuck upside down before auto-recovery. */
+  /** Seconds stuck upside down before the player truck is wrecked. */
   flipRecoverTime: 2,
   startX: 200,
   flatStartPx: 900,

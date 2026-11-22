@@ -127,8 +127,8 @@ export interface ButtonSpec {
 }
 
 /**
- * A button. Idle: navy face with a steel rim. Selected: bright face, dark text, two flag-red
- * triangles on its sides. A lighter flat band across the top third gives the shape without a gradient.
+ * A button. Idle: navy face with a steel rim. Selected: bright face and dark text. A lighter flat
+ * band across the top third gives the shape without a gradient.
  */
 export function button(scene: Phaser.Scene, layer: Layer, b: ButtonSpec): void {
   const g = scene.add.graphics();
@@ -143,13 +143,6 @@ export function button(scene: Phaser.Scene, layer: Layer, b: ButtonSpec): void {
   g.fillRoundedRect(x + 3, y + 3, b.w - 6, b.h - 6, 7);
   g.fillStyle(tone(face, b.selected ? 0.28 : 0.08), 1);
   g.fillRoundedRect(x + 3, y + 3, b.w - 6, (b.h - 6) * 0.38, { tl: 7, tr: 7, bl: 0, br: 0 });
-  if (b.selected) {
-    g.fillStyle(UI.red, 1);
-    for (const s of [-1, 1]) {
-      const ax = b.x + s * (b.w / 2 + 12);
-      g.fillTriangle(ax + s * 6, b.y - 9, ax + s * 6, b.y + 9, ax - s * 7, b.y);
-    }
-  }
   layer.add(g);
   label(scene, layer, b.x, b.y + 1, b.text, 'display', b.size ?? 18, b.selected ? INK.dark : INK.soft);
   if (b.hint) label(scene, layer, x + b.w - 12, b.y + 1, b.hint, 'body', 13, b.selected ? '#3a2f00' : INK.dim, 1);
