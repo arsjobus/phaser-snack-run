@@ -430,6 +430,8 @@ export const STUNT = {
   landSlope: 0.4,
   /** Flat road after the landing ramp. */
   runout: 192,
+  /** Clear flat road after the stunt landing (metres). */
+  clearRunoutMeters: 100,
 
   // --- the surge ---
   /** Seconds a pad keeps the surge alive (the clock stops while airborne). */
@@ -449,9 +451,9 @@ export const STUNT = {
   /** Share of the pitch torque used to hold the truck level on the ground while surging. */
   stabilize: 1.6,
   /** Share of the player's landing assist that stays on in the air while surging (1 = all of it). */
-  airAssist: 0.15,
-  /** Largest pitch spin (rad/s) a launch can add by chance: the accidental flips. */
-  kick: 7,
+  airAssist: 1,
+  /** Launch spin is disabled so the truck consistently lands on its wheels. */
+  kick: 0,
 
   /** Snack arc over the pit, fitted to simulated flights (x from the lip, truck-centre height above the lip's ground). */
   arcX: [210, 305, 400, 495, 590, 685, 780, 875, 970, 1065, 1160, 1255],

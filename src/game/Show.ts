@@ -49,7 +49,7 @@ interface StageState {
 }
 
 /**
- * The player's run through the stages: boost pads, the launch (with its chance spin), the
+ * The player's run through the stages: boost pads, a stable launch, the
  * pyrotechnics and the sky show cues, the landing and what it pays, and the grace period in which
  * bumps do no damage. Pure TypeScript; the scene calls `step` once per physics substep and reads
  * the events once per frame.

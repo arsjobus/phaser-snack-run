@@ -227,6 +227,7 @@ export class WreckField {
     const jitter = this.rng.range(-60, 60);
     const style = this.rng.int(0, RIVAL_STYLES.length - 1);
     let lane = this.rng.int(0, LANES.count - 1);
+    if (p.clearRunout) return;
     if (roll > this.chance((mid - this.startX) / PX_PER_METER)) return;
 
     let x = mid + jitter;

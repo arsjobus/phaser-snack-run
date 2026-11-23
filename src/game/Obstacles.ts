@@ -299,6 +299,7 @@ export class ObstacleField {
     const lanes = [this.rng.next(), this.rng.next()];
     const sideJitter = this.rng.range(50, 110);
 
+    if (p.clearRunout) return;
     const meters = (mid - this.startX) / PX_PER_METER;
     if (roll > this.chance(meters)) return;
     let x = mid + jitter;

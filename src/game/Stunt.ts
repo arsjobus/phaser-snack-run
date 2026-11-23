@@ -201,8 +201,9 @@ export function padAt(layout: StuntLayout, x: number): PadSpot | null {
   return null;
 }
 
-/** Spin (rad/s, signed) a launch adds by chance. Seeded, so a daily course gives everyone the same luck. */
+/** Optional signed pitch spin (rad/s) added at launch; disabled for fair stunt landings. */
 export function launchKick(seed: number, index: number): number {
+  if (STUNT.kick === 0) return 0;
   const rng = new Rng(((seed ^ 0x2545f491) + index * 0x9e3779b1) >>> 0);
   rng.next();
   return (rng.next() * 2 - 1) * STUNT.kick;

@@ -1,4 +1,4 @@
-import { BASE_Y, GAMEPLAY, PX_PER_METER, TERRAIN_STEP } from '../config';
+import { BASE_Y, GAMEPLAY, PX_PER_METER, STUNT, TERRAIN_STEP } from '../config';
 import { Rng } from './Rng';
 import { nextStuntAfter, stuntOffsets } from './Stunt';
 
@@ -15,6 +15,8 @@ export interface TerrainPiece {
   lipX: number;
   /** For a 'stunt' piece: the checkpoint index the stage leads up to. */
   stage?: number;
+  /** Flat recovery road reserved after a stunt landing; obstacle and wreck spawners skip it. */
+  clearRunout?: boolean;
 }
 
 export const JUMP_KINDS: readonly PieceKind[] = ['ramp', 'table', 'stunt'];
@@ -29,6 +31,7 @@ export class Terrain {
   private originX = 0;
   private rng: Rng;
   private lastKind: PieceKind = 'flat';
+  private clearRunoutEndX = -Infinity;
   /** Chunks in generation order; pruned together with the samples. */
   readonly pieces: TerrainPiece[] = [];
 
@@ -108,6 +111,12 @@ export class Terrain {
   }
 
   private appendPiece(): void {
+    if (this.endX < this.clearRunoutEndX) {
+      const x0 = this.endX;
+      while (this.endX < this.clearRunoutEndX) this.heights.push(BASE_Y);
+      this.pieces.push({ kind: 'flat', x0, x1: this.endX, liftX: x0, lipX: x0, clearRunout: true });
+      return;
+    }
     const stage = nextStuntAfter(this.endX, this.courseStart);
     if (this.endX >= stage.x0) {
       this.appendStage(stage.x0);
@@ -146,6 +155,7 @@ export class Terrain {
     this.lastKind = 'stunt';
     const stage = nextStuntAfter(x0, this.courseStart);
     this.pieces.push({ kind: 'stunt', x0, x1: this.endX, liftX: stage.lipX, lipX: stage.lipX, stage: stage.index });
+    this.clearRunoutEndX = stage.landEndX + STUNT.clearRunoutMeters * PX_PER_METER;
   }
 
   private pickKind(): PieceKind {

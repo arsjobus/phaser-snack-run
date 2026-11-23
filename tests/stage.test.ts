@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BASE_Y, BIOMES, GAMEPLAY, PHYSICS, STUNT, TERRAIN_STEP } from '../src/config';
+import { BASE_Y, BIOMES, GAMEPLAY, PHYSICS, PX_PER_METER, STUNT, TERRAIN_STEP } from '../src/config';
+import { ObstacleField } from '../src/game/Obstacles';
 import { SKY_WORD, SkyShow, skyDots } from '../src/game/Fireworks';
 import { ParticleSystem, type Particle } from '../src/game/Particles';
 import { PickupField } from '../src/game/Pickups';
@@ -8,6 +9,7 @@ import { RunModel } from '../src/game/Run';
 import { StageLocator, StuntShow, type ShowEvent } from '../src/game/Show';
 import { Terrain } from '../src/game/Terrain';
 import { TruckPhysics } from '../src/game/TruckPhysics';
+import { WreckField } from '../src/game/Wrecks';
 import { fitsWindow, isStuntCheckpoint, launchKick, padAt, stuntLayout, stuntLength, stuntOffsets } from '../src/game/Stunt';
 
 const START = GAMEPLAY.startX;
@@ -27,6 +29,8 @@ function drive(opts: { startSpeed?: number; seed?: number; kickOff?: boolean; se
   const events: ShowEvent[] = [];
   let top = 0;
   let landSpeed = 0;
+  let landAngle = 0;
+  let landedOnWheels = false;
   let t = 0;
   for (let i = 0; i < (opts.seconds ?? 14) / DT; i++) {
     terrain.ensure(truck.x + 1500);
@@ -34,12 +38,16 @@ function drive(opts: { startSpeed?: number; seed?: number; kickOff?: boolean; se
     show.step(DT, truck, terrain);
     for (const e of show.drain()) {
       events.push(e);
-      if (e.type === 'landed') landSpeed = truck.speed;
+      if (e.type === 'landed') {
+        landSpeed = truck.speed;
+        landAngle = truck.angle;
+        landedOnWheels = truck.wheelContacts.some((wheel) => wheel.inContact);
+      }
     }
     top = Math.max(top, truck.speed);
     t += DT;
   }
-  return { layout, terrain, show, truck, events, top, landSpeed, t };
+  return { layout, terrain, show, truck, events, top, landSpeed, landAngle, landedOnWheels, t };
 }
 
 describe('stage layout', () => {
@@ -127,6 +135,29 @@ describe('stage terrain', () => {
     expect(Math.abs(t.slopeAt(l.lipX + 40))).toBeGreaterThan(1.5); // but behind it the ground falls away
     expect(Math.abs(t.slopeAt((l.landX1 + l.landEndX) / 2))).toBeLessThanOrEqual(STUNT.landSlope + 0.05);
   });
+
+  it('keeps 150 metres of flat, hazard-free road after each stunt landing', () => {
+    const seed = 12;
+    const terrain = new Terrain(seed);
+    const layout = stuntLayout(2);
+    const clearEndX = layout.landEndX + STUNT.clearRunoutMeters * PX_PER_METER;
+    terrain.ensure(clearEndX);
+    const runout = terrain.pieces.find((piece) => piece.clearRunout)!;
+    expect(runout.x0).toBe(layout.x1);
+    expect(runout.x1).toBe(clearEndX);
+    for (let x = layout.x1; x <= clearEndX; x += TERRAIN_STEP) {
+      expect(terrain.heightAt(x)).toBe(BASE_Y);
+      expect(terrain.slopeAt(x)).toBeCloseTo(0, 6);
+    }
+
+    const wrecks = new WreckField(seed, terrain, START);
+    const obstacles = new ObstacleField(seed, terrain, START, wrecks);
+    wrecks.canBlock = (x, lane) => obstacles.canBlock(x, lane);
+    wrecks.sync();
+    obstacles.sync();
+    expect(wrecks.items.some((wreck) => wreck.x >= layout.landEndX && wreck.x <= clearEndX)).toBe(false);
+    expect(obstacles.items.some((obstacle) => obstacle.x >= layout.landEndX && obstacle.x <= clearEndX)).toBe(false);
+  });
 });
 
 describe('boost pads and the surge', () => {
@@ -202,13 +233,21 @@ describe('the show jump', () => {
     );
   });
 
-  it('spins the truck by chance at the launch: some courses flip, most do not, and it is seeded', () => {
+  it('lands upright on its wheels throughout the big jump for every seed and approach speed', () => {
+    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
+      for (const startSpeed of [0, 250, 600, 900]) {
+        const { events, landAngle, landedOnWheels } = drive({ seed, startSpeed });
+        const landed = events.find((event) => event.type === 'landed');
+        expect(landed && landed.type === 'landed' && landed.flips).toBe(0);
+        expect(Math.abs(landAngle)).toBeLessThan(Math.PI / 2);
+        expect(landedOnWheels).toBe(true);
+      }
+    }
+  });
+
+  it('does not add randomized spin at the launch', () => {
     const spins = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((s) => launchKick(s, 2));
-    expect(spins.every((k) => Math.abs(k) <= STUNT.kick)).toBe(true);
-    expect(launchKick(3, 2)).toBe(launchKick(3, 2));
-    expect(launchKick(3, 2)).not.toBe(launchKick(3, 4));
-    expect(spins.some((k) => Math.abs(k) > STUNT.kick * 0.7)).toBe(true);
-    expect(spins.some((k) => Math.abs(k) < STUNT.kick * 0.3)).toBe(true);
+    expect(spins).toEqual(Array(12).fill(0));
   });
 
   it('is immune to bumps while surging and for the grace period after, not later', () => {
