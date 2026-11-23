@@ -241,6 +241,19 @@ The original was pseudo-3D: a wide dirt field with trucks driving at different d
   - **Done:** a seeded random spin at the launch (measured over 60 seeds: about one jump in four flips, one in six ends on its roof, over nine in ten clear the pit), a weaker air assist while surging, no bump damage during the show and 2.5 s after, and the crew rights a truck left on its roof. CRUNCH is written by six rockets (dot-matrix letters that glide into place, twinkle and fade) with a finale of shells; +1000 for the clear, +150 per car, +500 per flip. Timed so the letters appear while the truck is over the pit.
   - **Not yet checked by eye:** the look and feel in a browser (pad art, pyro, letter size and timing). Tune `STUNT` in `config.ts`.
 
+### Phase 9.5: Change Requests and Feedback
+
+- [ ] The spectacle of the player jumping the big ramp over the cars needs to show to the player better. I tried to have the camera center on and follow the player's vehicle as it starts going up the ramp but it still seems like the players flies over the ramp so fast they cannot really enjoy the spectacle and they get a short glimpse of the fireworks shooting to spell CRUNCH in the air and the cars below. I'm not sure but feels like the camera isn't centered on the vehicle still and the entire experience needs to be polished more.
+- [ ] The time to reach the first check point is about 1 minute so 1 minute and 30 seconds to make it to the first checkpoint would be the good challenge. based off the feedback that the player can make it to the first checkpoint in about 1 minute then adjust time for every other checkpoint to keep this challenging but doable for the player
+- [ ] Make the loading screen have the similar theme as the rest of the game
+- [ ] In the settings menu, the Back button looks like any other button and it doesn't stand out. This makes it confusing and hard to navigate back out of the settings menu for the player. the Credits menu has a Back button too that I think we should copy and ensure they both keep the same look and style.
+- [ ] I feel like the unlockable upgrades were too easy to collect enough "coins" to unlock. Same for the paint jobs but we don't want to make the player spend months to unlock everything either.
+- [ ] In the Garage, those bank "coins" displayed to the player should have an icon next to them that best represents the points
+- [ ] On the Achievements screen, the listed achievements could use better padding / margins between them but when changing then make sure that other menus follow the same standards.
+- [ ] The only way to get to the Daily run is from the game over screen, and I don't think that mode adds anything to be desired so scrap it and mention of it in the game
+- [ ] On the start screen, you can see a sliver over the start sign on the left side of the screen, but wouldn't it be better displayed on the right side in full view and not partially outside the screen?
+- [ ] The water holes or puddles should only be placed snuggly upon flat surface or within depression on the track - not outside the track where the vehicles drive and not on slopes either.
+
 ---
 
 ## 6. Balance Cheat Sheet (starting values to tune)
