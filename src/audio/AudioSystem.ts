@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { AUDIO } from '../config';
 import { BIOME_LIST } from '../game/Biomes';
-import { engineFreq, midiToHz, snackNote, speedNorm } from './Mix';
+import { engineFreq, snackNote, speedNorm } from './Mix';
+import { SFX, sfxCacheKey, type SfxKey } from './sfx';
 
 /** What the audio needs to know each frame. */
 export interface AudioState {
@@ -20,9 +21,9 @@ export interface AudioState {
 }
 
 /**
- * Music comes from the bgm.mp3 audio asset. One-shot and engine sounds are synthesized at runtime:
- *  - synthesized engine, mud-roll hiss and stingers;
- *  - one-shot SFX: pickups, crunches, landings, warnings.
+ * Music comes from the bgm.mp3 audio asset and every one-shot sound effect from its own mp3 in
+ * public/audio (see `sfx.ts`), so they can be edited or swapped. Only the engine and the mud-roll
+ * hiss are still synthesized at runtime, because they are continuous and follow speed.
  * Everything feeds Phaser's master mute node, so M mutes it all. The context stays suspended until
  * the first key press or tap; until then every call here is a no-op.
  */
@@ -32,6 +33,8 @@ export class AudioSystem {
   private musicOn = true;
   private musicVol: number = AUDIO.musicVolume;
   private noise: AudioBuffer | null = null;
+  private cache: Phaser.Cache.CacheManager | null = null;
+  private buffers = new Map<SfxKey, AudioBuffer>();
   private bgm: (Phaser.Sound.BaseSound & { setVolume(value: number): void }) | null = null;
 
   private sfx: GainNode | null = null;
@@ -42,6 +45,7 @@ export class AudioSystem {
     if (!(sound instanceof Phaser.Sound.WebAudioSoundManager)) return;
     const ctx = sound.context;
     this.ctx = ctx;
+    this.cache = sound.game.cache;
 
     this.sfx = ctx.createGain();
     this.sfx.gain.value = AUDIO.sfxVolume;
@@ -83,15 +87,6 @@ export class AudioSystem {
     }
 
     this.updateEngine(s, now);
-  }
-
-  /** Bright checkpoint stinger over the music, in the current key. */
-  stinger(): void {
-    if (!this.live) return;
-    const root = 69;
-    [0, 4, 7, 12, 16].forEach((n, i) => {
-      this.blip('square', midiToHz(root + n), 0.2, 0.1, i * 0.07);
-    });
   }
 
   // ---- engine ---------------------------------------------------------------------------------
@@ -142,146 +137,93 @@ export class AudioSystem {
     r.gain.gain.setTargetAtTime(s.grounded && !s.over ? 0.18 * n : 0, now, 0.1);
   }
 
-  // ---- one-shot SFX ---------------------------------------------------------------------------
+  // ---- one-shot SFX (mp3 files, see sfx.ts) -----------------------------------------------------
 
   /** Pickup chime that climbs the scale with the combo. */
   snack(multiplier: number): void {
-    if (!this.live) return;
-    const f = midiToHz(snackNote(multiplier));
-    this.blip('triangle', f, 0.12, 0.16, 0);
-    this.blip('sine', f * 2, 0.08, 0.05, 0);
+    this.play('snack', { rate: 2 ** ((snackNote(multiplier) - 79) / 12) });
   }
 
   /** Fuel can: a gurgle plus two blips. */
   fuel(): void {
-    if (!this.live) return;
-    this.noiseHit(this.ctx!.currentTime, 0.35, 0.35, 'bandpass', 600, this.sfx!, 300, 1000);
-    this.blip('triangle', 392, 0.12, 0.14, 0.05);
-    this.blip('triangle', 523, 0.2, 0.14, 0.15);
+    this.play('fuel');
   }
 
   /** Landing thump, scaled by air time. */
   land(airTime: number): void {
-    if (!this.live || airTime < 0.15) return;
-    const t = this.ctx!.currentTime;
-    const power = Math.min(1, 0.25 + airTime * 0.8);
-    const o = this.osc('sine', 130, t, this.sfx!, 0.0001);
-    o.osc.frequency.exponentialRampToValueAtTime(45, t + 0.18);
-    this.env(o.gain, t, 0.003, 0.22, 0.6 * power);
-    o.osc.stop(t + 0.25);
-    this.noiseHit(t, 0.14, 0.3 * power, 'lowpass', 900, this.sfx!);
+    if (airTime < 0.15) return;
+    this.play('land', { gain: Math.min(1, 0.25 + airTime * 0.8) });
   }
 
   /** Crunch for a bump: a short dull knock, or a long metal crunch for a hard hit. */
   thud(hard: boolean): void {
-    if (!this.live) return;
-    const t = this.ctx!.currentTime;
-    this.noiseHit(t, hard ? 0.3 : 0.1, hard ? 0.55 : 0.25, hard ? 'bandpass' : 'lowpass', hard ? 1800 : 700, this.sfx!);
-    const o = this.osc(hard ? 'sawtooth' : 'sine', hard ? 90 : 110, t, this.sfx!, 0.0001);
-    o.osc.frequency.exponentialRampToValueAtTime(hard ? 45 : 70, t + 0.2);
-    this.env(o.gain, t, 0.003, hard ? 0.25 : 0.12, hard ? 0.35 : 0.3);
-    o.osc.stop(t + 0.3);
+    this.play(hard ? 'thudHard' : 'thudSoft');
   }
 
   /** Two quick notes for a wrench. */
   wrench(): void {
-    if (!this.live) return;
-    this.blip('triangle', 520, 0.08, 0.13, 0);
-    this.blip('triangle', 780, 0.14, 0.13, 0.08);
+    this.play('wrench');
   }
 
   /** Short fanfare for a takedown. */
   takedown(): void {
-    if (!this.live) return;
-    [440, 554, 660, 880].forEach((f, i) => this.blip('square', f, i === 3 ? 0.24 : 0.09, 0.14, i * 0.08));
+    this.play('takedown');
   }
 
   /** Rising three-note chime for a checkpoint (the score stings alongside it). */
   checkpoint(): void {
-    if (!this.live) return;
-    this.blip('triangle', 660, 0.12, 0.14, 0);
-    this.blip('triangle', 880, 0.12, 0.14, 0.1);
-    this.blip('triangle', 1320, 0.26, 0.14, 0.2);
-    this.stinger();
+    this.play('checkpoint');
   }
 
   /** A quick tire "swish" for a lane change. */
   swerve(): void {
-    if (!this.live) return;
-    this.noiseHit(this.ctx!.currentTime, 0.16, 0.22, 'bandpass', 900, this.sfx!, 500, 1800);
+    this.play('swerve');
   }
 
   /** Bright two-step chime for a dodge, an achievement or a purchase. */
   reward(): void {
-    if (!this.live) return;
-    this.blip('triangle', 784, 0.1, 0.13, 0);
-    this.blip('triangle', 1175, 0.2, 0.13, 0.09);
+    this.play('reward');
   }
 
   /** Low-fuel warning, once per blink of the HUD dial. */
   lowFuel(): void {
-    if (!this.live) return;
-    this.blip('square', 880, 0.09, 0.12, 0);
+    this.play('lowFuel');
   }
 
   /** The engine coughs as the tank runs dry. */
   empty(): void {
-    if (!this.live) return;
-    [110, 96, 80, 62].forEach((f, i) => this.blip('square', f, 0.12, 0.3, [0, 0.18, 0.4, 0.75][i]));
+    this.play('empty');
   }
 
   /** A boost pad: a rocket whoosh that climbs with each pad of the stage. */
   boost(count: number): void {
-    if (!this.live) return;
-    const t = this.ctx!.currentTime;
     const up = Math.min(5, Math.max(1, count));
-    this.noiseHit(t, 0.5, 0.5, 'bandpass', 700 + up * 260, this.sfx!, 400, 3200);
-    const o = this.osc('sawtooth', 110 + up * 30, t, this.sfx!, 0.0001);
-    o.osc.frequency.exponentialRampToValueAtTime(380 + up * 90, t + 0.35);
-    this.env(o.gain, t, 0.01, 0.4, 0.22);
-    o.osc.stop(t + 0.45);
+    this.play('boost', { rate: 2 ** ((up - 3) * 0.12) });
   }
 
   /** A pyro jet: a low whump and a hiss. */
   pyro(): void {
-    if (!this.live) return;
-    const t = this.ctx!.currentTime;
-    const o = this.osc('sine', 90, t, this.sfx!, 0.0001);
-    o.osc.frequency.exponentialRampToValueAtTime(38, t + 0.3);
-    this.env(o.gain, t, 0.004, 0.35, 0.7);
-    o.osc.stop(t + 0.4);
-    this.noiseHit(t, 0.9, 0.35, 'highpass', 2500, this.sfx!);
+    this.play('pyro');
   }
 
-  /** A rocket going up: a rising whistle. */
+  /** A rocket going up: a rising whistle (pitch varies a little each time). */
   rocket(): void {
-    if (!this.live) return;
-    const t = this.ctx!.currentTime;
-    const o = this.osc('sine', 500 + Math.random() * 200, t, this.sfx!, 0.0001);
-    o.osc.frequency.exponentialRampToValueAtTime(2400, t + 0.65);
-    this.env(o.gain, t, 0.02, 0.6, 0.08);
-    o.osc.stop(t + 0.7);
+    this.play('rocket', { rate: 0.85 + Math.random() * 0.3 });
   }
 
   /** A shell bursting: a crack and a crackle (loud for a letter, quieter for the finale). */
   burst(loud = true): void {
-    if (!this.live) return;
-    const t = this.ctx!.currentTime;
-    this.noiseHit(t, loud ? 0.45 : 0.3, loud ? 0.55 : 0.3, 'bandpass', 2200, this.sfx!, 4000, 600);
-    this.noiseHit(t + 0.08, 0.25, 0.2, 'highpass', 5000, this.sfx!);
+    this.play('burst', { gain: loud ? 1 : 0.55 });
   }
 
   /** Fanfare for a landed show jump. */
   showLanded(): void {
-    if (!this.live) return;
-    [523, 659, 784, 1047].forEach((f, i) => this.blip('square', f, i === 3 ? 0.4 : 0.1, 0.13, i * 0.09));
-    this.stinger();
+    this.play('showLanded');
   }
 
   /** Descending "wah-wah" when the run ends. */
   gameOver(): void {
-    if (!this.live) return;
-    [64, 62, 60, 57].forEach((m, i) => this.blip('sawtooth', midiToHz(m), i === 3 ? 0.7 : 0.28, 0.14, i * 0.3));
+    this.play('gameOver');
   }
 
   // ---- plumbing -------------------------------------------------------------------------------
@@ -312,60 +254,30 @@ export class AudioSystem {
     this.roll = null;
   }
 
-  private osc(type: OscillatorType, freq: number, t: number, out: AudioNode, startGain: number) {
-    const ctx = this.ctx!;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, t);
-    gain.gain.setValueAtTime(startGain, t);
-    osc.connect(gain);
-    gain.connect(out);
-    osc.start(t);
-    return { osc, gain };
-  }
-
-  /** Quick attack, exponential decay to silence over `dur`. */
-  private env(g: GainNode, t: number, attack: number, dur: number, peak: number): void {
-    g.gain.cancelScheduledValues(t);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(peak, t + attack);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(attack + 0.01, dur));
-  }
-
-  /** One short tone on the SFX bus (not filtered by the low-fuel muffle). */
-  private blip(type: OscillatorType, freq: number, dur: number, vol: number, delay: number): void {
-    const t = this.ctx!.currentTime + delay;
-    const o = this.osc(type, freq, t, this.sfx!, 0.0001);
-    this.env(o.gain, t, 0.005, dur, vol);
-    o.osc.stop(t + dur + 0.03);
-  }
-
-  /** A burst of filtered white noise; optionally sweeping the filter from `f` to `fTo`. */
-  private noiseHit(
-    t: number,
-    dur: number,
-    vol: number,
-    type: BiquadFilterType,
-    f: number,
-    out: AudioNode,
-    sweepFrom?: number,
-    sweepTo?: number,
-  ): void {
+  /** Play one of the sfx mp3s on the SFX bus. `rate` shifts pitch, `gain` scales the manifest volume. */
+  private play(key: SfxKey, opts: { rate?: number; gain?: number } = {}): void {
+    if (!this.live) return;
+    const buffer = this.buffer(key);
+    if (!buffer) return;
     const ctx = this.ctx!;
     const src = ctx.createBufferSource();
-    src.buffer = this.noise;
-    const filter = ctx.createBiquadFilter();
-    filter.type = type;
-    filter.frequency.setValueAtTime(sweepFrom ?? f, t);
-    if (sweepTo !== undefined) filter.frequency.linearRampToValueAtTime(sweepTo, t + dur);
+    src.buffer = buffer;
+    src.playbackRate.value = opts.rate ?? 1;
     const gain = ctx.createGain();
-    src.connect(filter);
-    filter.connect(gain);
-    gain.connect(out);
-    this.env(gain, t, 0.002, dur, vol);
-    src.start(t, Math.random() * 0.5);
-    src.stop(t + dur + 0.03);
+    gain.gain.value = SFX[key].volume * (opts.gain ?? 1);
+    src.connect(gain);
+    gain.connect(this.sfx!);
+    src.start();
+  }
+
+  /** The decoded mp3 of a sound effect, or null if it failed to load (the game then plays it silent). */
+  private buffer(key: SfxKey): AudioBuffer | null {
+    const cached = this.buffers.get(key);
+    if (cached) return cached;
+    const buf: unknown = this.cache?.audio.get(sfxCacheKey(key));
+    if (!(buf instanceof AudioBuffer)) return null;
+    this.buffers.set(key, buf);
+    return buf;
   }
 
   private makeNoise(ctx: AudioContext): AudioBuffer {

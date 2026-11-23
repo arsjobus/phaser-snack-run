@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { ART, TRUCK } from '../config';
 import { makeBackdrops } from '../art/backdrops';
+import { SFX_KEYS, sfxCacheKey, sfxUrl } from '../audio/sfx';
 import {
   OBSTACLE_ART,
   OBSTACLE_VARIANTS,
@@ -27,6 +28,7 @@ export class BootScene extends Phaser.Scene {
 
   preload(): void {
     this.load.audio('bgm', 'audio/bgm.mp3');
+    for (const key of SFX_KEYS) this.load.audio(sfxCacheKey(key), sfxUrl(key));
   }
 
   create(): void {
