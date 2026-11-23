@@ -396,6 +396,7 @@ export class GameScene extends Phaser.Scene {
     if (this.paused) {
       if (J(this.keys.ESC) || pad.start) {
         this.paused = false;
+        this.audio.setPaused(false);
         this.pauseLayer?.destroy();
         this.pauseLayer = null;
       }
@@ -1179,6 +1180,7 @@ export class GameScene extends Phaser.Scene {
 
   private showPause(): void {
     this.paused = true;
+    this.audio.setPaused(true);
     const layer = this.add.container(0, 0).setScrollFactor(0).setDepth(30);
     layer.add(this.add.rectangle(VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, 0x07121b, 0.72));
     layer.add(

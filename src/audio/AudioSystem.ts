@@ -30,11 +30,14 @@ export interface AudioState {
 export class AudioSystem {
   private ctx: AudioContext | null = null;
   private stopped = false;
+  private paused = false;
   private musicOn = true;
   private musicVol: number = AUDIO.musicVolume;
+  private sfxVol: number = AUDIO.sfxVolume;
   private noise: AudioBuffer | null = null;
   private cache: Phaser.Cache.CacheManager | null = null;
   private buffers = new Map<SfxKey, AudioBuffer>();
+  private activeSfx = new Set<AudioBufferSourceNode>();
   private bgm: (Phaser.Sound.BaseSound & { setVolume(value: number): void }) | null = null;
 
   private sfx: GainNode | null = null;
@@ -59,14 +62,25 @@ export class AudioSystem {
   }
 
   private get live(): boolean {
-    return this.ctx !== null && this.ctx.state === 'running' && !this.stopped;
+    return this.ctx !== null && this.ctx.state === 'running' && !this.stopped && !this.paused;
   }
 
   /** The player's music and SFX volume settings (0..1 each, on top of the mix in `AUDIO`). */
   setLevels(music: number, sfx: number): void {
     this.musicVol = AUDIO.musicVolume * music;
-    if (this.sfx) this.sfx.gain.value = AUDIO.sfxVolume * sfx;
+    this.sfxVol = AUDIO.sfxVolume * sfx;
+    if (this.sfx) this.sfx.gain.value = this.paused ? 0 : this.sfxVol;
     this.bgm?.setVolume(this.musicOn ? this.musicVol : 0);
+  }
+
+  /** Silence and stop effects while leaving the background music untouched. */
+  setPaused(paused: boolean): void {
+    this.paused = paused;
+    if (this.sfx) this.sfx.gain.value = paused ? 0 : this.sfxVol;
+    if (paused) {
+      for (const source of this.activeSfx) source.stop();
+      this.activeSfx.clear();
+    }
   }
 
   /** M-independent switch for just the music (N key). Returns the new state. */
@@ -232,6 +246,8 @@ export class AudioSystem {
   dispose(): void {
     this.stopped = true;
     this.bgm?.stop();
+    for (const source of this.activeSfx) source.stop();
+    this.activeSfx.clear();
     const ctx = this.ctx;
     if (!ctx) return;
     const t = ctx.currentTime;
@@ -267,6 +283,8 @@ export class AudioSystem {
     gain.gain.value = SFX[key].volume * (opts.gain ?? 1);
     src.connect(gain);
     gain.connect(this.sfx!);
+    this.activeSfx.add(src);
+    src.onended = () => this.activeSfx.delete(src);
     src.start();
   }
 
