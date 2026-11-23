@@ -2,8 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-    <title>4x4 Snack Run</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, user-scalable=no"
+    />
+    <title>4x4 CRUNCH</title>
     <link rel="icon" href="data:," />
     <style>
       html,
@@ -17,10 +20,56 @@
         width: 100%;
         height: 100%;
       }
+      #loading-screen {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        display: grid;
+        place-content: center;
+        gap: 18px;
+        padding: 24px;
+        color: #ffe066;
+        background: #1b1209;
+        font:
+          700 20px system-ui,
+          sans-serif;
+        text-align: center;
+      }
+      #loading-screen[hidden] {
+        display: none;
+      }
+      #loading-track {
+        width: min(280px, 70vw);
+        height: 8px;
+        overflow: hidden;
+        border: 1px solid #80613a;
+        border-radius: 999px;
+        background: #302316;
+      }
+      #loading-progress {
+        width: 0;
+        height: 100%;
+        background: #ffe066;
+        transition: width 120ms ease-out;
+      }
     </style>
   </head>
   <body>
     <div id="game"></div>
+    <div id="loading-screen" role="status" aria-live="polite">
+      <div>4x4 CRUNCH</div>
+      <div id="loading-label">Loading game... 0%</div>
+      <div
+        id="loading-track"
+        role="progressbar"
+        aria-label="Game loading"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+      >
+        <div id="loading-progress"></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

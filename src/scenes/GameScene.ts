@@ -436,7 +436,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.acc += dt;
     let steps = 0;
-    while (this.acc >= FIXED_DT && steps < 40) {
+    while (this.acc >= FIXED_DT && steps < 40 && !this.run.over) {
       this.terrain.ensure(this.truck.x + VIEW_W + 1500);
       const ev = this.truck.step(FIXED_DT, input, this.terrain);
       if (!this.run.over) this.stunt.step(FIXED_DT, this.truck, this.terrain);
@@ -445,7 +445,7 @@ export class GameScene extends Phaser.Scene {
       this.acc -= FIXED_DT;
       steps++;
     }
-    if (steps === 40) this.acc = 0;
+    if (this.run.over || steps === 40) this.acc = 0;
     this.terrain.prune(this.truck.x - 1800);
     for (const e of this.stunt.drain()) this.onShowEvent(e);
 
@@ -1501,7 +1501,7 @@ export class GameScene extends Phaser.Scene {
       .setColor(pos.place === 1 ? '#ffe066' : '#ffffff');
 
     const lines: string[] = [];
-    if (t.airTime > 0) lines.push(`AIR ${t.airTime.toFixed(2)}s   BEST ${this.bestAir.toFixed(2)}s`);
+    if (!r.over && t.airTime > 0) lines.push(`AIR ${t.airTime.toFixed(2)}s   BEST ${this.bestAir.toFixed(2)}s`);
     if (this.debug) {
       lines.push(
         `angle ${t.angle.toFixed(2)}  vy ${t.vy.toFixed(0)}  grounded ${t.grounded}`,
