@@ -11,9 +11,18 @@ export function segmentMeters(index: number): number {
   return CHECKPOINT.firstMeters + (index - 1) * CHECKPOINT.growthMeters;
 }
 
-/** Clock time granted for the segment that ends at checkpoint `index`. */
+/** How generous the clock is for the segment that ends at checkpoint `index` (1.5x a good player's time at first, then tighter). */
+export function segmentSlack(index: number): number {
+  return Math.max(CHECKPOINT.slackFloor, CHECKPOINT.slackFirst - CHECKPOINT.slackStep * (index - 1));
+}
+
+/**
+ * Clock time granted for the segment that ends at checkpoint `index`: what a good player needs
+ * for its length, times the slack. The first is 90 s; the later ones stay a fixed share above
+ * what the same player needs, so the clock keeps its teeth.
+ */
 export function segmentSeconds(index: number): number {
-  return segmentMeters(index) / CHECKPOINT.paceMps;
+  return (segmentMeters(index) / CHECKPOINT.playerMps) * segmentSlack(index);
 }
 
 export type CheckpointEvent =
@@ -21,13 +30,13 @@ export type CheckpointEvent =
   | { type: 'timeup' };
 
 /**
- * The checkpoint clock. Counts down while driving; reaching the next checkpoint banks the time
+ * The checkpoint clock. Counts down while driving; reaching the next checkpoint banks (up to a cap) the time
  * left, adds the next segment's allowance and pays a bonus. Pure TypeScript.
  */
 export class CheckpointTrack {
   /** Checkpoints reached so far. */
   reached = 0;
-  timeLeft = segmentSeconds(1) + CHECKPOINT.startBuffer;
+  timeLeft = segmentSeconds(1);
   timedOut = false;
 
   get nextIndex(): number {
@@ -59,7 +68,9 @@ export class CheckpointTrack {
         CHECKPOINT.basePoints + this.timeLeft * CHECKPOINT.pointsPerSecondLeft,
       );
       const timeAdded = segmentSeconds(index + 1);
-      this.timeLeft += timeAdded;
+      // The BONUS pays for every second left, but only `carryCap` of them roll into the next
+      // segment, so a long lead early on cannot make the clock meaningless later.
+      this.timeLeft = Math.min(this.timeLeft, CHECKPOINT.carryCap) + timeAdded;
       this.reached = index;
       events.push({ type: 'reached', index, timeAdded, points });
     }

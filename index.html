@@ -9,11 +9,25 @@
     <title>CRUNCH 4x4 - Off-Road Racing</title>
     <link rel="icon" href="data:," />
     <style>
+      /* The loading screen wears the game's own look (src/ui/Theme.ts): navy panel, steel rim,
+         logo-plate yellow, hazard stripes on top, a checkered edge below, Russo One and Rajdhani. */
+      @font-face {
+        font-family: "Russo One";
+        src: url("fonts/russo-one-latin-400-normal.woff2") format("woff2");
+        font-weight: 400;
+        font-display: block;
+      }
+      @font-face {
+        font-family: "Rajdhani";
+        src: url("fonts/rajdhani-latin-700-normal.woff2") format("woff2");
+        font-weight: 700;
+        font-display: block;
+      }
       html,
       body {
         margin: 0;
         height: 100%;
-        background: #1b1209;
+        background: #0b1230;
         overflow: hidden;
       }
       #game {
@@ -26,30 +40,88 @@
         z-index: 1;
         display: grid;
         place-content: center;
-        gap: 18px;
+        justify-items: center;
+        gap: 22px;
         padding: 24px;
-        color: #ffe066;
-        background: #1b1209;
-        font:
-          700 20px system-ui,
-          sans-serif;
+        background: #0b1230;
+        color: #c9d3ee;
+        font: 700 20px "Rajdhani", "Arial Narrow", Arial, sans-serif;
         text-align: center;
       }
       #loading-screen[hidden] {
         display: none;
       }
-      #loading-track {
-        width: min(280px, 70vw);
-        height: 8px;
-        overflow: hidden;
-        border: 1px solid #80613a;
-        border-radius: 999px;
-        background: #302316;
+      /* hard-edged hazard stripes along the top, like the menus' title bar */
+      #loading-screen::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 18px;
+        border-bottom: 4px solid #0a0a10;
+        background: repeating-linear-gradient(
+          -45deg,
+          #f2c200 0 14px,
+          #0a0a10 14px 28px
+        );
       }
+      /* the checkered flag strip along the bottom */
+      #loading-screen::after {
+        content: "";
+        position: absolute;
+        inset: auto 0 0 0;
+        height: 20px;
+        background: repeating-conic-gradient(#ffffff 0 25%, #0a0a10 0 50%) 0 0 / 20px 20px;
+      }
+      #loading-logo {
+        display: grid;
+        gap: 4px;
+        padding: 14px 40px 12px;
+        border: 4px solid #0a0a10;
+        border-radius: 14px;
+        background: #f2c200;
+        box-shadow: 0 0 0 4px #8fa4d6;
+        font-family: "Russo One", "Arial Black", Impact, sans-serif;
+        font-weight: 400;
+      }
+      #loading-logo b {
+        font-weight: 400;
+        font-size: clamp(34px, 8vw, 64px);
+        line-height: 1;
+        color: #b83a1a;
+      }
+      #loading-logo span {
+        font-size: clamp(13px, 2.4vw, 18px);
+        letter-spacing: 0.12em;
+        color: #14224a;
+      }
+      #loading-label {
+        font-family: "Russo One", "Arial Black", Impact, sans-serif;
+        font-weight: 400;
+        font-size: 16px;
+        letter-spacing: 0.08em;
+        color: #ffe066;
+      }
+      #loading-track {
+        box-sizing: border-box;
+        width: min(340px, 72vw);
+        height: 22px;
+        padding: 3px;
+        overflow: hidden;
+        border: 3px solid #44558a;
+        border-radius: 7px;
+        background: #16224a;
+        box-shadow: 0 0 0 3px #0a0a10;
+      }
+      /* the fill uses the same flat stripes as the HUD's hazard edge, no gradient blend */
       #loading-progress {
         width: 0;
         height: 100%;
-        background: #ffe066;
+        border-radius: 3px;
+        background: repeating-linear-gradient(
+          -45deg,
+          #f2c200 0 9px,
+          #0a0a10 9px 18px
+        );
         transition: width 120ms ease-out;
       }
     </style>
@@ -57,8 +129,8 @@
   <body>
     <div id="game"></div>
     <div id="loading-screen" role="status" aria-live="polite">
-      <div>CRUNCH 4x4</div>
-      <div id="loading-label">Loading game... 0%</div>
+      <div id="loading-logo"><b>CRUNCH 4x4</b><span>OFF-ROAD RACING</span></div>
+      <div id="loading-label">LOADING 0%</div>
       <div
         id="loading-track"
         role="progressbar"

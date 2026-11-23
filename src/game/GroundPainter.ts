@@ -13,11 +13,13 @@ import {
   groundDetails,
   hash01,
   lensOutline,
+  puddleSite,
   ruttedAt,
   rutWobble,
   type Detail,
 } from './GroundDetail';
 import { laneLift, laneScale } from './Lanes';
+import { nextStuntAfter } from './Stunt';
 import type { Terrain } from './Terrain';
 
 type G = Phaser.GameObjects.Graphics;
@@ -238,6 +240,12 @@ export class GroundPainter {
     });
   }
 
+  /** True on (or just before) a show stage: its pads, ramps and pit leave no room for a puddle. */
+  private onStage(x: number): boolean {
+    const s = nextStuntAfter(x, this.startX);
+    return x >= s.x0 - 400;
+  }
+
   private details(biome: Biome, xa: number, xb: number): void {
     for (const d of groundDetails(biome.id, xa, xb, this.detail)) this.detailOne(biome, d);
   }
@@ -315,6 +323,8 @@ export class GroundPainter {
         // reflected sky. All three follow the terrain, so the pool bends with the hill under it.
         const w = (40 + d.seed * 38) * d.size * laneScale(d.f);
         const hh = 5 + d.seed * 4;
+        // Only on level ground or in a dip of the track (never on a slope, and not on the show stage).
+        if (!puddleSite((px) => this.h(px), x - w / 2 - 2, x + w / 2 + 2) || this.onStage(x)) break;
         const water = mixColor(biome.sky[1], c.crustShadow, biome.id === 'swamp' ? 0.55 : biome.id === 'snow' ? 0.05 : 0.32);
         this.patch(OUTLINE, 0.6, x - w / 2 - 2, x + w / 2 + 2, d.f, hh + 3);
         this.patch(water, 1, x - w / 2, x + w / 2, d.f, hh);

@@ -91,13 +91,6 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     check: (_s, r) => !!r && r.meters >= 5000,
   },
   {
-    id: 'daily1',
-    name: 'Daily Driver',
-    description: 'Finish a daily challenge run',
-    reward: 75,
-    check: (_s, r) => !!r && r.daily && r.endReason !== null,
-  },
-  {
     id: 'upgrade1',
     name: 'Garage Rat',
     description: 'Buy a garage upgrade',

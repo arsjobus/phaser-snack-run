@@ -13,11 +13,11 @@ import {
   type SaveData,
 } from '../progress/Progress';
 import { SKINS } from '../progress/Skins';
-import { dayKey } from '../progress/Daily';
+import { dayKey } from '../progress/Day';
 import { defaultStore, type KeyValueStore } from '../progress/Storage';
 import { PadEdges, firstPad, padButtons } from '../input/Gamepad';
-import { INK, UI, rowY, wrapIndex } from '../ui/Theme';
-import { bottomBar, button, flatBackdrop, label, panel, pips, rankBadge, rowPlate, topBar, type Layer } from '../ui/Ui';
+import { INK, LIST, UI, listRows, rowY, wrapIndex } from '../ui/Theme';
+import { bottomBar, button, coinIcon, flatBackdrop, label, panel, pips, rankBadge, rowPlate, topBar, type Layer } from '../ui/Ui';
 
 const TABS = ['UPGRADES', 'PAINT', 'SCORES', 'ACHIEVEMENTS'] as const;
 type Tab = (typeof TABS)[number];
@@ -25,7 +25,7 @@ type Tab = (typeof TABS)[number];
 /**
  * The garage (Phase 7): spend the snack bank on upgrades and paint, and look at the high scores,
  * lifetime stats and achievements. Reached with G from the game-over screen. Keys: Left/Right
- * switch tab, Up/Down pick a row, Enter buys or equips, Space drives, D starts the daily challenge,
+ * switch tab, Up/Down pick a row, Enter buys or equips, Space drives,
  * Esc goes back to the start screen. Taps and clicks work on tabs, rows and buttons too. Drawn with
  * the shared UI kit (`src/ui/`), so it matches the start screen and the settings.
  */
@@ -54,7 +54,7 @@ export class GarageScene extends Phaser.Scene {
     this.layer = this.add.container(0, 0);
     const kb = this.input.keyboard!;
     this.cursors = kb.createCursorKeys();
-    this.keys = kb.addKeys('SPACE,ENTER,ESC,G,D,A,W,S,O') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = kb.addKeys('SPACE,ENTER,ESC,G,A,W,S,O') as Record<string, Phaser.Input.Keyboard.Key>;
     kb.addCapture('UP,DOWN,LEFT,RIGHT,SPACE');
     this.draw();
   }
@@ -68,8 +68,7 @@ export class GarageScene extends Phaser.Scene {
     if (J(c.up) || J(this.keys.W)) this.move(-1);
     if (J(this.keys.ENTER)) this.activate();
     if (J(this.keys.O)) this.scene.start('Settings', { from: 'Garage' });
-    if (J(this.keys.D)) this.scene.start('Game', { daily: true });
-    if (J(this.keys.SPACE) || J(this.keys.G)) this.scene.start('Game', { daily: false });
+    if (J(this.keys.SPACE) || J(this.keys.G)) this.scene.start('Game');
     if (J(this.keys.ESC)) this.scene.start('Menu');
     const e = this.edges.update(padButtons(firstPad()));
     if (e.left) this.setTab(-1);
@@ -78,7 +77,6 @@ export class GarageScene extends Phaser.Scene {
     if (e.up) this.move(-1);
     if (e.confirm) this.activate();
     if (e.back) this.scene.start('Menu');
-    if (e.daily) this.scene.start('Game', { daily: true });
     if (e.settings) this.scene.start('Settings', { from: 'Garage' });
   }
 
@@ -133,7 +131,8 @@ export class GarageScene extends Phaser.Scene {
   private draw(): void {
     this.layer.removeAll(true);
     topBar(this, this.layer, 'GARAGE');
-    this.text(VIEW_W - 28, 30, `BANK ${this.save.coins}`, 22, INK.good, 1, true);
+    this.text(VIEW_W - 62, 30, `BANK ${this.save.coins}`, 22, INK.good, 1, true);
+    coinIcon(this, this.layer, VIEW_W - 38, 30, 12);
 
     TABS.forEach((name, i) => {
       button(this, this.layer, {
@@ -158,16 +157,22 @@ export class GarageScene extends Phaser.Scene {
     else if (this.tab === 'SCORES') this.drawScores();
     else this.drawAchievements();
 
-    this.text(VIEW_W / 2, 436, this.message, 17, INK.title, 0.5);
-    button(this, this.layer, { x: 330, y: 478, w: 250, h: 38, text: 'DRIVE', hint: 'SPACE', size: 16, selected: true, onClick: () => this.scene.start('Game', { daily: false }) });
-    button(this, this.layer, { x: 630, y: 478, w: 250, h: 38, text: 'BACK TO MENU', hint: 'ESC', size: 16, onClick: () => this.scene.start('Menu') });
-    bottomBar(this, this.layer, 'LEFT/RIGHT tab   UP/DOWN pick   ENTER buy / equip   D daily challenge   O settings');
+    this.text(VIEW_W / 2, 441, this.message, 17, INK.title, 0.5);
+    button(this, this.layer, { x: 330, y: 482, w: 250, h: 38, text: 'DRIVE', hint: 'SPACE', size: 16, selected: true, onClick: () => this.scene.start('Game') });
+    button(this, this.layer, { x: 630, y: 482, w: 250, h: 38, text: 'BACK TO MENU', hint: 'ESC', size: 16, onClick: () => this.scene.start('Menu') });
+    bottomBar(this, this.layer, 'LEFT/RIGHT tab   UP/DOWN pick   ENTER buy / equip   O settings');
   }
 
-  /** Clickable row background; a click selects, a second click on the selected row activates. */
-  private rowBox(i: number, y: number): void {
-    rowPlate(this, this.layer, VIEW_W / 2, y, 860, 54, i === this.row);
-    const zone = this.add.zone(VIEW_W / 2, y, 860, 54).setInteractive({ useHandCursor: true });
+  /** A price: the number with the snack-coin icon after it, right-aligned at `x`. */
+  private price(x: number, y: number, cost: number, color: string): void {
+    coinIcon(this, this.layer, x - 11, y, 11);
+    this.text(x - 30, y, String(cost), 18, color, 1, true);
+  }
+
+  /** Clickable row background (`h` tall); a click selects, a second click on the selected row activates. */
+  private rowBox(i: number, y: number, h: number): void {
+    rowPlate(this, this.layer, VIEW_W / 2, y, 860, h, i === this.row);
+    const zone = this.add.zone(VIEW_W / 2, y, 860, h).setInteractive({ useHandCursor: true });
     zone.on('pointerdown', () => {
       if (this.row === i) this.activate();
       else {
@@ -179,31 +184,38 @@ export class GarageScene extends Phaser.Scene {
   }
 
   private drawUpgrades(): void {
+    const rows = listRows(142, 352, UPGRADE_IDS.length, 58);
     UPGRADE_IDS.forEach((id, i) => {
       const u = PROGRESSION.upgrades[id];
       const level = this.save.upgrades[id];
-      const y = rowY(150, 66, i) + 10;
-      this.rowBox(i, y);
-      this.text(60, y - 10, u.name, 20, INK.text, 0, true);
-      this.text(60, y + 14, u.blurb, 15, INK.soft);
+      const y = rows.y(i);
+      this.rowBox(i, y, rows.h);
+      this.text(30 + LIST.padX, y - 10, u.name, 20, INK.text, 0, true);
+      this.text(30 + LIST.padX, y + 14, u.blurb, 15, INK.soft);
       pips(this, this.layer, 560, y, level, u.max);
       const cost = upgradeCost(id, level);
       const afford = cost !== null && this.save.coins >= cost;
-      this.text(VIEW_W - 60, y, cost === null ? 'MAXED' : `${cost} coins`, 18, cost === null ? INK.cyan : afford ? INK.good : INK.bad, 1, true);
+      const right = VIEW_W - 30 - LIST.padX;
+      if (cost === null) this.text(right, y, 'MAXED', 18, INK.cyan, 1, true);
+      else this.price(right, y, cost, afford ? INK.good : INK.bad);
     });
-    this.text(60, 372, 'Upgrades do not apply in the daily challenge: everyone drives the same stock truck.', 15, INK.dim);
-    this.text(60, 396, 'Earn coins by driving: snacks, distance, checkpoints, takedowns and close calls.', 15, INK.dim);
+    this.text(60, 372, 'Earn coins by driving: snacks, distance, checkpoints, takedowns and close calls.', 15, INK.dim);
+    this.text(60, 396, 'Each level costs more than the last, and the best paint jobs cost the most.', 15, INK.dim);
   }
 
   private drawPaint(): void {
+    const rows = listRows(142, 424, SKINS.length, 58);
     SKINS.forEach((skin, i) => {
-      const y = rowY(146, 58, i) + 10;
-      this.rowBox(i, y);
+      const y = rows.y(i);
+      this.rowBox(i, y, rows.h);
       const owned = this.save.ownedSkins.includes(skin.id);
       const worn = this.save.skin === skin.id;
-      this.layer.add(this.add.image(120, y + 4, playerTruckKey(skin.id)).setScale(0.55));
+      this.layer.add(this.add.image(120, y + 4, playerTruckKey(skin.id)).setScale(0.5));
       this.text(220, y, skin.name, 20, INK.text, 0, true);
-      this.text(VIEW_W - 60, y, worn ? 'EQUIPPED' : owned ? 'OWNED' : `${skin.cost} coins`, 18, worn ? INK.cyan : owned ? INK.soft : this.save.coins >= skin.cost ? INK.good : INK.bad, 1, true);
+      const right = VIEW_W - 30 - LIST.padX;
+      if (worn) this.text(right, y, 'EQUIPPED', 18, INK.cyan, 1, true);
+      else if (owned) this.text(right, y, 'OWNED', 18, INK.soft, 1, true);
+      else this.price(right, y, skin.cost, this.save.coins >= skin.cost ? INK.good : INK.bad);
     });
   }
 
@@ -225,7 +237,6 @@ export class GarageScene extends Phaser.Scene {
       this.text(cols.meters, y, `${h.meters} m`, 16, color, 1);
       this.text(cols.snacks, y, String(h.snacks), 16, color, 1);
       this.text(cols.date, y, h.date, 15, color, 0);
-      if (h.daily) this.text(600, y, 'DAILY', 13, INK.good, 1, true);
     });
     panel(this, this.layer, 664, 140, 256, 282, 'LIFETIME');
     this.text(
@@ -235,27 +246,29 @@ export class GarageScene extends Phaser.Scene {
       17,
       INK.soft,
     );
-    const days = Object.entries(this.save.dailyBest).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 2);
-    if (days.length) this.text(690, 392, days.map(([d, v]) => `daily ${d.slice(5)}  ${v}`), 14, INK.cyan);
   }
 
   private drawAchievements(): void {
     const got = ACHIEVEMENTS.filter((a) => this.save.achievements[a.id]).length;
-    this.text(60, 138, `ACHIEVEMENTS  ${got} / ${ACHIEVEMENTS.length}`, 16, INK.cyan, 0, true);
+    this.text(60, 130, `ACHIEVEMENTS  ${got} / ${ACHIEVEMENTS.length}`, 16, INK.cyan, 0, true);
+    // Two columns of plates, `LIST.rowGap` apart both ways, like every other list in the menus.
+    const rows = listRows(148, 428, Math.ceil(ACHIEVEMENTS.length / 2), 40);
+    const w = 430;
     ACHIEVEMENTS.forEach((a, i) => {
       const col = i % 2;
-      const rowI = Math.floor(i / 2);
-      const x = 50 + col * 440;
-      const y = rowY(166, 33, rowI);
+      const cx = VIEW_W / 2 + (col === 0 ? -1 : 1) * (w / 2 + LIST.rowGap / 2);
+      const y = rows.y(Math.floor(i / 2));
       const done = !!this.save.achievements[a.id];
+      rowPlate(this, this.layer, cx, y, w, rows.h, false);
+      const x = cx - w / 2 + LIST.padX;
       const g = this.add.graphics();
       g.fillStyle(UI.outline, 1);
-      g.fillCircle(x + 10, y + 4, 9);
+      g.fillCircle(x + 8, y, 9);
       g.fillStyle(done ? UI.yellow : UI.panelLight, 1);
-      g.fillCircle(x + 10, y + 4, 7);
+      g.fillCircle(x + 8, y, 7);
       this.layer.add(g);
-      this.text(x + 28, y - 3, `${a.name}  (+${a.reward})`, 16, done ? INK.title : INK.dim, 0, true);
-      this.text(x + 28, y + 14, a.description, 13, done ? INK.soft : '#5d6a96');
+      this.text(x + 28, y - 8, `${a.name}  (+${a.reward})`, 15, done ? INK.title : INK.dim, 0, true);
+      this.text(x + 28, y + 9, a.description, 13, done ? INK.soft : '#5d6a96');
     });
   }
 }

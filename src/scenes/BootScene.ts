@@ -42,7 +42,7 @@ export class BootScene extends Phaser.Scene {
     this.load.on("progress", (value: number) => {
       const percent = Math.round(value * 100);
       if (loadingLabel)
-        loadingLabel.textContent = `Loading game... ${percent}%`;
+        loadingLabel.textContent = `LOADING ${percent}%`;
       if (loadingProgress) loadingProgress.style.width = `${percent}%`;
       loadingBar?.setAttribute("aria-valuenow", String(percent));
     });
@@ -86,8 +86,8 @@ export class BootScene extends Phaser.Scene {
     }
     const q = new URLSearchParams(window.location.search);
     // The start screen comes first. Developer shortcuts skip it: `?art` is the art preview,
-    // `?settings` opens the settings screen, and `?play`, `?seed=...` or `?daily` go straight to a run.
-    const straightToRun = q.has("play") || q.has("seed") || q.has("daily");
+    // `?settings` opens the settings screen, and `?play` or `?seed=...` go straight to a run.
+    const straightToRun = q.has("play") || q.has("seed");
     this.scene.start(
       q.has("art")
         ? "Art"

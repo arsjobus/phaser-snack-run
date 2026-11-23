@@ -1,6 +1,6 @@
 # 4x4 Snack Run: Redux Roadmap
 
-> **Status:** Phases 0 to 7.5, 8.5 and the code half of Phase 8 are done (see `README.md`): touch controls, gamepad, remappable keys, a settings screen, a performance pass, plus a road art pass and monster-truck-lifted vehicles. What is left is the human half of Phase 8: playtests and the itch.io release. All art is generated at runtime. All art is generated in code (`src/art/`); texture keys (`truck_body`, `rival_0..5`, `wheel`, `snack`, `fuel_can`, `wrench`, `start_gate`, `cp_gate`, and `sky_<biome>`, `trees_<biome>`, ...) are stable so real sprites can drop in.
+> **Status:** Phases 0 to 7.5, 8.5, 9, 9.5 and the code half of Phase 8 are done (see `README.md`): touch controls, gamepad, remappable keys, a settings screen, a performance pass, plus a road art pass and monster-truck-lifted vehicles. What is left is the human half of Phase 8: playtests and the itch.io release. All art is generated at runtime. All art is generated in code (`src/art/`); texture keys (`truck_body`, `rival_0..5`, `wheel`, `snack`, `fuel_can`, `wrench`, `start_gate`, `cp_gate`, and `sky_<biome>`, `trees_<biome>`, ...) are stable so real sprites can drop in.
 
 An endless-runner redux of a late-90s Flash/Shockwave-era 4x4 racing game. Same spirit (muddy tracks, big trucks, jumps, snack pickups), rebuilt for modern browsers.
 
@@ -150,7 +150,7 @@ An endless-runner redux of a late-90s Flash/Shockwave-era 4x4 racing game. Same 
 
 - [x] Local high-score table and run stats (top 10 plus lifetime stats, saved in `localStorage`, with an in-memory fallback)
 - [x] Coins/"snack bank" currency spent in the garage (`G` on the game-over screen) on: truck paint (5 skins), tank size, fuel efficiency, damage resistance (5 levels each)
-- [x] Daily seed challenge (same course for everyone: the UTC day is the seed; stock truck, no upgrades; best score kept per day; first run of the day pays a bonus)
+- [x] ~~Daily seed challenge~~ (built, then scrapped in Phase 9.5)
 - [x] Achievements (15, with coin rewards: e.g. "10-snack combo", "hang time", "no damage to 2 km"); unlock with a toast mid-run
 - **Exit:** a reason to play "one more run"
 
@@ -221,7 +221,7 @@ The original was pseudo-3D: a wide dirt field with trucks driving at different d
 - [x] All vehicles have flat bottom chasis like they never used to have two cutout spots for their wheels.
   - **Done:** every body gets a skirt that lowers its underside, and two wheel arches are cut up into it with a fender flare and a dark lining; tires now reach up into them (`src/art/chassis.ts`, tested for all 7 trucks). Physics is untouched.
 - [x] There should be start screen with buttons to play, garage, settings, and credits to credit the game developers.
-  - **Done:** `MenuScene` (first screen; `?play`, `?seed` or `?daily` skip it) and `CreditsScene` (text in `src/credits.ts`; edit the names there). Settings and garage return to where you came from; game over has a MENU button (Esc).
+  - **Done:** `MenuScene` (first screen; `?play` or `?seed` skip it) and `CreditsScene` (text in `src/credits.ts`; edit the names there). Settings and garage return to where you came from; game over has a MENU button (Esc).
 - [x] Plan a better UI artwork for the menus throughout the game (including highscore) that match a racing game like this.
   - **Done:** the plan is `docs/ui-art-plan.md`, and it is implemented as a shared kit (`src/ui/`) used by the start screen, garage, high scores, settings, credits and game over.
 - [x] Suggest to use a better free and public domain font for primary and secondary fonts
@@ -243,16 +243,26 @@ The original was pseudo-3D: a wide dirt field with trucks driving at different d
 
 ### Phase 9.5: Change Requests and Feedback
 
-- [ ] The spectacle of the player jumping the big ramp over the cars needs to show to the player better. I tried to have the camera center on and follow the player's vehicle as it starts going up the ramp but it still seems like the players flies over the ramp so fast they cannot really enjoy the spectacle and they get a short glimpse of the fireworks shooting to spell CRUNCH in the air and the cars below. I'm not sure but feels like the camera isn't centered on the vehicle still and the entire experience needs to be polished more.
-- [ ] The time to reach the first check point is about 1 minute so 1 minute and 30 seconds to make it to the first checkpoint would be the good challenge. based off the feedback that the player can make it to the first checkpoint in about 1 minute then adjust time for every other checkpoint to keep this challenging but doable for the player
-- [ ] Make the loading screen have the similar theme as the rest of the game
-- [ ] In the settings menu, the Back button looks like any other button and it doesn't stand out. This makes it confusing and hard to navigate back out of the settings menu for the player. the Credits menu has a Back button too that I think we should copy and ensure they both keep the same look and style.
-- [ ] I feel like the unlockable upgrades were too easy to collect enough "coins" to unlock. Same for the paint jobs but we don't want to make the player spend months to unlock everything either.
-- [ ] In the Garage, those bank "coins" displayed to the player should have an icon next to them that best represents the points
-- [ ] On the Achievements screen, the listed achievements could use better padding / margins between them but when changing then make sure that other menus follow the same standards.
-- [ ] The only way to get to the Daily run is from the game over screen, and I don't think that mode adds anything to be desired so scrap it and mention of it in the game
-- [ ] On the start screen, you can see a sliver over the start sign on the left side of the screen, but wouldn't it be better displayed on the right side in full view and not partially outside the screen?
-- [ ] The water holes or puddles should only be placed snuggly upon flat surface or within depression on the track - not outside the track where the vehicles drive and not on slopes either.
+- [x] The spectacle of the player jumping the big ramp over the cars needs to show to the player better. I tried to have the camera center on and follow the player's vehicle as it starts going up the ramp but it still seems like the players flies over the ramp so fast they cannot really enjoy the spectacle and they get a short glimpse of the fireworks shooting to spell CRUNCH in the air and the cars below. I'm not sure but feels like the camera isn't centered on the vehicle still and the entire experience needs to be polished more.
+  - **Done:** a show camera (`src/game/ShowCam.ts`, tuned by `CAMERA.focus*` and `STUNT.camLead/slow*` in `config.ts`). From 520 px before the first pad the framing locks onto the truck: dead centre (the speed look-ahead that pushed it off centre fades out), a fast vertical follow so the ramp climb never leaves the frame. From 420 px before the lip the whole game runs at half speed (eased in and out), through the jump over the pit, and both hold for 1.4 s after the landing so the CRUNCH finale and the cars below are seen. The fireworks, truck, rivals and clock all slow together, so nothing is out of step. It lets go at once if the run ends. **Not yet checked by eye in a browser:** tune `STUNT.slowScale` (0.5) and `slowHold` if it feels too slow or too short.
+- [x] The time to reach the first check point is about 1 minute so 1 minute and 30 seconds to make it to the first checkpoint would be the good challenge. based off the feedback that the player can make it to the first checkpoint in about 1 minute then adjust time for every other checkpoint to keep this challenging but doable for the player
+  - **Done:** the clock is now based on a good player's pace (1,000 m in 60 s, `CHECKPOINT.playerMps`): the first checkpoint gets 1.5x that, **90 s**, and the slack shrinks by 0.06 per checkpoint down to 1.2x (`slackFirst`, `slackStep`, `slackFloor`; `segmentSeconds` in `Checkpoint.ts`): 90 s, 99 s, 108 s ... then 1.2x from checkpoint 6. At most 25 s left on the clock carries into the next segment (`carryCap`; the BONUS still pays for all of it), so an early lead cannot make the clock meaningless later. The old +20 s start buffer is gone. Tests: a player at the playtest pace never runs dry, one 15% slower manages the early checkpoints, one 40% slower is caught.
+- [x] Make the loading screen have the similar theme as the rest of the game
+  - **Done:** the HTML loading screen (`index.html`) now wears the menus' look: navy background, the yellow CRUNCH 4x4 logo plate, hazard stripes along the top, a checkered strip along the bottom, Russo One for the text and a bar with the same hazard-striped fill, in a steel-rimmed track.
+- [x] In the settings menu, the Back button looks like any other button and it doesn't stand out. This makes it confusing and hard to navigate back out of the settings menu for the player. the Credits menu has a Back button too that I think we should copy and ensure they both keep the same look and style.
+  - **Done:** one shared `backButton` (`src/ui/Ui.ts`): the wide yellow button with the ESC hint that Credits already had, now used by both Settings and Credits so they cannot drift apart. In Settings it sits under the key list, and gets a white ring when the keyboard cursor is on it.
+- [x] I feel like the unlockable upgrades were too easy to collect enough "coins" to unlock. Same for the paint jobs but we don't want to make the player spend months to unlock everything either.
+  - **Done:** upgrades now start at 330 / 260 / 310 coins (was 150 / 120 / 140) and each level costs 1.8x the last (was 1.7x); paints cost 500 / 500 / 900 / 1,500 (was 300 / 300 / 500 / 800). Everything together is about 23,000 coins: roughly 100 runs at the ~215 coins a typical run pays (an estimate from an assumed typical run, not a playtest: tune `PROGRESSION` and `SKINS` if it is still too quick or too slow). The first purchase takes two runs, not one.
+- [x] In the Garage, those bank "coins" displayed to the player should have an icon next to them that best represents the points
+  - **Done:** a gold snack coin (a gold coin stamped with a little red cracker, `coinIcon` in `src/ui/Ui.ts`) sits next to the bank total and after every price in the upgrades and paint lists.
+- [x] On the Achievements screen, the listed achievements could use better padding / margins between them but when changing then make sure that other menus follow the same standards.
+  - **Done:** the achievements are two columns of plates, 8 px apart both ways with 16 px inside, via `listRows` and `LIST` (`src/ui/Theme.ts`). The same standard is now used by the garage's upgrade and paint rows and the settings rows (plates were 4 to 6 px apart, now 8). Tests pin the gap.
+- [x] The only way to get to the Daily run is from the game over screen, and I don't think that mode adds anything to be desired so scrap it and mention of it in the game
+  - **Done:** removed: the daily seed, the D key and pad X, the game-over button, the garage text and the `?daily` shortcut, the daily bonus coins, daily bests, the DAILY tags on scores and the Daily Driver achievement (14 left). Old saves still load; the old fields are dropped. `Daily.ts` is gone (`dayKey` moved to `Day.ts`).
+- [x] On the start screen, you can see a sliver over the start sign on the left side of the screen, but wouldn't it be better displayed on the right side in full view and not partially outside the screen?
+  - **Done:** the start sign now stands at the right of the start screen, fully in view, on a far lane so it sits above the button row (`MENU_GATE` in `src/ui/MenuModel.ts`).
+- [x] The water holes or puddles should only be placed snuggly upon flat surface or within depression on the track - not outside the track where the vehicles drive and not on slopes either.
+  - **Done:** puddles only appear on the drivable track (depth 0.5 to 2.4 lanes: none in the foreground, none past the last lane) and only where the ground under the whole puddle is level or sunk into a dip with higher walls on both sides, never on a slope or on the show stage (`puddleSite` in `GroundDetail.ts`; the painter checks the real terrain). Since fewer spots qualify, puddles are weighted up a little so they still show. Tests pin the zone and the rule.
 
 ---
 
@@ -276,15 +286,15 @@ The original was pseudo-3D: a wide dirt field with trucks driving at different d
 | Obstacles                 | from 150 m (rock), 250 m (tires), 400 m (log), 600 m (boulder); 30% per flat/hill chunk rising to 80% at 3 km, 15% rising to 50% for a second one; rows 420 px apart, at most 2 of 4 lanes blocked (wrecks included) |
 | Obstacle hits             | rock: 0.6x bump damage, takes 35% of the closing speed; tires: no damage, 22%; log: 0.9x, 50%; boulder: 1.3x (up to 33%), 65%; fixed ones cannot hurt again for 0.5 s |
 | Close call                | +50 BONUS for passing an obstacle you swerved away from (it was ahead in the lane you left) |
-| Coins                     | 2 per snack, 1 per 25 m, 15 per checkpoint, 10 per takedown, 2 per close call; +50 for the first daily run of a day |
-| Upgrades                  | tank +20% capacity, efficiency -7% burn, armor -8% damage per level (5 levels); level n costs about base x 1.7^n (150 / 120 / 140 to start) |
-| Paint                     | 5 skins: free, 300, 300, 500, 800 coins |
+| Coins                     | 2 per snack, 1 per 25 m, 15 per checkpoint, 10 per takedown, 2 per close call |
+| Upgrades                  | tank +20% capacity, efficiency -7% burn, armor -8% damage per level (5 levels); level n costs about base x 1.8^n (330 / 260 / 310 to start) |
+| Paint                     | 5 skins: free, 500, 500, 900, 1,500 coins (everything is ~23,000 coins, ~100 typical runs) |
 | Rivals on course          | 1 at the start, +1 per 800 m, max 3; opening grid of two just past the line |
 | Rival speed               | cruise 520-720 px/s by skill, +/-190 rubber band over 700 px |
 | Draft                     | within 260 px behind a rival in your lane: builds over 1 s to +45% engine force, +12% top speed |
 | Checkpoint spacing        | 1,000 m, each segment +150 m longer |
 | Show stage                | before every 2nd checkpoint, in the last 10% of the segment: 7 pads, 288 px ramp, 1,280 px pit, landing table; surge 1.8x force / 1.18x top speed, fades over 1.2 s; clear +1000, +150 per car, +500 per flip; no damage during it and 2.5 s after |
-| Checkpoint clock          | segment length / 8 m/s (+20 s on the first); time left carries over; reaching a gate: +10% fuel, +250 BONUS +10 per second left; a dry clock ends the run |
+| Checkpoint clock          | a good player's time (1,000 m in 60 s) x slack: 1.5 for the first checkpoint (90 s), 0.06 less each, floor 1.2; at most 25 s carries over; reaching a gate: +10% fuel, +250 BONUS +10 per second left; a dry clock ends the run |
 
 ---
 

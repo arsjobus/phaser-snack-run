@@ -2,7 +2,7 @@
 
 An endless-runner redux of a classic Flash-era 4x4 racer. Muddy tracks, big trucks, ramps, snacks and fuel.
 
-**Status:** Phases 0 to 7.5, Phase 9 (the monster-truck show) and the code half of Phase 8 are done (touch, gamepad, remappable keys, settings, performance, a road art pass and lifted monster trucks); playtests and the itch.io release remain. Phases 0 to 7 were: setup, core driving, fuel/snacks/scoring, the HUD with checkpoints, rivals, collisions and wrecks, the art pass, audio, and now depth lanes with obstacles plus progression (a garage, high scores, a daily challenge and achievements). See [`roadmap.md`](roadmap.md).
+**Status:** Phases 0 to 7.5, Phase 9 (the monster-truck show), Phase 9.5 (feedback) and the code half of Phase 8 are done (touch, gamepad, remappable keys, settings, performance, a road art pass and lifted monster trucks); playtests and the itch.io release remain. Phases 0 to 7 were: setup, core driving, fuel/snacks/scoring, the HUD with checkpoints, rivals, collisions and wrecks, the art pass, audio, and now depth lanes with obstacles plus progression (a garage, high scores, a daily challenge and achievements). See [`roadmap.md`](roadmap.md).
 
 ## Quick start
 
@@ -25,11 +25,11 @@ npm run dev        # http://localhost:5173
 
 →/D gas (**hold it: there is no auto-gas**; let go and engine braking slows you down) · ←/A brake/reverse · **↑/W and ↓/S: hold to drift away from / towards the camera through the depth field** (Q/E also work) · R reset upright · M mute all · N music on/off · H debug overlay · SPACE/ENTER/tap restart after game over · **G** garage and **D** daily challenge / free run (game-over screen)
 
-**Gamepad:** RT/A/stick right gas (triggers are analog) · LT/B/X/stick left brake · stick or D-pad up/down drift · Start/A restart · Y garage · X daily · Back settings · LB reset · RB music. **Touch:** GAS, BRAKE and ▲/▼ buttons appear on touch devices. **O** opens the settings (also from the garage) where every driving key can be rebound.
+**Gamepad:** RT/A/stick right gas (triggers are analog) · LT/B/X/stick left brake · stick or D-pad up/down drift · Start/A restart · Y garage · Back settings · LB reset · RB music. **Touch:** GAS, BRAKE and ▲/▼ buttons appear on touch devices. **O** opens the settings (also from the garage) where every driving key can be rebound.
 
 There is no air control and no lean: the arrow keys steer through the field instead, and a gentle passive assist levels the truck in the air so it lands on its wheels.
 
-Add `?seed=anything` to the URL for a repeatable course, or `?daily` to start in the daily challenge.
+Add `?seed=anything` to the URL for a repeatable course.
 
 ## What's in Phase 9 (the monster-truck show)
 
@@ -40,7 +40,7 @@ Before every second checkpoint (the biome borders: 2nd, 4th, 6th...) the last te
 - **The big ramp:** 288 px high with a curved face, then a sheer drop onto a pit with four rows of parked cars, and a landing table with a long slope down. Cars are scenery: trucks fly over them.
 - **Pyrotechnics:** cold-spark fountains and flame jets on both sides of the road at the top of the launch ramp and of the landing table.
 - **CRUNCH in fireworks:** one rocket per letter climbs from the pit, bursts, and its stars glide into a dot-matrix letter that hangs and twinkles above the cars, followed by a finale.
-- **Accidents:** every launch adds a seeded random spin (the same for everyone on a daily course), so some jumps flip. Bumps do no damage while surging and for 2.5 s after the landing, and a truck left on its roof is set back on its wheels after 0.9 s.
+- **Accidents:** every launch adds a seeded random spin (the same for a given `?seed` course), so some jumps flip. Bumps do no damage while surging and for 2.5 s after the landing, and a truck left on its roof is set back on its wheels after 0.9 s.
 - **Landing:** +1000 BONUS for clearing the pit, +150 per car, +500 per flip. The surge fades over about a second and the truck is back to its normal top speed for the next biome.
 - **Where:** `Stunt.ts` (geometry, pure), `Show.ts` (the run through a stage, pure), `Fireworks.ts` (pure), `StageView.ts` (drawing), `art/show.ts`, tuning in `STUNT` in `config.ts`, tests in `tests/stage.test.ts`.
 
@@ -87,12 +87,11 @@ Every one-shot effect is an mp3 in `public/audio/` (`snack.mp3`, `fuel.mp3`, `bo
 
 **Progression** (`src/progress/`, all saved in `localStorage`; if it is blocked the game keeps progress in memory for the session)
 
-- **Coins ("snack bank"):** 2 per snack, 1 per 25 m, 15 per checkpoint, 10 per takedown, 2 per close call.
-- **Garage** (press **G** on the game-over screen): upgrade **tank size** (+20% capacity per level), **fuel efficiency** (-7% burn) and **damage resistance** (-8% damage), 5 levels each, and buy **paint** (5 skins). ←/→ switch tab, ↑/↓ pick, ENTER buys or equips, SPACE drives; clicks and taps work too.
+- **Coins ("snack bank", shown with a snack-coin icon):** 2 per snack, 1 per 25 m, 15 per checkpoint, 10 per takedown, 2 per close call.
+- **Garage** (press **G** on the game-over screen): upgrade **tank size** (+20% capacity per level), **fuel efficiency** (-7% burn) and **damage resistance** (-8% damage), 5 levels each, and buy **paint** (5 skins). ←/→ switch tab, ↑/↓ pick, ENTER buys or equips, SPACE drives; clicks and taps work too. Upgrades cost 330 / 260 / 310 coins for the first level and 1.8x more for each next one; paint costs 500 to 1,500. Unlocking everything is about 100 typical runs.
 - **High scores:** a top-10 table (shown on the game-over screen and in the garage) plus lifetime stats (runs, distance, best air, best chain, ...).
-- **Daily challenge** (press **D** on the game-over screen, or open `?daily`): the UTC date is the seed, so everyone gets the same terrain, pickups, obstacles and wrecks (rivals still react to how you drive). Everyone drives the stock truck (upgrades are off); your best score per day is kept, and the first daily run of a day pays a 50-coin bonus.
-- **Achievements:** 15 of them with coin rewards (a 10-snack combo, hang time, 2 km without damage, 5 takedowns, 25 lane changes, 10 close calls, ...), unlocked with a toast mid-run and listed in the garage.
-- Tests cover save loading and sanitising (including corrupt data and a throwing store), upgrade pricing and perks, banking runs, the score table, daily seeds and determinism, and the achievements.
+- **Achievements:** 14 of them with coin rewards (a 10-snack combo, hang time, 2 km without damage, 5 takedowns, 25 lane changes, 10 close calls, ...), unlocked with a toast mid-run and listed in the garage.
+- Tests cover save loading and sanitising (including corrupt data and a throwing store), upgrade pricing and perks, banking runs, the score table, determinism, and the achievements.
 
 ## What's in Phase 6
 
@@ -193,7 +192,7 @@ src/
     Input.ts, Rng.ts
   audio/               sfx.ts (the sound-effect mp3 list), Composition.ts (the theme), Sequencer.ts + Mix.ts (pure, tested), AudioSystem.ts (Web Audio: music, engine, SFX)
   art/                 procedural art: trucks.ts (6 bodies + rotation strips), backdrops.ts (per biome), props.ts, show.ts (parked cars, pyro stand, boost arch), pixelFont.ts
-  progress/            Progress.ts (saves, coins, upgrades, scores), Achievements.ts, Skins.ts, Daily.ts, Storage.ts (all pure TS)
+  progress/            Progress.ts (saves, coins, upgrades, scores), Achievements.ts, Skins.ts, Day.ts, Storage.ts (all pure TS)
   scenes/
     BootScene.ts       builds every texture from src/art
     GameScene.ts       loop, camera, HUD, input

@@ -52,8 +52,6 @@ export interface RunSummary {
   /** Metres driven before the first damage (the whole run if the truck was never hurt). */
   cleanMeters: number;
   endReason: EndReason | null;
-  /** The daily challenge (set by the caller). */
-  daily: boolean;
 }
 
 /**
@@ -220,7 +218,7 @@ export class RunModel {
   }
 
   /** The run so far, for high scores, coins and achievements. */
-  summary(daily = false): RunSummary {
+  summary(): RunSummary {
     const s = this.score;
     return {
       score: s.total,
@@ -237,7 +235,6 @@ export class RunModel {
       damageTaken: this.damageTaken,
       cleanMeters: Math.floor(this.firstDamageMeters ?? this.meters),
       endReason: this.endReason,
-      daily,
     };
   }
 }

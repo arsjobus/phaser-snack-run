@@ -10,7 +10,6 @@ export interface PadSnapshot {
 export interface PadButtons {
   confirm: boolean;
   garage: boolean;
-  daily: boolean;
   settings: boolean;
   reset: boolean;
   music: boolean;
@@ -59,7 +58,7 @@ export function padHeld(p: PadSnapshot | null): Held {
 
 /** Which one-shot buttons are down right now (edges are found by `PadEdges`). */
 export function padButtons(p: PadSnapshot | null): PadButtons {
-  const none = { confirm: false, garage: false, daily: false, settings: false, reset: false, music: false, back: false, up: false, down: false, left: false, right: false, start: false };
+  const none = { confirm: false, garage: false, settings: false, reset: false, music: false, back: false, up: false, down: false, left: false, right: false, start: false };
   if (!p) return none;
   const on = (i: number) => btn(p, i) > 0.5;
   const ly = axis(p, 1);
@@ -67,7 +66,6 @@ export function padButtons(p: PadSnapshot | null): PadButtons {
   return {
     confirm: on(B.START) || on(B.A),
     garage: on(B.Y),
-    daily: on(B.X),
     settings: on(B.BACK),
     reset: on(B.LB),
     music: on(B.RB),

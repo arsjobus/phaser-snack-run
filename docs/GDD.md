@@ -35,7 +35,6 @@ Drive → grab snacks and fuel → dodge or bump rivals → hit ramps for air �
 | R     | Reset upright                         |
 | Space / Enter / tap | Restart after game over |
 | G     | Garage (from the game-over screen)    |
-| D     | Daily challenge / free run (from the game-over screen) |
 | M     | Mute all sound                        |
 | N     | Music on/off                          |
 | H     | Debug overlay                         |

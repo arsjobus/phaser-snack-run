@@ -40,10 +40,10 @@ const SLOTS = 4;
 
 /** Relative weights of the detail kinds per biome (they need not sum to 1). */
 export const DETAIL_WEIGHTS: Record<BiomeId, Partial<Record<DetailKind, number>>> = {
-  forest: { pebble: 0.22, gravel: 0.22, stone: 0.08, clod: 0.28, crack: 0.08, puddle: 0.12 },
+  forest: { pebble: 0.22, gravel: 0.22, stone: 0.08, clod: 0.28, crack: 0.08, puddle: 0.2 },
   desert: { pebble: 0.2, gravel: 0.2, stone: 0.08, clod: 0.06, crack: 0.16, ripple: 0.3 },
-  snow: { pebble: 0.06, gravel: 0.06, stone: 0.04, clod: 0.12, sparkle: 0.5, puddle: 0.22 },
-  swamp: { pebble: 0.06, gravel: 0.08, stone: 0.06, clod: 0.27, puddle: 0.38, crack: 0.05, ripple: 0.1 },
+  snow: { pebble: 0.06, gravel: 0.06, stone: 0.04, clod: 0.12, sparkle: 0.5, puddle: 0.3 },
+  swamp: { pebble: 0.06, gravel: 0.08, stone: 0.06, clod: 0.2, puddle: 0.5, crack: 0.05, ripple: 0.1 },
 };
 
 /** Puddles and cracks only look right on the big foreground dirt or the near field. */
@@ -59,6 +59,44 @@ const FAR_KINDS: ReadonlySet<DetailKind> = new Set(['pebble', 'gravel', 'clod', 
 export const FLAT_KINDS: ReadonlySet<DetailKind> = new Set(['crack', 'puddle', 'ripple', 'sparkle']);
 export const FLAT_FIELD: readonly [number, number] = [0.5, 1.6];
 export const FLAT_FOREGROUND = 1.7;
+/**
+ * Puddles are the one flat detail with a stricter rule (Phase 9.5): they only lie ON the track the
+ * vehicles drive on (between these depths, in lanes: never in the foreground in front of the near
+ * lane, never at the far edge of the field), and only where the ground is flat or sunk into a dip,
+ * never on a slope (see `puddleSite`).
+ */
+export const PUDDLE_FIELD: readonly [number, number] = [0.5, 2.4];
+/** A puddle site is flat when the ground under it never slopes more than this (rise over run). */
+export const PUDDLE_MAX_SLOPE = 0.05;
+/** In a dip the ground may slope up to this under the puddle, but both walls must stand `PUDDLE_DIP_DEPTH` px higher. */
+export const PUDDLE_DIP_SLOPE = 0.12;
+export const PUDDLE_DIP_DEPTH = 4;
+/** How far (px) beyond each end of the puddle the dip's walls are measured. */
+export const PUDDLE_WALL = 48;
+
+/**
+ * Whether the ground between world x0 and x1 can hold a puddle: `flat` (the whole span is level) or
+ * `dip` (a hollow: both walls beyond the ends are higher than anything under the puddle, and the
+ * sides are gentle), else null. `heightAt` is the terrain's ground height (y-down, so a bigger y is lower).
+ */
+export function puddleSite(heightAt: (x: number) => number, x0: number, x1: number): 'flat' | 'dip' | null {
+  const n = Math.max(2, Math.ceil((x1 - x0) / 8));
+  let maxSlope = 0;
+  let low = -Infinity;
+  let prev = heightAt(x0);
+  low = prev;
+  for (let i = 1; i <= n; i++) {
+    const x = x0 + ((x1 - x0) * i) / n;
+    const y = heightAt(x);
+    maxSlope = Math.max(maxSlope, Math.abs(y - prev) / ((x1 - x0) / n));
+    low = Math.max(low, y);
+    prev = y;
+  }
+  if (maxSlope <= PUDDLE_MAX_SLOPE) return 'flat';
+  if (maxSlope <= PUDDLE_DIP_SLOPE && heightAt(x0 - PUDDLE_WALL) <= low - PUDDLE_DIP_DEPTH && heightAt(x1 + PUDDLE_WALL) <= low - PUDDLE_DIP_DEPTH) return 'dip';
+  return null;
+}
+
 /** Standing details (rocks, clods) stay this far (lanes) inside the field's far edge. */
 export const FAR_MARGIN = 0.5;
 
@@ -122,6 +160,8 @@ export function groundDetails(biome: BiomeId, xa: number, xb: number, density = 
       if (FLAT_KINDS.has(kind)) {
         // Remap onto the zones where a flat detail sits well on the ground (same random number).
         f = fg ? -(FLAT_FOREGROUND + r * (FOREGROUND_DEPTH - FLAT_FOREGROUND)) : FLAT_FIELD[0] + r * (FLAT_FIELD[1] - FLAT_FIELD[0]);
+        // Puddles only ever sit on the drivable track, so the foreground ones move into the field.
+        if (kind === 'puddle') f = PUDDLE_FIELD[0] + r * (PUDDLE_FIELD[1] - PUDDLE_FIELD[0]);
       }
       out.push({
         kind,

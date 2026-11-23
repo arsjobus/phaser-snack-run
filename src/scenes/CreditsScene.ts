@@ -3,7 +3,7 @@ import { VIEW_W } from '../config';
 import { ALL_CREDITS, GAME_TITLE } from '../credits';
 import { PadEdges, firstPad, padButtons } from '../input/Gamepad';
 import { INK } from '../ui/Theme';
-import { bottomBar, button, flatBackdrop, label, logoPlate, panel, topBar, type Layer } from '../ui/Ui';
+import { backButton, bottomBar, flatBackdrop, label, logoPlate, panel, topBar, type Layer } from '../ui/Ui';
 
 /**
  * Credits: who made the game and what it is built with (the text lives in `src/credits.ts`).
@@ -29,7 +29,7 @@ export class CreditsScene extends Phaser.Scene {
       label(this, layer, VIEW_W / 2, y, c.role, 'body', 15, INK.cyan);
       label(this, layer, VIEW_W / 2, y + 19, c.names.join('  '), 'display', 17, INK.text);
     });
-    button(this, layer, { x: VIEW_W / 2, y: 472, w: 220, h: 44, text: 'BACK', hint: 'ESC', selected: true, size: 18, onClick: () => this.back() });
+    backButton(this, layer, VIEW_W / 2, 472, () => this.back());
     bottomBar(this, layer, `${GAME_TITLE}   ·   ENTER or ESC to go back`);
     const kb = this.input.keyboard!;
     const onKey = (e: KeyboardEvent) => {

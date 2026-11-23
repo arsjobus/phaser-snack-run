@@ -33,6 +33,7 @@ describe('road details lie on the road', () => {
     for (const b of BIOMES) {
       for (const d of groundDetails(b, 0, 40000)) {
         if (!FLAT_KINDS.has(d.kind)) continue;
+        if (d.kind === 'puddle') continue; // puddles have their own, stricter zone (tests/phase95.test.ts)
         const inField = d.f >= 0;
         if (inField) {
           expect(d.f).toBeGreaterThanOrEqual(FLAT_FIELD[0]);

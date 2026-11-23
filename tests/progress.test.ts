@@ -6,7 +6,7 @@ import { RunModel, type RunSummary } from '../src/game/Run';
 import { Terrain } from '../src/game/Terrain';
 import { TruckPhysics } from '../src/game/TruckPhysics';
 import { ACHIEVEMENTS, unlockAchievements } from '../src/progress/Achievements';
-import { dailySeed, dayKey } from '../src/progress/Daily';
+import { dayKey } from '../src/progress/Day';
 import {
   UPGRADE_IDS,
   buySkin,
@@ -42,7 +42,6 @@ function summary(over: Partial<RunSummary> = {}): RunSummary {
     damageTaken: 0,
     cleanMeters: 500,
     endReason: 'fuel',
-    daily: false,
     ...over,
   };
 }
@@ -78,7 +77,9 @@ describe('Saves', () => {
     expect(s.skin).toBe('sunny');
     expect(s.ownedSkins).toEqual(['sunny', 'lime']);
     expect(s.highScores).toHaveLength(1);
-    expect(s.dailyBest).toEqual({ '2026-01-01': 400 });
+    // Saves from before the daily run was scrapped still load; its fields are just dropped.
+    expect(s).not.toHaveProperty('dailyBest');
+    expect(s.highScores[0]).not.toHaveProperty('daily');
     expect(s.stats.runs).toBe(0);
     expect(s.stats.bestScore).toBe(77);
     expect(s.achievements).toEqual({ combo10: '2026-01-01' });
@@ -215,7 +216,7 @@ describe('Perks in a run', () => {
     expect(clean.summary().crashes).toBe(0);
   });
 
-  it('the stock truck is what the daily challenge uses', () => {
+  it('NO_PERKS is the stock truck', () => {
     const s = emptySave();
     s.upgrades.tank = 3;
     expect(new RunModel(1, new Terrain(1), START, NO_PERKS).fuel.capacity).toBe(1);
@@ -230,8 +231,6 @@ describe('Banking runs', () => {
     const s = summary({ snacks: 10, meters: 500, checkpoints: 2, takedowns: 1, nearMisses: 3 });
     expect(coinsForRun(s)).toBe(10 * C.perSnack + 500 / C.meters + 2 * C.perCheckpoint + C.perTakedown + 3 * C.perNearMiss);
     expect(coinsForRun(summary({ snacks: 0, meters: 0 }))).toBe(0);
-    expect(coinsForRun(summary({ daily: true }), true)).toBe(coinsForRun(summary()) + C.daily);
-    expect(coinsForRun(summary({ daily: true }), false)).toBe(coinsForRun(summary()));
   });
 
   it('keeps a sorted, trimmed high-score table and reports the rank', () => {
@@ -266,41 +265,12 @@ describe('Banking runs', () => {
     expect(s.stats.coinsEarned).toBe(r1.coins + r2.coins);
     expect(s.coins).toBe(r1.coins + r2.coins);
   });
-
-  it('tracks the best score of each daily and pays the daily bonus once a day', () => {
-    const s = emptySave();
-    const a = recordRun(s, summary({ daily: true, score: 700 }), '2026-03-01');
-    expect(a.dailyFirst).toBe(true);
-    expect(a.dailyBest).toBe(700);
-    const b = recordRun(s, summary({ daily: true, score: 400 }), '2026-03-01');
-    expect(b.dailyFirst).toBe(false);
-    expect(b.dailyBest).toBe(700);
-    expect(b.coins).toBe(a.coins - PROGRESSION.coins.daily);
-    expect(recordRun(s, summary({ daily: true, score: 900 }), '2026-03-01').dailyBest).toBe(900);
-    expect(recordRun(s, summary({ daily: true, score: 100 }), '2026-03-02').dailyFirst).toBe(true);
-    expect(recordRun(s, summary({ daily: false, score: 5000 }), '2026-03-02').dailyBest).toBeNull();
-    expect(s.dailyBest).toEqual({ '2026-03-01': 900, '2026-03-02': 100 });
-  });
 });
 
-describe('Daily challenge', () => {
-  it('uses the UTC day, and the same seed gives the same course', () => {
+describe('Day stamp', () => {
+  it('uses the UTC day', () => {
     expect(dayKey(new Date('2026-11-20T23:59:59Z'))).toBe('2026-11-20');
     expect(dayKey(new Date('2026-11-21T00:00:01Z'))).toBe('2026-11-21');
-    expect(dailySeed('2026-11-20')).toBe(dailySeed('2026-11-20'));
-    expect(dailySeed('2026-11-20')).not.toBe(dailySeed('2026-11-21'));
-    const make = () => {
-      const t = new Terrain(dailySeed('2026-11-20'));
-      const run = new RunModel(dailySeed('2026-11-20'), t, START);
-      run.pickups.ensure(START + 60000);
-      return { t, run };
-    };
-    const a = make();
-    const b = make();
-    expect(a.run.pickups.items.map((p) => [p.kind, p.x, p.lane])).toEqual(b.run.pickups.items.map((p) => [p.kind, p.x, p.lane]));
-    expect(a.run.obstacles.items.map((o) => [o.kind, o.x, o.lane])).toEqual(b.run.obstacles.items.map((o) => [o.kind, o.x, o.lane]));
-    expect(a.run.wrecks.items.map((w) => [w.x, w.lane])).toEqual(b.run.wrecks.items.map((w) => [w.x, w.lane]));
-    expect(a.run.obstacles.items.length).toBeGreaterThan(5);
   });
 });
 
@@ -345,10 +315,10 @@ describe('Achievements', () => {
     expect(ids).not.toContain('combo10');
   });
 
-  it('daily and lane achievements need the run', () => {
+  it('lane and run achievements need the run', () => {
     const s = emptySave();
-    const ids = unlockAchievements(s, summary({ daily: true, laneChanges: 25, nearMisses: 10, takedowns: 5, checkpoints: 5, meters: 5000, bestMultiplier: SCORING.maxCombo }), '2026-04-01').map((a) => a.id);
-    expect(ids).toEqual(expect.arrayContaining(['daily1', 'lanes25', 'close10', 'takedown5', 'cp5', 'km5', 'maxcombo']));
+    const ids = unlockAchievements(s, summary({ laneChanges: 25, nearMisses: 10, takedowns: 5, checkpoints: 5, meters: 5000, bestMultiplier: SCORING.maxCombo }), '2026-04-01').map((a) => a.id);
+    expect(ids).toEqual(expect.arrayContaining(['lanes25', 'close10', 'takedown5', 'cp5', 'km5', 'maxcombo']));
   });
 });
 

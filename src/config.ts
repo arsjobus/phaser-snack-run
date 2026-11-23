@@ -82,6 +82,12 @@ export const CAMERA = {
   yAnchor: 0.62,
   yLerp: 4, // per second
   lookAhead: 0.18, // seconds of velocity added to x target
+  /** The show camera (Phase 9.5): how fast it settles on the truck, and where the truck sits (fractions of the screen). */
+  focusRise: 6, // per second, easing the framing in
+  focusFall: 2.5, // per second, easing it back out after the landing
+  focusYLerp: 10, // vertical follow speed while focused, so the climb never leaves the frame
+  focusXAnchor: 0.5,
+  focusYAnchor: 0.56,
 };
 
 /** Reference camera scrollY when the truck rests on the baseline; used for parallax Y. */
@@ -174,10 +180,21 @@ export const CHECKPOINT = {
   firstMeters: 1000,
   /** Each following segment is this much longer (m). */
   growthMeters: 150,
-  /** Time allowance per segment = length / pace (m/s). 8 m/s is a slow drive; top speed is ~22 m/s. */
-  paceMps: 8,
-  /** Extra seconds on the very first clock so the opening is forgiving. */
-  startBuffer: 20,
+  /**
+   * The pace (m/s) a good player drives a segment at: playtesters reach the first checkpoint
+   * (1,000 m) in about 60 s, so 1000 / 60. The clock is this pace's time times a slack factor.
+   */
+  playerMps: 1000 / 60,
+  /**
+   * Slack on the clock: the first segment gets 1.5x a good player's time (90 s for the first
+   * checkpoint), and each later one `slackStep` less, down to `slackFloor`, so the clock stays
+   * tight but fair as the run goes on.
+   */
+  slackFirst: 1.5,
+  slackStep: 0.06,
+  slackFloor: 1.2,
+  /** Most seconds of clock left at a gate that carry over into the next segment (the rest still pays BONUS). */
+  carryCap: 25,
   /** Tank fraction restored on reaching a checkpoint. */
   fuelBonus: 0.1,
   /** BONUS points for reaching one: flat + per second left on the clock. */
@@ -430,6 +447,15 @@ export const STUNT = {
   landSlope: 0.4,
   /** Flat road after the landing ramp. */
   runout: 192,
+  // --- the show camera (Phase 9.5) ---
+  /** The framing locks on the truck this far before the first pad (px). */
+  camLead: 520,
+  /** Slow motion: it starts this far before the lip (px), runs at this game speed, and eases in/out at `slowRate` per second. */
+  slowLead: 420,
+  slowScale: 0.5,
+  slowRate: 5,
+  /** The slow motion and the framing hold this long (real seconds) after the landing so the finale is seen. */
+  slowHold: 1.4,
   /** Clear flat road after the stunt landing (metres). */
   clearRunoutMeters: 50,
 
@@ -548,7 +574,7 @@ export const AUDIO = {
   biomeTranspose: [0, 2, -2, 3],
 } as const;
 
-/** Progression (Phase 7): coins, upgrades, high scores, the daily challenge. All saved locally. */
+/** Progression (Phase 7): coins, upgrades, high scores. All saved locally. */
 export const PROGRESSION = {
   saveKey: 'snack-run:save',
   /** Entries kept in the high-score table. */
@@ -561,8 +587,6 @@ export const PROGRESSION = {
     perCheckpoint: 15,
     perTakedown: 10,
     perNearMiss: 2,
-    /** Flat bonus for finishing the daily challenge. */
-    daily: 50,
   },
   /**
    * Garage upgrades. Level n costs `cost * growth^n` (n from 0); each level adds `perLevel`:
@@ -570,8 +594,8 @@ export const PROGRESSION = {
    * with more fuel); efficiency = less fuel burned; armor = less damage taken.
    */
   upgrades: {
-    tank: { name: 'Tank size', blurb: '+20% capacity per level', max: 5, cost: 150, growth: 1.7, perLevel: 0.2 },
-    efficiency: { name: 'Fuel efficiency', blurb: '-7% fuel burned per level', max: 5, cost: 120, growth: 1.7, perLevel: 0.07 },
-    armor: { name: 'Damage resistance', blurb: '-8% damage taken per level', max: 5, cost: 140, growth: 1.7, perLevel: 0.08 },
+    tank: { name: 'Tank size', blurb: '+20% capacity per level', max: 5, cost: 330, growth: 1.8, perLevel: 0.2 },
+    efficiency: { name: 'Fuel efficiency', blurb: '-7% fuel burned per level', max: 5, cost: 260, growth: 1.8, perLevel: 0.07 },
+    armor: { name: 'Damage resistance', blurb: '-8% damage taken per level', max: 5, cost: 310, growth: 1.8, perLevel: 0.08 },
   },
 } as const;

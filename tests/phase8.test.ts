@@ -368,14 +368,14 @@ describe('Phase 8 art: the road', () => {
     }
   });
 
-  it('suits the biome: sparkles and ice only in snow, ripples not in the forest, puddles never far away', () => {
+  it('suits the biome: sparkles and ice only in snow, ripples not in the forest, puddles only on the track', () => {
     const kinds = (b: 'forest' | 'desert' | 'snow' | 'swamp') => new Set(groundDetails(b, 0, 20000).map((d) => d.kind));
     expect(kinds('snow').has('sparkle')).toBe(true);
     expect(kinds('forest').has('sparkle')).toBe(false);
     expect(kinds('forest').has('ripple')).toBe(false);
     expect(kinds('desert').has('ripple')).toBe(true);
     expect(kinds('swamp').has('puddle')).toBe(true);
-    for (const d of groundDetails('swamp', 0, 20000)) if (d.kind === 'puddle' || d.kind === 'crack') expect(d.f).toBeLessThan(1.7);
+    for (const d of groundDetails('swamp', 0, 20000)) if (d.kind === 'crack') expect(d.f).toBeLessThan(1.7);
   });
 
   it('density 0 draws nothing and a lower density draws fewer', () => {

@@ -25,11 +25,11 @@ import { biomeAtX, biomeChangesAt, type Biome } from '../game/Biomes';
 import { checkpointMeters } from '../game/Checkpoint';
 import { truckCircles } from '../game/Collision';
 import { PlayerLane, laneDepth, laneLift, laneProject, laneScale, laneShade } from '../game/Lanes';
-import { NO_PERKS } from '../game/Perks';
 import { obstacleCircles } from '../game/Obstacles';
 import { emitCrash, emitDust, emitLanding, emitMud, emitSmoke, sprayRate } from '../game/Effects';
 import { ParticleSystem, particleFade, particleRadius } from '../game/Particles';
 import { TrackMarks } from '../game/TrackMarks';
+import { ShowCam } from '../game/ShowCam';
 import { StuntShow, type ShowEvent } from '../game/Show';
 import { StageView } from '../game/StageView';
 import { RIVAL_STYLES } from '../game/Rival';
@@ -55,7 +55,7 @@ import { touchHeld, touchVisible } from '../input/Touch';
 import { TouchView } from '../input/TouchView';
 import { keyLabel, loadSettings, particleScale, pickupMark, shakeScale, type Action, type Settings } from '../settings/Settings';
 import { unlockAchievements, type Achievement } from '../progress/Achievements';
-import { dailySeed, dayKey } from '../progress/Daily';
+import { dayKey } from '../progress/Day';
 import { loadSave, perksFor, recordRun, writeSave, type RunResult, type SaveData } from '../progress/Progress';
 import { defaultStore, type KeyValueStore } from '../progress/Storage';
 import { FONT_BODY, FONT_DISPLAY } from '../ui/Fonts';
@@ -99,7 +99,6 @@ export class GameScene extends Phaser.Scene {
   private laneHud!: Phaser.GameObjects.Graphics;
   private store: KeyValueStore = defaultStore();
   private save!: SaveData;
-  private daily = false;
   private day = dayKey();
   private achClock = 0;
   private banked: (RunResult & { achievements: Achievement[] }) | null = null;
@@ -145,16 +144,10 @@ export class GameScene extends Phaser.Scene {
   private overAt = 0;
   private startX = GAMEPLAY.startX;
   private lastBeepTick = -1;
-  private showCameraFocus = false;
-  private cameraFocus = 0;
+  private showCam = new ShowCam();
 
   constructor() {
     super('Game');
-  }
-
-  /** `daily: true` starts the daily challenge: the day's seed, and the stock truck for everyone. */
-  init(data?: { daily?: boolean }): void {
-    this.daily = data?.daily === true || new URLSearchParams(window.location.search).has('daily');
   }
 
   create(): void {
@@ -164,8 +157,7 @@ export class GameScene extends Phaser.Scene {
     this.bestAir = 0;
     this.flippedTimer = 0;
     this.overAt = 0;
-    this.showCameraFocus = false;
-    this.cameraFocus = 0;
+    this.showCam.reset();
     this.paused = false;
     this.pauseLayer = null;
     this.gameOverButtonLayer = null;
@@ -216,17 +208,12 @@ export class GameScene extends Phaser.Scene {
     this.audio.setLevels(this.settings.music, this.settings.sfx);
 
     const param = new URLSearchParams(window.location.search).get('seed');
-    this.seed = this.daily
-      ? dailySeed(this.day)
-      : param
-        ? hashSeed(param)
-        : Math.floor(Math.random() * 2 ** 31);
+    this.seed = param ? hashSeed(param) : Math.floor(Math.random() * 2 ** 31);
 
     this.terrain = new Terrain(this.seed, this.startX);
     this.stunt = new StuntShow(this.seed, this.startX);
     this.rightClock = 0;
-    // The daily challenge is the same stock truck for everyone; otherwise garage upgrades apply.
-    this.run = new RunModel(this.seed, this.terrain, this.startX, this.daily ? NO_PERKS : perksFor(this.save));
+    this.run = new RunModel(this.seed, this.terrain, this.startX, perksFor(this.save));
     this.race = new Race(this.seed, this.terrain, this.run.wrecks, this.startX, this.run.obstacles);
     this.biome = biomeAtX(this.startX, this.startX);
     this.parallax = new Parallax(this, this.biome.id);
@@ -307,7 +294,6 @@ export class GameScene extends Phaser.Scene {
       .setDepth(10)
       .setAlpha(0);
     this.tweens.add({ targets: this.hint, alpha: 0, delay: 9000, duration: 1200 });
-    if (this.daily) this.flash('DAILY CHALLENGE  ' + this.day);
 
     const kb = this.input.keyboard!;
     // Driving keys are rebindable, so they are tracked by key code (see src/input); the menu keys are fixed.
@@ -322,7 +308,7 @@ export class GameScene extends Phaser.Scene {
       kb.off('keydown');
       kb.off('keyup');
     });
-    this.keys = kb.addKeys('G,D,O,SPACE,ENTER,ESC') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = kb.addKeys('G,O,SPACE,ENTER,ESC') as Record<string, Phaser.Input.Keyboard.Key>;
     this.applyQuality();
 
     this.terrain.ensure(this.startX + VIEW_W + 1500);
@@ -388,7 +374,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number): void {
-    const dt = Math.min(delta / 1000, 1 / 20);
+    // `realDt` is wall-clock time (menus, camera framing); `dt` is game time, slowed during the show jump.
+    const realDt = Math.min(delta / 1000, 1 / 20);
+    const dt = realDt * this.showCam.timeScale;
     const J = Phaser.Input.Keyboard.JustDown;
     const pad = this.pollInput();
     const b = this.settings.bindings;
@@ -403,13 +391,12 @@ export class GameScene extends Phaser.Scene {
       this.tracker.endFrame();
       return;
     }
-    if (this.settings.effects === 'auto' && this.governor.update(dt)) this.applyQuality();
+    if (this.settings.effects === 'auto' && this.governor.update(realDt)) this.applyQuality();
     if (this.run.over) {
       if (pad.left || pad.up) this.moveGameOverSelection(-1);
       else if (pad.right || pad.down) this.moveGameOverSelection(1);
       else if (J(this.keys.G) || pad.garage) this.scene.start('Garage');
       else if (J(this.keys.O) || pad.settings) this.scene.start('Settings', { from: 'Game' });
-      else if (J(this.keys.D) || pad.daily) this.restart(!this.daily);
       else if (J(this.keys.ESC) || (pad.back && this.time.now - this.overAt > 400)) this.scene.start('Menu');
       else if (pressed('reset') || J(this.keys.SPACE) || J(this.keys.ENTER)) this.restart();
       else if (pad.confirm) this.activateGameOverSelection();
@@ -490,7 +477,7 @@ export class GameScene extends Phaser.Scene {
       this.flippedTimer = 0;
     }
 
-    this.updateCamera(dt);
+    this.updateCamera(realDt);
     this.view.update(this.truck, this.terrain, dt, this.lane.f);
     this.syncBiome();
     this.drawGround();
@@ -518,16 +505,18 @@ export class GameScene extends Phaser.Scene {
     emitDust(this.particles, Math.random, this.biome, t.x - 30, this.terrain.heightAt(t.x) - laneLift(from), t.speed, 5, 0.8);
   }
 
-  private updateCamera(dt: number): void {
+  private updateCamera(realDt: number): void {
     const cam = this.cameras.main;
-    const targetFocus = this.showCameraFocus ? 1 : 0;
-    this.cameraFocus += (targetFocus - this.cameraFocus) * (1 - Math.exp(-CAMERA.yLerp * dt));
-    const xAnchor = CAMERA.xAnchor + (0.5 - CAMERA.xAnchor) * this.cameraFocus;
-    const yAnchor = CAMERA.yAnchor + (0.5 - CAMERA.yAnchor) * this.cameraFocus;
-    const tx = this.truck.x + this.truck.vx * CAMERA.lookAhead - VIEW_W * xAnchor;
+    // `dt` is game time (slowed during the show); the framing eases in real time.
+    const near = this.stunt.stageNear(this.truck.x);
+    const f = this.showCam.update(realDt, this.truck.x, near ? near.layout : null, this.run.over, near?.landed ?? false).focus;
+    const xAnchor = CAMERA.xAnchor + (CAMERA.focusXAnchor - CAMERA.xAnchor) * f;
+    const yAnchor = CAMERA.yAnchor + (CAMERA.focusYAnchor - CAMERA.yAnchor) * f;
+    // The look-ahead pushes the truck off centre at speed, so it fades out as the show camera takes over.
+    const tx = this.truck.x + this.truck.vx * CAMERA.lookAhead * (1 - f) - VIEW_W * xAnchor;
     const ty = this.truck.y - VIEW_H * yAnchor;
     cam.scrollX = tx;
-    cam.scrollY += (ty - cam.scrollY) * (1 - Math.exp(-CAMERA.yLerp * dt));
+    cam.scrollY += (ty - cam.scrollY) * (1 - Math.exp(-(CAMERA.yLerp + (CAMERA.focusYLerp - CAMERA.yLerp) * f) * realDt));
   }
 
   /** The backdrop follows the screen centre, so it has changed by the time the new ground arrives. */
@@ -767,7 +756,6 @@ export class GameScene extends Phaser.Scene {
     const t = this.truck;
     switch (e.type) {
       case 'pad': {
-        this.showCameraFocus = true;
         this.audio.boost(e.count);
         const k = shakeScale(this.settings);
         if (k > 0) this.cameras.main.shake(110, 0.004 * k);
@@ -785,7 +773,7 @@ export class GameScene extends Phaser.Scene {
         this.bannerText('SHOW TIME!', '#ffe066', 1300);
         break;
       case 'landed': {
-        this.showCameraFocus = false;
+        this.showCam.landed();
         const points = e.points > 0 ? this.run.score.addBonus(e.points) : 0;
         if (e.cleared) {
           this.audio.showLanded();
@@ -1174,8 +1162,8 @@ export class GameScene extends Phaser.Scene {
     this.flippedTimer = 0;
   }
 
-  private restart(daily = this.daily): void {
-    this.scene.restart({ daily });
+  private restart(): void {
+    this.scene.restart();
   }
 
   private showPause(): void {
@@ -1211,7 +1199,7 @@ export class GameScene extends Phaser.Scene {
   /** Banks the finished run once: coins, lifetime stats, the score table and any achievements. */
   private bankRun(): RunResult & { achievements: Achievement[] } {
     if (this.banked) return this.banked;
-    const summary = this.run.summary(this.daily);
+    const summary = this.run.summary();
     const result = recordRun(this.save, summary, this.day);
     const achievements = unlockAchievements(this.save, summary, this.day);
     writeSave(this.store, this.save);
@@ -1224,7 +1212,7 @@ export class GameScene extends Phaser.Scene {
     this.achClock += dt;
     if (this.run.over || this.achClock < 0.5) return;
     this.achClock = 0;
-    const fresh = unlockAchievements(this.save, this.run.summary(this.daily), this.day);
+    const fresh = unlockAchievements(this.save, this.run.summary(), this.day);
     if (fresh.length === 0) return;
     writeSave(this.store, this.save);
     this.audio.reward();
@@ -1251,9 +1239,9 @@ export class GameScene extends Phaser.Scene {
     const put = (x: number, y: number, text: string | string[], kind: 'display' | 'body', size: number, color: string, ox = 0.5) =>
       label(this, layer, x, y, text, kind, size, color, ox);
 
-    const title = TITLES[this.run.endReason ?? 'fuel'] + (this.daily ? '  (DAILY)' : '');
+    const title = TITLES[this.run.endReason ?? 'fuel'];
     put(cx, 62, title, 'display', 34, INK.red);
-    const sm = this.run.summary(this.daily);
+    const sm = this.run.summary();
     const left = 104;
     put(left, 108, `SCORE ${s.total}${result.newBestScore ? '   NEW BEST!' : ''}`, 'display', 22, result.newBestScore ? INK.title : INK.text, 0);
     put(
@@ -1266,7 +1254,6 @@ export class GameScene extends Phaser.Scene {
         `lane changes ${sm.laneChanges}   close calls ${sm.nearMisses}`,
         '',
         `+${result.coins} COINS   bank ${this.save.coins}`,
-        result.dailyBest !== null ? `DAILY BEST ${result.dailyBest}${result.dailyFirst ? '  (+bonus)' : ''}` : '',
       ],
       'body',
       18,
@@ -1290,7 +1277,6 @@ export class GameScene extends Phaser.Scene {
       rankBadge(this, layer, tx + 8, y, i + 1, 10);
       put(tx + 150, y, String(h.score), 'display', 16, color, 1);
       put(tx + 250, y, `${h.meters} m`, 'body', 17, color, 1);
-      if (h.daily) put(tx + 340, y, 'DAILY', 'body', 14, INK.good, 1);
     });
     if (result.achievements.length) {
       put(cx, 318, result.achievements.map((a) => `ACHIEVEMENT: ${a.name}  +${a.reward} coins`), 'body', 16, INK.title);
@@ -1300,7 +1286,6 @@ export class GameScene extends Phaser.Scene {
     const buttons: GameOverOption[] = [
       ['DRIVE AGAIN', 'SPACE', () => this.restart(), UI.yellow],
       ['GARAGE', 'G', () => this.scene.start('Garage'), UI.cyan],
-      [this.daily ? 'FREE RUN' : 'DAILY', 'D', () => this.restart(!this.daily), UI.green],
       ['SETTINGS', 'O', () => this.scene.start('Settings', { from: 'Game' }), UI.green],
       ['MENU', 'ESC', () => this.scene.start('Menu'), UI.yellowLight],
     ];
@@ -1317,8 +1302,8 @@ export class GameScene extends Phaser.Scene {
     layer.removeAll(true);
     const put = (x: number, y: number, text: string, kind: 'display' | 'body', size: number, color: string) =>
       label(this, layer, x, y, text, kind, size, color);
-    const w = 144;
-    const gap = 12;
+    const w = 170;
+    const gap = 16;
     const x0 = VIEW_W / 2 - (this.gameOverOptions.length * w + (this.gameOverOptions.length - 1) * gap) / 2 + w / 2;
     this.gameOverOptions.forEach(([text, hint, go, accent], i) => {
       put(x0 + i * (w + gap), 382, hint, 'body', 13, INK.dim);

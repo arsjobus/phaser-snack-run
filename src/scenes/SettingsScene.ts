@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { PadEdges, firstPad, padButtons } from '../input/Gamepad';
-import { INK, UI, wrapIndex } from '../ui/Theme';
-import { bottomBar, flatBackdrop, label, rowPlate, topBar, type Layer } from '../ui/Ui';
+import { INK, LIST, UI, wrapIndex } from '../ui/Theme';
+import { backButton, bottomBar, flatBackdrop, label, rowPlate, topBar, type Layer } from '../ui/Ui';
 import { defaultStore, type KeyValueStore } from '../progress/Storage';
 import {
   ACTIONS,
@@ -173,7 +173,7 @@ export class SettingsScene extends Phaser.Scene {
     this.input.keyboard?.off('keydown');
     if (this.from === 'Menu') this.scene.start('Menu');
     else if (this.from === 'Garage') this.scene.start('Garage');
-    else this.scene.start('Game', { daily: false });
+    else this.scene.start('Game');
   }
 
   /** Rows 0 to `LEFT_ROWS - 1` are the left column (sound and screen), the rest the right column (keys). */
@@ -191,13 +191,20 @@ export class SettingsScene extends Phaser.Scene {
       const j = left ? i : i - LEFT_ROWS;
       const cx = left ? 250 : 712;
       const w = 430;
-      const step = left ? 44 : 36;
-      const y = 120 + j * step;
+      // Rows are `LIST.rowGap` apart (the same standard as the garage and the achievements).
+      const rowH = left ? 38 : 28;
+      const step = rowH + LIST.rowGap;
+      const y = 124 + j * step;
       const on = i === this.row;
-      const lx = cx - w / 2 + 16;
+      const lx = cx - w / 2 + LIST.padX;
       const vx = cx + 30; // where the value starts
-      rowPlate(this, this.layer, cx, y, w, step - 6, on);
-      const zone = this.add.zone(cx, y, w, step - 6).setInteractive({ useHandCursor: true });
+      if (r.kind === 'back') {
+        // The Back button looks exactly like the Credits one: wide, yellow, with its key hint.
+        backButton(this, this.layer, cx, y + 14, () => this.back(), on);
+        return;
+      }
+      rowPlate(this, this.layer, cx, y, w, rowH, on);
+      const zone = this.add.zone(cx, y, w, rowH).setInteractive({ useHandCursor: true });
       zone.on('pointerdown', (p: Phaser.Input.Pointer) => {
         this.row = i;
         if (r.kind === 'slider' && p.x >= vx && p.x <= vx + 130) {
@@ -238,9 +245,6 @@ export class SettingsScene extends Phaser.Scene {
         }
         case 'reset':
           this.text(lx, y, 'Reset keys to defaults', 16, col);
-          break;
-        case 'back':
-          this.text(lx, y, 'BACK', 16, on ? INK.title : INK.soft, 0, true);
           break;
       }
     });

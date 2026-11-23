@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { BASE_Y, CHECKPOINT, FUEL, GAMEPLAY, PX_PER_METER } from '../src/config';
+import { BASE_Y, CHECKPOINT, GAMEPLAY, PX_PER_METER } from '../src/config';
 import {
   CheckpointTrack,
   checkpointMeters,
   segmentMeters,
   segmentSeconds,
+  segmentSlack,
 } from '../src/game/Checkpoint';
 import { DamageMeter } from '../src/game/Damage';
 import {
@@ -87,7 +88,8 @@ describe('Checkpoints', () => {
   it('counts down, then banks time, pays a bonus and advances on reaching a gate', () => {
     const c = new CheckpointTrack();
     const t0 = c.timeLeft;
-    expect(t0).toBeCloseTo(segmentSeconds(1) + CHECKPOINT.startBuffer, 6);
+    expect(t0).toBeCloseTo(segmentSeconds(1), 6);
+    expect(t0).toBeCloseTo(90, 6); // 1:30 for the first checkpoint
     expect(c.update(10, 100)).toEqual([]);
     expect(c.timeLeft).toBeCloseTo(t0 - 10, 6);
     expect(c.progress(100)).toBeCloseTo(0.1, 6);
@@ -100,7 +102,7 @@ describe('Checkpoints', () => {
     expect(e.index).toBe(1);
     expect(e.timeAdded).toBeCloseTo(segmentSeconds(2), 6);
     expect(e.points).toBe(Math.round(CHECKPOINT.basePoints + left * CHECKPOINT.pointsPerSecondLeft));
-    expect(c.timeLeft).toBeCloseTo(left + segmentSeconds(2), 6);
+    expect(c.timeLeft).toBeCloseTo(Math.min(left, CHECKPOINT.carryCap) + segmentSeconds(2), 6);
     expect(c.nextIndex).toBe(2);
     expect(c.progress(checkpointMeters(1))).toBe(0);
     expect(c.progress(checkpointMeters(2))).toBe(1);
@@ -119,17 +121,39 @@ describe('Checkpoints', () => {
     expect(d.update(1, 50)).toEqual([]);
   });
 
-  it('gives a slow-but-steady driver (the reference pace) enough time forever', () => {
+  it('is a fair clock: a good player (about 60 s per first segment) never runs dry, a dawdler does', () => {
+    const drive = (mps: number): { timedOut: boolean; reached: number } => {
+      const c = new CheckpointTrack();
+      let meters = 0;
+      let timedOut = false;
+      for (let t = 0; t < 7200 && !timedOut && c.reached < 12; t += 1 / 60) {
+        meters += mps / 60;
+        timedOut = c.update(1 / 60, meters).some((e) => e.type === 'timeup');
+      }
+      return { timedOut, reached: c.reached };
+    };
+    expect(drive(CHECKPOINT.playerMps).timedOut).toBe(false);
+    expect(drive(CHECKPOINT.playerMps).reached).toBe(12);
+    // Even a driver 15% slower than the playtesters keeps up through the early checkpoints...
+    expect(drive(CHECKPOINT.playerMps * 0.85).reached).toBeGreaterThan(3);
+    // ...but the slack shrinks, so a much slower one is eventually caught.
+    expect(drive(CHECKPOINT.playerMps * 0.6).timedOut).toBe(true);
+  });
+
+  it('tightens the slack checkpoint by checkpoint, never below the floor', () => {
+    expect(segmentSeconds(1)).toBeCloseTo(90, 6);
+    for (let i = 1; i < 12; i++) expect(segmentSlack(i + 1)).toBeLessThanOrEqual(segmentSlack(i));
+    expect(segmentSlack(30)).toBe(CHECKPOINT.slackFloor);
+    for (let i = 1; i < 12; i++) expect(segmentSeconds(i + 1)).toBeGreaterThan(segmentSeconds(i) - 1e-9);
+  });
+
+  it('banks at most carryCap seconds into the next segment but pays BONUS on all of them', () => {
     const c = new CheckpointTrack();
-    const mps = FUEL.refSpeed / PX_PER_METER; // 9.5 m/s
-    let meters = 0;
-    let timedOut = false;
-    for (let t = 0; t < 3600 && !timedOut; t += 1 / 60) {
-      meters += mps / 60;
-      timedOut = c.update(1 / 60, meters).some((e) => e.type === 'timeup');
-    }
-    expect(timedOut).toBe(false);
-    expect(c.reached).toBeGreaterThan(5);
+    const left = c.timeLeft;
+    const ev = c.update(0, checkpointMeters(1))[0];
+    if (ev.type !== 'reached') throw new Error('expected a checkpoint');
+    expect(ev.points).toBe(Math.round(CHECKPOINT.basePoints + left * CHECKPOINT.pointsPerSecondLeft));
+    expect(c.timeLeft).toBeCloseTo(CHECKPOINT.carryCap + segmentSeconds(2), 6);
   });
 });
 

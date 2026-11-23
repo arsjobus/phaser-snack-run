@@ -6,7 +6,7 @@ import type { KeyValueStore } from './Storage';
 
 /**
  * Everything the game remembers between runs (pure TypeScript, no Phaser): the snack bank, garage
- * upgrades, paint, the high-score table, lifetime stats, daily bests and unlocked achievements.
+ * upgrades, paint, the high-score table, lifetime stats and unlocked achievements.
  * Saved as one JSON blob; `sanitizeSave` accepts anything (old, hand-edited, corrupt) and returns
  * a valid save, so a bad blob can never break the game.
  */
@@ -20,8 +20,6 @@ export interface HighScore {
   snacks: number;
   /** UTC day (`YYYY-MM-DD`) the run was driven. */
   date: string;
-  /** Driven in the daily challenge. */
-  daily: boolean;
   reason: EndReason | null;
 }
 
@@ -49,8 +47,6 @@ export interface SaveData {
   ownedSkins: string[];
   /** Best first, at most `PROGRESSION.highScores` entries. */
   highScores: HighScore[];
-  /** Best score of each daily challenge, by UTC day. */
-  dailyBest: Record<string, number>;
   stats: LifetimeStats;
   /** Unlocked achievements: id -> UTC day. */
   achievements: Record<string, string>;
@@ -82,7 +78,6 @@ export function emptySave(): SaveData {
     skin: DEFAULT_SKIN,
     ownedSkins: [DEFAULT_SKIN],
     highScores: [],
-    dailyBest: {},
     stats: emptyStats(),
     achievements: {},
   };
@@ -120,16 +115,10 @@ export function sanitizeSave(raw: unknown): SaveData {
         meters: Math.floor(num(e.meters)),
         snacks: Math.floor(num(e.snacks)),
         date: e.date,
-        daily: e.daily === true,
         reason: typeof e.reason === 'string' && REASONS.includes(e.reason) ? (e.reason as EndReason) : null,
       });
     }
     out.highScores = list.sort((a, b) => b.score - a.score).slice(0, PROGRESSION.highScores);
-  }
-  if (isObject(raw.dailyBest)) {
-    for (const [day, v] of Object.entries(raw.dailyBest)) {
-      if (DAY.test(day) && typeof v === 'number' && Number.isFinite(v)) out.dailyBest[day] = Math.floor(Math.max(0, v));
-    }
   }
   if (isObject(raw.stats)) {
     for (const k of Object.keys(out.stats) as (keyof LifetimeStats)[]) out.stats[k] = num(raw.stats[k]);
@@ -210,8 +199,8 @@ export { NO_PERKS };
 
 // ---- runs --------------------------------------------------------------------------------------
 
-/** Coins a run earns. The daily bonus is paid for the first daily run of the day (`firstDaily`). */
-export function coinsForRun(s: RunSummary, firstDaily = false): number {
+/** Coins a run earns. */
+export function coinsForRun(s: RunSummary): number {
   const C = PROGRESSION.coins;
   const base =
     s.snacks * C.perSnack +
@@ -219,7 +208,7 @@ export function coinsForRun(s: RunSummary, firstDaily = false): number {
     s.checkpoints * C.perCheckpoint +
     s.takedowns * C.perTakedown +
     s.nearMisses * C.perNearMiss;
-  return Math.floor(base) + (s.daily && firstDaily ? C.daily : 0);
+  return Math.floor(base);
 }
 
 export interface RunResult {
@@ -228,19 +217,14 @@ export interface RunResult {
   rank: number | null;
   newBestScore: boolean;
   newBestMeters: boolean;
-  /** Best score of today's daily challenge after this run (daily runs only). */
-  dailyBest: number | null;
-  /** First daily run of the day (the bonus was paid). */
-  dailyFirst: boolean;
 }
 
-/** Banks a finished run: coins, lifetime stats, the high-score table and the daily best. */
+/** Banks a finished run: coins, lifetime stats and the high-score table. */
 export function recordRun(save: SaveData, s: RunSummary, day: string): RunResult {
   const st = save.stats;
   const newBestScore = s.score > st.bestScore;
   const newBestMeters = s.meters > st.bestMeters;
-  const dailyFirst = s.daily && save.dailyBest[day] === undefined;
-  const coins = coinsForRun(s, dailyFirst);
+  const coins = coinsForRun(s);
 
   save.coins += coins;
   st.runs++;
@@ -260,7 +244,6 @@ export function recordRun(save: SaveData, s: RunSummary, day: string): RunResult
     meters: s.meters,
     snacks: s.snacks,
     date: day,
-    daily: s.daily,
     reason: s.endReason,
   };
   // The newest run goes below older runs with the same score.
@@ -269,17 +252,10 @@ export function recordRun(save: SaveData, s: RunSummary, day: string): RunResult
   const rank = at === -1 ? save.highScores.length : at + 1;
   save.highScores = save.highScores.slice(0, PROGRESSION.highScores);
 
-  let dailyBest: number | null = null;
-  if (s.daily) {
-    dailyBest = Math.max(save.dailyBest[day] ?? 0, s.score);
-    save.dailyBest[day] = dailyBest;
-  }
   return {
     coins,
     rank: rank <= PROGRESSION.highScores ? rank : null,
     newBestScore,
     newBestMeters,
-    dailyBest,
-    dailyFirst,
   };
 }

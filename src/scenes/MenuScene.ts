@@ -12,7 +12,7 @@ import { bodyOrigin } from '../game/TruckView';
 import { PadEdges, firstPad, padButtons } from '../input/Gamepad';
 import { loadSave } from '../progress/Progress';
 import { defaultStore } from '../progress/Storage';
-import { MENU_ITEMS, type MenuId } from '../ui/MenuModel';
+import { MENU_GATE, MENU_ITEMS, type MenuId } from '../ui/MenuModel';
 import { INK, wrapIndex } from '../ui/Theme';
 import { button, label, logoPlate, type Layer } from '../ui/Ui';
 
@@ -61,7 +61,13 @@ export class MenuScene extends Phaser.Scene {
     const ground = this.add.graphics().setDepth(1);
     new GroundPainter(ground, terrain, startX).paint(150, SCROLL_Y0, biome);
     const gy = terrain.heightAt(400);
-    this.add.image(100, gy + 4, 'start_gate').setOrigin(0.5, 1).setDepth(0.5);
+    // The start sign stands on the right, wholly in view and clear of the buttons (a far lane lifts it
+    // above them); it used to sit at the left edge with only a sliver on screen.
+    this.add
+      .image(MENU_GATE.screenX + 150, laneProject(gy, gy + 4, MENU_GATE.lane), 'start_gate')
+      .setOrigin(0.5, 1)
+      .setScale(laneScale(MENU_GATE.lane))
+      .setDepth(0.5);
 
     // The lineup: the player's truck up front, three rivals behind it on the far lanes.
     const lineup = [
@@ -146,7 +152,7 @@ export class MenuScene extends Phaser.Scene {
   private go(id: MenuId): void {
     switch (id) {
       case 'play':
-        this.scene.start('Game', { daily: false });
+        this.scene.start('Game');
         break;
       case 'garage':
         this.scene.start('Garage');

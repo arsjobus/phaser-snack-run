@@ -80,6 +80,13 @@ export class StuntShow {
     return this.locator.onStage(x, lead);
   }
 
+  /** The stage the truck at x is at or heading for (from the camera's lead to the end of the slope), else null. */
+  stageNear(x: number): { layout: StuntLayout; landed: boolean } | null {
+    const layout = this.locator.at(x - 120);
+    if (x < layout.pads[0].x0 - STUNT.camLead - 200 || x > layout.landEndX + 400) return null;
+    return { layout, landed: this.states.get(layout.index)?.landed === true };
+  }
+
   /** Returns and clears the events since the last call. */
   drain(): ShowEvent[] {
     const out = this.events;

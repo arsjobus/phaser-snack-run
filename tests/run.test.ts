@@ -149,6 +149,7 @@ describe('RunModel', () => {
     for (; t < seconds && !run.over; t += dt) {
       terrain.ensure(x + 4000);
       x += speed * dt;
+      run.checkpoints.timeLeft = Math.max(run.checkpoints.timeLeft, 30); // these tests are about fuel, not the checkpoint clock
       // Chassis-centre height on flat ground; if not grabbing, drive far above everything.
       const y = grab ? terrain.heightAt(x) - PICKUPS.hover : BASE_Y - 5000;
       const can = run.pickups.items.find((p) => p.kind === 'fuel' && !p.taken && p.x >= x);

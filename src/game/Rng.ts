@@ -1,4 +1,4 @@
-/** Small deterministic PRNG (mulberry32) so runs can be seeded (?seed=123) for daily challenges. */
+/** Small deterministic PRNG (mulberry32) so runs can be seeded (?seed=123). */
 export class Rng {
   private s: number;
 

@@ -1,7 +1,6 @@
 /**
  * What the garage upgrades do to a run, as plain multipliers (pure TypeScript, no saves in here):
- * a bigger tank, a thriftier engine, tougher armor. `NO_PERKS` is the stock truck (and the daily
- * challenge, where everyone drives the same truck).
+ * a bigger tank, a thriftier engine, tougher armor. `NO_PERKS` is the stock truck.
  */
 export interface Perks {
   /** Tank capacity multiplier (1.4 = a 40% bigger tank). */

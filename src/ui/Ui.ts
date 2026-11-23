@@ -154,6 +154,49 @@ export function button(scene: Phaser.Scene, layer: Layer, b: ButtonSpec): void {
   }
 }
 
+/**
+ * The Back button of the sub-menus (settings and credits): the same wide, bright yellow button with
+ * the key hint, so it is the one thing on those screens that stands out. `focus` rings it when the
+ * keyboard cursor is on it.
+ */
+export const BACK_BUTTON = { w: 220, h: 44, size: 18 } as const;
+export function backButton(scene: Phaser.Scene, layer: Layer, x: number, y: number, onClick: () => void, focus = false, text = 'BACK'): void {
+  if (focus) {
+    const g = scene.add.graphics();
+    g.lineStyle(3, UI.white, 1);
+    g.strokeRoundedRect(x - BACK_BUTTON.w / 2 - 7, y - BACK_BUTTON.h / 2 - 7, BACK_BUTTON.w + 14, BACK_BUTTON.h + 14, 14);
+    layer.add(g);
+  }
+  button(scene, layer, { x, y, w: BACK_BUTTON.w, h: BACK_BUTTON.h, text, hint: 'ESC', selected: true, size: BACK_BUTTON.size, onClick });
+}
+
+/**
+ * The snack coin: a gold coin stamped with a little red cracker, so it reads as the snack bank's
+ * money. Flat and outlined like the rest of the art. `r` is the coin's radius.
+ */
+export function coinIcon(scene: Phaser.Scene, layer: Layer, x: number, y: number, r = 10): void {
+  const g = scene.add.graphics();
+  g.fillStyle(UI.outline, 1);
+  g.fillCircle(x, y, r + 2);
+  g.fillStyle(0xc99a00, 1);
+  g.fillCircle(x, y, r);
+  g.fillStyle(UI.yellow, 1);
+  g.fillCircle(x, y, r * 0.82);
+  g.fillStyle(UI.yellowLight, 1);
+  g.slice(x, y, r * 0.82, Math.PI * 1.1, Math.PI * 1.9, false);
+  g.fillPath();
+  // The cracker: a rounded square with four holes.
+  const s = r * 0.95;
+  g.fillStyle(UI.outline, 1);
+  g.fillRoundedRect(x - s / 2 - 1, y - s / 2 - 1, s + 2, s + 2, 2);
+  g.fillStyle(0xd9602e, 1);
+  g.fillRoundedRect(x - s / 2, y - s / 2, s, s, 1.5);
+  g.fillStyle(UI.yellowLight, 1);
+  const d = s * 0.22;
+  for (const [ox, oy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) g.fillCircle(x + ox * d, y + oy * d, Math.max(0.9, r * 0.09));
+  layer.add(g);
+}
+
 /** A row background for lists (garage upgrades, settings): flat, rimmed when it is the selected row. */
 export function rowPlate(scene: Phaser.Scene, layer: Layer, cx: number, y: number, w: number, h: number, selected: boolean): Phaser.GameObjects.Graphics {
   const g = scene.add.graphics();

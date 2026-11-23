@@ -141,5 +141,18 @@ export function rankColor(rank: number): number {
  */
 export const rowY = (top: number, step: number, i: number): number => top + i * step;
 
+/**
+ * The spacing every list in the menus follows (garage rows, achievements, settings): rows are
+ * separated by at least `rowGap` px, and text starts `padX` px inside its plate.
+ */
+export const LIST = { rowGap: 8, padX: 16 } as const;
+
+/** Rows of a list laid out between `top` and `bottom`: each is at most `maxH` tall, `LIST.rowGap` apart. */
+export function listRows(top: number, bottom: number, n: number, maxH: number): { h: number; step: number; y: (i: number) => number } {
+  const h = Math.max(1, Math.min(maxH, (bottom - top - Math.max(0, n - 1) * LIST.rowGap) / Math.max(1, n)));
+  const step = h + LIST.rowGap;
+  return { h, step, y: (i) => top + h / 2 + i * step };
+}
+
 /** Wraps a menu cursor by `d` over `n` items. */
 export const wrapIndex = (i: number, d: number, n: number): number => (n <= 0 ? 0 : (((i + d) % n) + n) % n);
