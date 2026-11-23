@@ -11,6 +11,7 @@ import {
   OBSTACLE_KINDS,
   PX_PER_METER,
   SCROLL_Y0,
+  STUNT,
   TRUCK,
   VIEW_H,
   VIEW_W,
@@ -29,6 +30,8 @@ import { obstacleCircles } from '../game/Obstacles';
 import { emitCrash, emitDust, emitLanding, emitMud, emitSmoke, sprayRate } from '../game/Effects';
 import { ParticleSystem, particleFade, particleRadius } from '../game/Particles';
 import { TrackMarks } from '../game/TrackMarks';
+import { StuntShow, type ShowEvent } from '../game/Show';
+import { StageView } from '../game/StageView';
 import { RIVAL_STYLES } from '../game/Rival';
 import { HUD_H, Hud } from '../game/Hud';
 import { warnTick } from '../game/HudModel';
@@ -103,6 +106,10 @@ export class GameScene extends Phaser.Scene {
   private achToast!: Phaser.GameObjects.Text;
   private particles = new ParticleSystem();
   private tracks = new TrackMarks();
+  private stunt!: StuntShow;
+  private stageView!: StageView;
+  private rightClock = 0;
+  private showToast!: Phaser.GameObjects.Text;
   private decals!: Phaser.GameObjects.Graphics;
   private shadows!: Phaser.GameObjects.Graphics;
   /** Fractional particle counts carried between frames, per wheel key. */
@@ -211,7 +218,9 @@ export class GameScene extends Phaser.Scene {
         ? hashSeed(param)
         : Math.floor(Math.random() * 2 ** 31);
 
-    this.terrain = new Terrain(this.seed);
+    this.terrain = new Terrain(this.seed, this.startX);
+    this.stunt = new StuntShow(this.seed, this.startX);
+    this.rightClock = 0;
     // The daily challenge is the same stock truck for everyone; otherwise garage upgrades apply.
     this.run = new RunModel(this.seed, this.terrain, this.startX, this.daily ? NO_PERKS : perksFor(this.save));
     this.race = new Race(this.seed, this.terrain, this.run.wrecks, this.startX, this.run.obstacles);
@@ -221,6 +230,8 @@ export class GameScene extends Phaser.Scene {
     this.groundPainter = new GroundPainter(this.ground, this.terrain, this.startX);
     this.decals = this.add.graphics().setDepth(1.2);
     this.shadows = this.add.graphics().setDepth(1.5);
+    this.stageView?.destroy();
+    this.stageView = new StageView(this, this.terrain, this.startX, () => this.audio);
     this.addStartGate();
     this.truck = new TruckPhysics(this.startX, BASE_Y - 45);
     this.truck.autoLevel = true; // no air control: a gentle assist keeps it landing on its wheels
@@ -263,6 +274,12 @@ export class GameScene extends Phaser.Scene {
       .setDepth(10);
     this.toast = this.add
       .text(VIEW_W / 2, 90, '', text(34, '#ffe066'))
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(10)
+      .setAlpha(0);
+    this.showToast = this.add
+      .text(VIEW_W / 2, 52, '', text(34, '#ff9f45'))
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(10)
@@ -348,6 +365,7 @@ export class GameScene extends Phaser.Scene {
     this.groundPainter.detail = this.quality;
     this.parallax.calm = this.settings.reducedMotion;
     this.particles.density = particleScale(this.settings, this.quality);
+    this.stageView.calm = this.settings.reducedMotion;
   }
 
   /** Reads keyboard, pad and touch into one `held` state and returns the pad's one-shot buttons. */
@@ -421,6 +439,7 @@ export class GameScene extends Phaser.Scene {
     while (this.acc >= FIXED_DT && steps < 40) {
       this.terrain.ensure(this.truck.x + VIEW_W + 1500);
       const ev = this.truck.step(FIXED_DT, input, this.terrain);
+      if (!this.run.over) this.stunt.step(FIXED_DT, this.truck, this.terrain);
       this.race.stepPhysics(FIXED_DT);
       if (ev.landedAirTime !== null) this.onLanded(ev.landedAirTime);
       this.acc -= FIXED_DT;
@@ -428,6 +447,7 @@ export class GameScene extends Phaser.Scene {
     }
     if (steps === 40) this.acc = 0;
     this.terrain.prune(this.truck.x - 1800);
+    for (const e of this.stunt.drain()) this.onShowEvent(e);
 
     for (const e of this.run.update(dt, { x: this.truck.x, y: this.truck.y, speed: this.truck.speed, lane: this.lane.f })) {
       this.onRunEvent(e);
@@ -449,8 +469,17 @@ export class GameScene extends Phaser.Scene {
     });
 
     // A player truck stuck on its roof/side becomes a wreck instead of auto-recovering.
-    this.flippedTimer =
-      !this.run.over && this.truck.flipped && this.truck.speed < 80 ? this.flippedTimer + dt : 0;
+    // During the show (surge and the grace after the landing) a flip is a spectacle, not a wreck:
+    // the crew sets the truck back on its wheels.
+    const immune = this.stunt.immune(this.truck);
+    const stuck = !this.run.over && this.truck.flipped && this.truck.speed < 80;
+    this.flippedTimer = stuck && !immune ? this.flippedTimer + dt : 0;
+    this.rightClock = stuck && immune ? this.rightClock + dt : 0;
+    if (this.rightClock > STUNT.rightAfter) {
+      this.recover();
+      this.rightClock = 0;
+      this.popup(this.truck.x, this.truck.y - 90, 'CREW TO THE RESCUE', '#9be0ff');
+    }
     if (this.flippedTimer > GAMEPLAY.flipRecoverTime) {
       for (const e of this.run.wreck()) this.onRunEvent(e);
       this.flippedTimer = 0;
@@ -468,6 +497,7 @@ export class GameScene extends Phaser.Scene {
     this.updateFx(dt);
     this.drawDecals();
     this.syncGates();
+    this.stageView.update(dt, this.cameras.main, time / 1000, this.truck, this.lane.f, this.truck.surgeAmount > 0.1);
     this.parallax.update(this.cameras.main.scrollX, this.cameras.main.scrollY, dt);
     this.drawDebug();
     this.updateHud();
@@ -715,6 +745,57 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Bumps, crashes, wrecks and takedowns from the race model. */
+  /** A big centre-screen message in its own colour (the pad count, the show jump). */
+  private bannerText(msg: string, color: string, hold = 900): void {
+    this.showToast.setText(msg).setColor(color).setAlpha(1).setScale(1.3);
+    this.tweens.killTweensOf(this.showToast);
+    this.tweens.add({ targets: this.showToast, scale: 1, duration: 150 });
+    this.tweens.add({ targets: this.showToast, alpha: 0, delay: hold, duration: 450 });
+  }
+
+  /** Boost pads, pyrotechnics, the CRUNCH fireworks and the landing of the show jump. */
+  private onShowEvent(e: ShowEvent): void {
+    const t = this.truck;
+    switch (e.type) {
+      case 'pad': {
+        this.audio.boost(e.count);
+        const k = shakeScale(this.settings);
+        if (k > 0) this.cameras.main.shake(110, 0.004 * k);
+        this.bannerText(e.count === 1 ? 'BOOST!' : `BOOST x${e.count}`, '#ff9f45', 500);
+        this.stageView.sparks(t.x, laneProject(this.terrain.heightAt(t.x), t.y + 20, this.lane.f), 0xffd23f, 14);
+        break;
+      }
+      case 'pyro':
+        this.stageView.pyro(e.layout, e.site, e.x);
+        break;
+      case 'sky':
+        this.stageView.startSky(e.layout);
+        break;
+      case 'launch':
+        this.bannerText('SHOW TIME!', '#ffe066', 1300);
+        break;
+      case 'landed': {
+        const points = e.points > 0 ? this.run.score.addBonus(e.points) : 0;
+        if (e.cleared) {
+          this.audio.showLanded();
+          if (!this.settings.reducedMotion) this.cameras.main.flash(160, 255, 240, 190, false);
+          const lines = [`SHOW JUMP!  +${points} BONUS`, `${e.cars} CARS CLEARED`];
+          if (e.flips > 0) lines.push(e.flips > 1 ? `${e.flips} FLIPS!` : 'FLIP!');
+          this.tweens.killTweensOf(this.cpToast);
+          this.cpToast.setText(lines).setAlpha(1).setScale(1.3);
+          this.tweens.add({ targets: this.cpToast, scale: 1, duration: 160 });
+          this.tweens.add({ targets: this.cpToast, alpha: 0, delay: 2200, duration: 500 });
+          const y = this.terrain.heightAt(t.x) - 120;
+          this.stageView.sparks(t.x, y, 0xffe066, 30);
+          this.stageView.sparks(t.x + 90, y - 30, 0x6fc4ff, 30);
+        } else {
+          this.bannerText(points > 0 ? `FLIP!  +${points}` : 'SHORT!', '#ffb066', 1000);
+        }
+        break;
+      }
+    }
+  }
+
   private onRaceEvent(e: RaceEvent): void {
     switch (e.type) {
       case 'bump': {
@@ -727,7 +808,7 @@ export class GameScene extends Phaser.Scene {
         if (hard) {
           const k = shakeScale(this.settings);
           if (k > 0) this.cameras.main.shake(140, Math.min(0.012, 0.004 + e.impact / 60000) * k);
-          for (const ev of this.run.hurt(e.damage)) this.onRunEvent(ev);
+          if (!this.stunt.immune(this.truck)) for (const ev of this.run.hurt(e.damage)) this.onRunEvent(ev);
         }
         break;
       }

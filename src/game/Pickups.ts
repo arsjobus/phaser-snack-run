@@ -1,8 +1,9 @@
-import { FUEL, LANES, PICKUPS, PX_PER_METER, WRENCH } from '../config';
+import { FUEL, LANES, PICKUPS, PX_PER_METER, STUNT, WRENCH } from '../config';
 import { fuelPerPx } from './Fuel';
 import { clampLane, sameLane } from './Lanes';
 import type { ObstacleField } from './Obstacles';
 import { Rng } from './Rng';
+import { stuntLayout, stuntLength } from './Stunt';
 import { JUMP_KINDS, type PieceKind, type Terrain, type TerrainPiece } from './Terrain';
 import type { WreckField } from './Wrecks';
 
@@ -26,6 +27,7 @@ const SNACK_CHANCE: Record<PieceKind, number> = {
   washboard: 0.55,
   ramp: 1,
   table: 1,
+  stunt: 0,
 };
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
@@ -84,18 +86,23 @@ export class PickupField {
     this.terrain.ensure(toX);
     this.spawnSnacks();
     while (this.nextFuelX < toX) {
-      this.terrain.ensure(this.nextFuelX + 1200);
+      // (a whole stage ahead, so a can that lands in one is found and moved)
+      this.terrain.ensure(this.nextFuelX + 1200 + stuntLength());
       this.spawnSnacks();
-      const x = this.safeFuelX(this.nextFuelX);
+      const wanted = this.nextFuelX;
+      const x = this.safeFuelX(wanted);
       this.items = this.items.filter((p) => !(p.kind === 'snack' && Math.abs(p.x - x) < 70));
       const lane = this.laneRng.int(1, Math.max(1, LANES.count - 2));
       this.add('fuel', x, this.terrain.heightAt(x) - PICKUPS.hover, lane);
       this.fuelXs.push(x);
       this.lastFuelX = x;
-      this.nextFuelX = this.planFuel(x);
+      // A can that had to slide back before a stage (up to a few thousand px) does not make the
+      // next gap shorter: the stage is crossed boosted, at a fraction of the fuel, so it is credited.
+      const inStage = this.terrain.pieces.some((q) => q.kind === 'stunt' && wanted > q.x0 - 140 && wanted < q.x1 + 60);
+      this.nextFuelX = this.planFuel(x) + (inStage ? Math.max(0, wanted - x) : 0);
     }
     while (this.nextWrenchX < toX) {
-      this.terrain.ensure(this.nextWrenchX + 1200);
+      this.terrain.ensure(this.nextWrenchX + 1200 + stuntLength());
       this.spawnSnacks();
       const x = this.safeWrenchX(this.nextWrenchX);
       this.add('wrench', x, this.terrain.heightAt(x) - WRENCH.hover, this.laneRng.int(0, LANES.count - 1));
@@ -168,15 +175,20 @@ export class PickupField {
         (p) => JUMP_KINDS.includes(p.kind) && x > p.x0 - 140 && x < p.x1 + 60,
       );
       if (!piece) break;
-      x = piece.x0 - 140;
+      // Before a stage there may be no room behind (the last can is close): go on past it instead.
+      x = piece.kind === 'stunt' && piece.x0 - 140 < this.lastFuelX + 200 ? piece.x1 + 60 : piece.x0 - 140;
     }
     // Nor on a roadside wreck or obstacle.
     for (let i = 0; i < 4; i++) {
       const w = this.wrecks?.near(x, 110) ?? this.obstacles?.near(x, 110);
       if (!w) break;
-      x = w.x - 150;
+      // (back, unless that is on a jump: then forward)
+      const back = w.x - 150;
+      x = this.terrain.pieces.some((p) => JUMP_KINDS.includes(p.kind) && back > p.x0 - 140 && back < p.x1 + 60) ? w.x + 150 : back;
     }
-    return Math.max(x, this.lastFuelX + 200);
+    x = Math.max(x, this.lastFuelX + 200);
+    const jump = this.terrain.pieces.find((p) => JUMP_KINDS.includes(p.kind) && x > p.x0 - 140 && x < p.x1 + 60);
+    return jump ? jump.x1 + 60 : x;
   }
 
   /** Wrenches lie on the ground: not on jumps or their landings, wrecks, or right on a can. */
@@ -207,7 +219,22 @@ export class PickupField {
     }
   }
 
+  /** The stage's reward: a snack line along the flat pads and a long arc over the pit. */
+  private stuntSnacks(p: TerrainPiece): void {
+    const t = this.terrain;
+    const stage = stuntLayout(p.stage ?? 0, this.startX);
+    const lane = 1;
+    const first = stage.pads[0].x0;
+    const last = stage.rampX0;
+    for (let x = first + 40; x < last; x += PICKUPS.spacing * 2) this.add('snack', x, t.heightAt(x) - PICKUPS.hover, lane);
+    STUNT.arcX.forEach((dx, i) => this.add('snack', stage.lipX + dx, stage.lipY - STUNT.arcY[i], lane));
+  }
+
   private snacksFor(p: TerrainPiece): void {
+    if (p.kind === 'stunt') {
+      this.stuntSnacks(p);
+      return;
+    }
     if (this.rng.next() > SNACK_CHANCE[p.kind]) return;
     const t = this.terrain;
     const hover = PICKUPS.hover;

@@ -92,11 +92,16 @@ describe('PickupField', () => {
       let prev = START;
       for (const x of f.fuelXs) {
         // Fuel burned between the cans, integrated numerically at the reference speed.
+        // A stage (Phase 9) is crossed on the boost pads' surge, which cannot be braked: it costs
+        // a fraction of the reference pace, so its road is not counted.
+        const stages = t.pieces.filter((p) => p.kind === 'stunt');
         let cost = 0;
         for (let px = prev; px < x; px += 10) {
+          if (stages.some((p) => px >= p.x0 && px < p.x1)) continue;
           cost += fuelPerPx(FUEL.refSpeed, (px - START) / PX_PER_METER) * 10;
         }
-        expect(cost).toBeLessThanOrEqual(FUEL.maxGapRatio * FUEL.canRestore + 1e-6);
+        // (+1e-3: the integral steps 10 px at a time, so it can overshoot a gap planned at the bound.)
+        expect(cost).toBeLessThanOrEqual(FUEL.maxGapRatio * FUEL.canRestore + 1e-3);
         expect(cost).toBeLessThan(1); // and always well within one tank
         prev = x;
       }

@@ -230,6 +230,54 @@ export class AudioSystem {
     [110, 96, 80, 62].forEach((f, i) => this.blip('square', f, 0.12, 0.3, [0, 0.18, 0.4, 0.75][i]));
   }
 
+  /** A boost pad: a rocket whoosh that climbs with each pad of the stage. */
+  boost(count: number): void {
+    if (!this.live) return;
+    const t = this.ctx!.currentTime;
+    const up = Math.min(5, Math.max(1, count));
+    this.noiseHit(t, 0.5, 0.5, 'bandpass', 700 + up * 260, this.sfx!, 400, 3200);
+    const o = this.osc('sawtooth', 110 + up * 30, t, this.sfx!, 0.0001);
+    o.osc.frequency.exponentialRampToValueAtTime(380 + up * 90, t + 0.35);
+    this.env(o.gain, t, 0.01, 0.4, 0.22);
+    o.osc.stop(t + 0.45);
+  }
+
+  /** A pyro jet: a low whump and a hiss. */
+  pyro(): void {
+    if (!this.live) return;
+    const t = this.ctx!.currentTime;
+    const o = this.osc('sine', 90, t, this.sfx!, 0.0001);
+    o.osc.frequency.exponentialRampToValueAtTime(38, t + 0.3);
+    this.env(o.gain, t, 0.004, 0.35, 0.7);
+    o.osc.stop(t + 0.4);
+    this.noiseHit(t, 0.9, 0.35, 'highpass', 2500, this.sfx!);
+  }
+
+  /** A rocket going up: a rising whistle. */
+  rocket(): void {
+    if (!this.live) return;
+    const t = this.ctx!.currentTime;
+    const o = this.osc('sine', 500 + Math.random() * 200, t, this.sfx!, 0.0001);
+    o.osc.frequency.exponentialRampToValueAtTime(2400, t + 0.65);
+    this.env(o.gain, t, 0.02, 0.6, 0.08);
+    o.osc.stop(t + 0.7);
+  }
+
+  /** A shell bursting: a crack and a crackle (loud for a letter, quieter for the finale). */
+  burst(loud = true): void {
+    if (!this.live) return;
+    const t = this.ctx!.currentTime;
+    this.noiseHit(t, loud ? 0.45 : 0.3, loud ? 0.55 : 0.3, 'bandpass', 2200, this.sfx!, 4000, 600);
+    this.noiseHit(t + 0.08, 0.25, 0.2, 'highpass', 5000, this.sfx!);
+  }
+
+  /** Fanfare for a landed show jump. */
+  showLanded(): void {
+    if (!this.live) return;
+    [523, 659, 784, 1047].forEach((f, i) => this.blip('square', f, i === 3 ? 0.4 : 0.1, 0.13, i * 0.09));
+    this.stinger();
+  }
+
   /** Descending "wah-wah" when the run ends. */
   gameOver(): void {
     if (!this.live) return;

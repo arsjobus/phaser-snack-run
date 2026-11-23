@@ -227,13 +227,19 @@ The original was pseudo-3D: a wide dirt field with trucks driving at different d
 - [x] Suggest to use a better free and public domain font for primary and secondary fonts
   - **Done:** Russo One (primary) and Rajdhani (secondary), bundled in `public/fonts/` and used everywhere (menus, HUD, toasts). Both are SIL OFL, free but **not** public domain. For true public domain (CC0), Kenney Future is the best fit; swap it in `src/ui/Fonts.ts`.
 
-### Phase 9: Over the top gimimic
+### Phase 9: Over the top gimmick
 
-- [ ] At the last 10% of the 2nd checkpoint (every 2nd check point) then there will be a series of boost pads that once the vehicle touches it cannot brake on flat ground so it's not possible for a vehicle to flip and no obstacles 
-- [ ] Upon touching the boost pad then the vehicle will boost very fast and it'll keep hitting boost pads and boosting while coming up to a big ramp
-- [ ] The vehicles will go up the big ramp and they'll keep boosting up it and they'll launch off over a below line up of cars like a monster truck rally show and there will be pyrotechnics that go off at the top of the ramps both starting and landing ramps
-- [ ] At the end of the jump then vehicles will land and go into the next biome / area and go back to their normal topspeed
-- [ ] The vehicles should be able to flip over accidentally while jumping over the cars below. This is meant to be a fun reward / treat for the player so CRUNCH should be written by firework in the sky over the cars below. Make it exciting.
+- [x] At the last 10% of the 2nd checkpoint (every 2nd check point) then there will be a series of boost pads that once the vehicle touches it cannot brake on flat ground so it's not possible for a vehicle to flip and no obstacles
+  - **Done:** `Stunt.ts` places a stage inside the last `STUNT.fraction` (10%) of every segment that ends at a biome border (checkpoints 2, 4, 6...), ending 192 px before the gate. While the surge is on, gas is forced, the brake is dead and a ground stabiliser holds the truck level. No obstacles, wrecks, cans, wrenches or new rivals on or just before the stage.
+- [x] Upon touching the boost pad then the vehicle will boost very fast and it'll keep hitting boost pads and boosting while coming up to a big ramp
+  - **Done:** four pads on the flat and three on the ramp face, all across the whole field. Each pad kicks 170 px/s and refreshes the surge (1.8x force, 1.18x top speed); the toast counts BOOST x2... x7.
+- [x] The vehicles will go up the big ramp and they'll keep boosting up it and they'll launch off over a below line up of cars like a monster truck rally show and there will be pyrotechnics that go off at the top of the ramps both starting and landing ramps
+  - **Done:** a 288 px curved ramp, a sheer drop, a pit with four rows of parked cars (new `art/show.ts`), a landing table and a gentle slope. Spark fountains and flame jets stand on both sides of the road at the lip and on the landing table. Rivals use the pads and ramp too.
+- [x] At the end of the jump then vehicles will land and go into the next biome / area and go back to their normal topspeed
+  - **Done:** landing cuts the surge to 0.25 s, then it fades over 1.2 s with extra drag on the overspeed; tested to be back at the normal top speed. The gate and the next biome follow the run-out.
+- [x] The vehicles should be able to flip over accidentally while jumping over the cars below. This is meant to be a fun reward / treat for the player so CRUNCH should be written by firework in the sky over the cars below. Make it exciting.
+  - **Done:** a seeded random spin at the launch (measured over 60 seeds: about one jump in four flips, one in six ends on its roof, over nine in ten clear the pit), a weaker air assist while surging, no bump damage during the show and 2.5 s after, and the crew rights a truck left on its roof. CRUNCH is written by six rockets (dot-matrix letters that glide into place, twinkle and fade) with a finale of shells; +1000 for the clear, +150 per car, +500 per flip. Timed so the letters appear while the truck is over the pit.
+  - **Not yet checked by eye:** the look and feel in a browser (pad art, pyro, letter size and timing). Tune `STUNT` in `config.ts`.
 
 ---
 
@@ -264,6 +270,7 @@ The original was pseudo-3D: a wide dirt field with trucks driving at different d
 | Rival speed               | cruise 520-720 px/s by skill, +/-190 rubber band over 700 px |
 | Draft                     | within 260 px behind a rival in your lane: builds over 1 s to +45% engine force, +12% top speed |
 | Checkpoint spacing        | 1,000 m, each segment +150 m longer |
+| Show stage                | before every 2nd checkpoint, in the last 10% of the segment: 7 pads, 288 px ramp, 1,280 px pit, landing table; surge 1.8x force / 1.18x top speed, fades over 1.2 s; clear +1000, +150 per car, +500 per flip; no damage during it and 2.5 s after |
 | Checkpoint clock          | segment length / 8 m/s (+20 s on the first); time left carries over; reaching a gate: +10% fuel, +250 BONUS +10 per second left; a dry clock ends the run |
 
 ---

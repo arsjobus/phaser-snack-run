@@ -1,4 +1,4 @@
-import { PHYSICS, RIVALS, TRUCK } from '../config';
+import { PHYSICS, RIVALS, STUNT, TRUCK } from '../config';
 import type { InputState } from './Input';
 import type { Terrain } from './Terrain';
 
@@ -41,6 +41,14 @@ export class TruckPhysics {
    * which level themselves through their own lean input.
    */
   autoLevel = false;
+  /**
+   * Boost-pad surge (Phase 9). `surge` is the seconds left (the clock stops while airborne),
+   * `surgeAmount` how much of the boost is applied (0..1, eased) and `lastPad` the pad touched last.
+   * While it is on, gas is forced, the brake is dead and a stabiliser holds the truck level on the ground.
+   */
+  surge = 0;
+  surgeAmount = 0;
+  lastPad = -1;
 
   private airGrace = 0;
 
@@ -55,6 +63,20 @@ export class TruckPhysics {
     this.vx = this.vy = this.angle = this.angVel = 0;
     this.airTime = this.airGrace = this.roofTime = 0;
     this.boost = 0;
+    this.surge = this.surgeAmount = 0;
+    this.lastPad = -1;
+  }
+
+  /** A boost pad: refresh the surge and kick the truck along the road. Returns true for a new pad. */
+  hitPad(id: number, terrain: Terrain): boolean {
+    this.surge = STUNT.surgeTime;
+    if (id === this.lastPad) return false;
+    this.lastPad = id;
+    const slope = terrain.slopeAt(this.x);
+    const len = Math.hypot(1, slope);
+    this.vx += (STUNT.padKick / len) * 1;
+    this.vy += (STUNT.padKick * slope) / len;
+    return true;
   }
 
   /** Apply an impulse (px/s units, mass 1) at world point (px, py): collisions use this. */
@@ -92,8 +114,16 @@ export class TruckPhysics {
 
     let wheelsDown = 0;
     let bodyDown = false;
-    const force = P.engineForce * (1 + RIVALS.draftForce * this.boost);
-    const top = P.topSpeed * (1 + RIVALS.draftTop * this.boost);
+    const surging = this.surge > 0;
+    this.surgeAmount = surging
+      ? Math.min(1, this.surgeAmount + dt / STUNT.rise)
+      : Math.max(0, this.surgeAmount - dt / STUNT.fall);
+    const sa = this.surgeAmount;
+    const force = P.engineForce * (1 + RIVALS.draftForce * this.boost) * (1 + (STUNT.forceMult - 1) * sa);
+    const top = P.topSpeed * (1 + RIVALS.draftTop * this.boost) * (1 + (STUNT.topMult - 1) * sa);
+    // The surge cannot be braked: gas is forced on and the brake is dead.
+    const throttle = surging ? 1 : input.throttle;
+    const brake = surging ? 0 : input.brake;
 
     const contact = (
       ox: number,
@@ -141,15 +171,17 @@ export class TruckPhysics {
       let Ft = -P.rollingResistance * vt;
       // Engine braking: off the throttle (and not braking) the truck slows by itself, so it only
       // keeps its speed while the driver holds the gas.
-      if (drives && input.throttle <= 0 && input.brake <= 0) Ft -= P.coastDrag * vt;
+      if (drives && throttle <= 0 && brake <= 0) Ft -= P.coastDrag * vt;
       if (drives) {
-        if (input.throttle > 0) {
-          Ft += input.throttle * force * Math.max(0, 1 - vt / top);
+        if (throttle > 0) {
+          Ft += throttle * force * Math.max(0, 1 - vt / top);
         }
-        if (input.brake > 0) {
-          if (vt > 30) Ft -= input.brake * P.brakeForce;
-          else Ft -= input.brake * P.reverseForce * Math.max(0, 1 + vt / P.reverseTop);
+        if (brake > 0) {
+          if (vt > 30) Ft -= brake * P.brakeForce;
+          else Ft -= brake * P.reverseForce * Math.max(0, 1 + vt / P.reverseTop);
         }
+        // The surge fades: whatever speed is left above the normal top speed bleeds off.
+        if (!surging && sa > 0 && vt > top) Ft -= STUNT.overspeedDrag * (vt - top);
       } else {
         // Body scraping the dirt: lots of friction
         Ft -= 3 * vt;
@@ -182,7 +214,14 @@ export class TruckPhysics {
     if (airborne && this.autoLevel) {
       const want = Math.atan(terrain.slopeAt(this.x + this.vx * 0.3));
       const lvl = 2.2 * (want - this.angle) - 0.45 * this.angVel;
-      torque += Math.max(-1, Math.min(1, lvl)) * P.airTorque * P.autoLevelStrength;
+      const assist = surging ? STUNT.airAssist : 1;
+      torque += Math.max(-1, Math.min(1, lvl)) * P.airTorque * P.autoLevelStrength * assist;
+    }
+    if (surging && !airborne) {
+      // On the ground the surge holds the truck level with the slope: it cannot wheelie or flip.
+      const want = Math.atan(terrain.slopeAt(this.x));
+      const lvl = 3 * (want - this.angle) - 0.9 * this.angVel;
+      torque += Math.max(-1, Math.min(1, lvl)) * P.groundTorque * STUNT.stabilize;
     }
     if (airborne) {
       this.angVel *= Math.max(0, 1 - P.airAngularDamping * dt);
@@ -201,11 +240,16 @@ export class TruckPhysics {
 
     // Airtime bookkeeping with a short grace period so tiny bumps don't count as jumps
     const events: StepEvents = { landedAirTime: null };
+    // The surge clock only runs on the ground, so a jump never uses it up.
+    if (surging && !airborne) this.surge = Math.max(0, this.surge - dt);
     if (airborne) {
       this.airGrace += dt;
       if (this.airGrace > 0.08) this.airTime += dt;
     } else {
-      if (this.airTime > 0) events.landedAirTime = this.airTime + 0.08;
+      if (this.airTime > 0) {
+        events.landedAirTime = this.airTime + 0.08;
+        this.surge = Math.min(this.surge, STUNT.landSurge);
+      }
       this.airTime = 0;
       this.airGrace = 0;
     }

@@ -1,7 +1,8 @@
 import { BASE_Y, GAMEPLAY, PX_PER_METER, TERRAIN_STEP } from '../config';
 import { Rng } from './Rng';
+import { nextStuntAfter, stuntOffsets } from './Stunt';
 
-export type PieceKind = 'flat' | 'hills' | 'washboard' | 'ramp' | 'table';
+export type PieceKind = 'flat' | 'hills' | 'washboard' | 'ramp' | 'table' | 'stunt';
 
 /** Record of one generated chunk, so spawners (snacks, fuel) can lay content on top of it. */
 export interface TerrainPiece {
@@ -12,9 +13,11 @@ export interface TerrainPiece {
   /** World x of the first and last sample at the piece's highest point (ramp: the lip). */
   liftX: number;
   lipX: number;
+  /** For a 'stunt' piece: the checkpoint index the stage leads up to. */
+  stage?: number;
 }
 
-export const JUMP_KINDS: readonly PieceKind[] = ['ramp', 'table'];
+export const JUMP_KINDS: readonly PieceKind[] = ['ramp', 'table', 'stunt'];
 
 /**
  * Infinite heightfield terrain built from "chunks" (pieces) appended on demand.
@@ -29,7 +32,10 @@ export class Terrain {
   /** Chunks in generation order; pruned together with the samples. */
   readonly pieces: TerrainPiece[] = [];
 
-  constructor(seed: number) {
+  constructor(
+    seed: number,
+    private courseStart: number = GAMEPLAY.startX,
+  ) {
     this.rng = new Rng(seed);
     const n = Math.ceil((GAMEPLAY.flatStartPx + 400) / TERRAIN_STEP);
     for (let i = 0; i < n; i++) this.heights.push(BASE_Y);
@@ -102,12 +108,23 @@ export class Terrain {
   }
 
   private appendPiece(): void {
+    const stage = nextStuntAfter(this.endX, this.courseStart);
+    if (this.endX >= stage.x0) {
+      this.appendStage(stage.x0);
+      return;
+    }
     const kind = this.pickKind();
     this.lastKind = kind;
     const offs = this.build(kind);
     // Flat breathing room after every piece.
     for (let i = 0; i < this.rng.int(3, 6); i++) offs.push(0);
     const x0 = this.endX;
+    if (x0 + offs.length * TERRAIN_STEP > stage.x0) {
+      // This piece would run into the stage: lay flat road up to it instead.
+      while (this.endX < stage.x0) this.heights.push(BASE_Y);
+      this.pieces.push({ kind: 'flat', x0, x1: this.endX, liftX: x0, lipX: x0 });
+      return;
+    }
     for (const o of offs) this.heights.push(BASE_Y + o);
     let top = 0;
     for (const o of offs) top = Math.min(top, o);
@@ -120,6 +137,15 @@ export class Terrain {
       liftX: x0 + first * TERRAIN_STEP,
       lipX: x0 + last * TERRAIN_STEP,
     });
+  }
+
+  /** The Phase 9 stage: boost pads, the big ramp, the pit and the landing ramp (see `Stunt.ts`). */
+  private appendStage(x0: number): void {
+    const offs = stuntOffsets();
+    for (const o of offs) this.heights.push(BASE_Y + o);
+    this.lastKind = 'stunt';
+    const stage = nextStuntAfter(x0, this.courseStart);
+    this.pieces.push({ kind: 'stunt', x0, x1: this.endX, liftX: stage.lipX, lipX: stage.lipX, stage: stage.index });
   }
 
   private pickKind(): PieceKind {

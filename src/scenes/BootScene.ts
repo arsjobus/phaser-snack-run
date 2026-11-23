@@ -12,6 +12,7 @@ import {
   drawWrench,
   obstacleKey,
 } from '../art/props';
+import { SHOW_CAR_H, SHOW_CAR_VARIANTS, SHOW_CAR_W, drawBoostArch, drawPyroStand, drawShowCar, showCarKey } from '../art/show';
 import { makeRotationAtlas, makeTruckTextures } from '../art/trucks';
 
 /**
@@ -42,6 +43,9 @@ export class BootScene extends Phaser.Scene {
     this.bake('start_gate', 132, 220, drawStartGate);
     this.bake('cp_gate', 260, 212, (g) => drawCheckpointGate(g, 0x2f6fd6, 0xffe066));
     this.bake('cp_gate_zone', 260, 212, (g) => drawCheckpointGate(g, 0xe8742a, 0x9be0ff));
+    for (let v = 0; v < SHOW_CAR_VARIANTS; v++) this.bake(showCarKey(v), SHOW_CAR_W, SHOW_CAR_H, (g) => drawShowCar(g, v));
+    this.bake('pyro_stand', 30, 76, drawPyroStand);
+    this.bake('boost_arch', 300, 214, drawBoostArch);
     for (const kind of Object.keys(OBSTACLE_ART) as (keyof typeof OBSTACLE_ART)[]) {
       const art = OBSTACLE_ART[kind];
       for (let v = 0; v < OBSTACLE_VARIANTS; v++) this.bake(obstacleKey(kind, v), art.w, art.h, (g) => art.draw(g, v));

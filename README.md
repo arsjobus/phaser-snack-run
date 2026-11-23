@@ -2,7 +2,7 @@
 
 An endless-runner redux of a classic Flash-era 4x4 racer. Muddy tracks, big trucks, ramps, snacks and fuel.
 
-**Status:** Phases 0 to 7.5 and the code half of Phase 8 are done (touch, gamepad, remappable keys, settings, performance, a road art pass and lifted monster trucks); playtests and the itch.io release remain. Phases 0 to 7 were: setup, core driving, fuel/snacks/scoring, the HUD with checkpoints, rivals, collisions and wrecks, the art pass, audio, and now depth lanes with obstacles plus progression (a garage, high scores, a daily challenge and achievements). See [`roadmap.md`](roadmap.md).
+**Status:** Phases 0 to 7.5, Phase 9 (the monster-truck show) and the code half of Phase 8 are done (touch, gamepad, remappable keys, settings, performance, a road art pass and lifted monster trucks); playtests and the itch.io release remain. Phases 0 to 7 were: setup, core driving, fuel/snacks/scoring, the HUD with checkpoints, rivals, collisions and wrecks, the art pass, audio, and now depth lanes with obstacles plus progression (a garage, high scores, a daily challenge and achievements). See [`roadmap.md`](roadmap.md).
 
 ## Quick start
 
@@ -30,6 +30,19 @@ npm run dev        # http://localhost:5173
 There is no air control and no lean: the arrow keys steer through the field instead, and a gentle passive assist levels the truck in the air so it lands on its wheels.
 
 Add `?seed=anything` to the URL for a repeatable course, or `?daily` to start in the daily challenge.
+
+## What's in Phase 9 (the monster-truck show)
+
+Before every second checkpoint (the biome borders: 2nd, 4th, 6th...) the last tenth of the segment is a stage:
+
+- **Boost pads:** four on the flat, three up the ramp face, across the whole field (every lane). Each pad kicks the truck along the road and refreshes a **surge**: 1.8x engine force, 1.18x top speed. While it lasts the gas is forced on, the brake is dead and a stabiliser holds the truck level on the ground, so it cannot wheelie or flip. Rivals use the pads too.
+- **No clutter:** the stage has no obstacles, wrecks, cans or wrenches, and no new rivals spawn on or just before it. A snack line runs along the pads and a long arc over the pit follows the real flight path.
+- **The big ramp:** 288 px high with a curved face, then a sheer drop onto a pit with four rows of parked cars, and a landing table with a long slope down. Cars are scenery: trucks fly over them.
+- **Pyrotechnics:** cold-spark fountains and flame jets on both sides of the road at the top of the launch ramp and of the landing table.
+- **CRUNCH in fireworks:** one rocket per letter climbs from the pit, bursts, and its stars glide into a dot-matrix letter that hangs and twinkles above the cars, followed by a finale.
+- **Accidents:** every launch adds a seeded random spin (the same for everyone on a daily course), so some jumps flip. Bumps do no damage while surging and for 2.5 s after the landing, and a truck left on its roof is set back on its wheels after 0.9 s.
+- **Landing:** +1000 BONUS for clearing the pit, +150 per car, +500 per flip. The surge fades over about a second and the truck is back to its normal top speed for the next biome.
+- **Where:** `Stunt.ts` (geometry, pure), `Show.ts` (the run through a stage, pure), `Fireworks.ts` (pure), `StageView.ts` (drawing), `art/show.ts`, tuning in `STUNT` in `config.ts`, tests in `tests/stage.test.ts`.
 
 ## What's in Phase 8.5 (feedback)
 
@@ -165,13 +178,17 @@ src/
     RivalView.ts       rival visuals (far lane is higher/smaller/darker)
     Parallax.ts        tiling background layers, one set per biome, cross-faded
     Biomes.ts          biome palettes, rotation by checkpoint, ground segments (pure TS)
-    Particles.ts       capped particle pool (pure TS)
+    Particles.ts       capped particle pool, with homing particles (pure TS)
+    Stunt.ts           the Phase 9 stage: layout, terrain offsets, pads (pure TS)
+    Show.ts            a run through a stage: pads, cues, launch, landing, grace (pure TS)
+    Fireworks.ts       CRUNCH lettering, rockets, shells, fountains (pure TS)
+    StageView.ts       draws pads, parked cars, pyro stands and the fireworks
     Effects.ts         mud, dust, landing and crash emitters (pure TS)
     TrackMarks.ts      tire-track segments (pure TS)
     Rotation.ts        nearest pre-rendered rotation frame (pure TS)
     Input.ts, Rng.ts
   audio/               Composition.ts (the theme), Sequencer.ts + Mix.ts (pure, tested), AudioSystem.ts (Web Audio: music, engine, SFX)
-  art/                 procedural art: trucks.ts (6 bodies + rotation strips), backdrops.ts (per biome), props.ts, pixelFont.ts
+  art/                 procedural art: trucks.ts (6 bodies + rotation strips), backdrops.ts (per biome), props.ts, show.ts (parked cars, pyro stand, boost arch), pixelFont.ts
   progress/            Progress.ts (saves, coins, upgrades, scores), Achievements.ts, Skins.ts, Daily.ts, Storage.ts (all pure TS)
   scenes/
     BootScene.ts       builds every texture from src/art

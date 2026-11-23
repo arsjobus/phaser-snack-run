@@ -1,6 +1,6 @@
 import { FX } from '../config';
 
-export type ParticleKind = 'dust' | 'smoke' | 'mud' | 'chunk' | 'spark';
+export type ParticleKind = 'dust' | 'smoke' | 'mud' | 'chunk' | 'spark' | 'flame' | 'star';
 
 /** One short-lived particle. Plain data so the whole system is testable without Phaser. */
 export interface Particle {
@@ -22,6 +22,10 @@ export interface Particle {
   drag: number;
   rot: number;
   spin: number;
+  /** Homing (fireworks lettering): the point to glide to and how fast (1/s); 0 or unset = free flight. */
+  tx?: number;
+  ty?: number;
+  home?: number;
 }
 
 /** Ground-hugging kinds: they land, bounce a little and splat. */
@@ -49,6 +53,13 @@ export class ParticleSystem {
   update(dt: number, groundAt?: (x: number) => number): void {
     for (const p of this.items) {
       p.age += dt;
+      if (p.home && p.tx !== undefined && p.ty !== undefined) {
+        // Glide to the target, exactly and at any frame rate.
+        const k = 1 - Math.exp(-p.home * dt);
+        p.x += (p.tx - p.x) * k;
+        p.y += (p.ty - p.y) * k;
+        continue;
+      }
       p.vx -= p.vx * Math.min(1, p.drag * dt);
       p.vy += p.gravity * dt;
       p.x += p.vx * dt;
@@ -78,7 +89,7 @@ export class ParticleSystem {
 /** Opacity of a particle right now (0..1 of its own alpha). */
 export function particleFade(p: Particle): number {
   const k = Math.min(1, p.age / p.life);
-  if (p.kind === 'mud' || p.kind === 'chunk') return k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3;
+  if (p.kind === 'mud' || p.kind === 'chunk' || p.kind === 'star') return k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3;
   return 1 - k;
 }
 

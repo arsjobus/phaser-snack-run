@@ -393,6 +393,100 @@ export const RIVALS = {
   draftTop: 0.12,
 } as const;
 
+/**
+ * Phase 9: the monster-truck show. In the last `fraction` of every `BIOMES.checkpointsPer`-th
+ * segment (the ones that end at a biome border) the course turns into a stage: a row of boost pads
+ * (the first ones on the flat, the rest up the ramp face), one big launch ramp, a pit of parked
+ * cars, a landing ramp and pyrotechnics on both ramps. The pads' surge cannot be braked, the
+ * stage has no obstacles, and flying over the cars spells CRUNCH in fireworks. All lengths are px
+ * along the road and multiples of `TERRAIN_STEP`.
+ */
+export const STUNT = {
+  /** The stage sits inside the last share of the segment that ends at a biome border. */
+  fraction: 0.1,
+  /** Flat run-out between the landing and the biome gate. */
+  gateMargin: 192,
+  /** Flat approach before the first pad. */
+  lead: 288,
+  /** Pads on the flat: how many, their length along the road and the gap between them. */
+  flatPads: 4,
+  padLength: 112,
+  padGap: 128,
+  /** Pads on the ramp face, as shares of the ramp's length. */
+  rampPads: [0.28, 0.5, 0.72],
+  /** The launch ramp: length, height, and the curve exponent (higher = flatter start, steeper lip). */
+  rampLength: 1040,
+  rampHeight: 288,
+  rampCurve: 1.9,
+  /** The sheer face behind the lip. */
+  lipDrop: 64,
+  /** The pit between the ramps, and the parked cars in it. */
+  pitLength: 1280,
+  carSpacing: 140,
+  /** The landing ramp: a wall up to a table, then a long gentle slope down. */
+  landWall: 64,
+  landHeight: 112,
+  landTop: 96,
+  landSlope: 0.4,
+  /** Flat road after the landing ramp. */
+  runout: 192,
+
+  // --- the surge ---
+  /** Seconds a pad keeps the surge alive (the clock stops while airborne). */
+  surgeTime: 1.1,
+  /** After landing the surge lasts at most this long, then it fades. */
+  landSurge: 0.25,
+  /** Engine force and top speed multipliers at full surge. */
+  forceMult: 1.8,
+  topMult: 1.18,
+  /** Speed (px/s) each pad kicks along the road. */
+  padKick: 170,
+  /** Seconds to reach full surge and to fade back to normal. */
+  rise: 0.18,
+  fall: 1.2,
+  /** Extra drag (per second) on the speed above the normal top speed while the surge fades. */
+  overspeedDrag: 2.4,
+  /** Share of the pitch torque used to hold the truck level on the ground while surging. */
+  stabilize: 1.6,
+  /** Share of the player's landing assist that stays on in the air while surging (1 = all of it). */
+  airAssist: 0.15,
+  /** Largest pitch spin (rad/s) a launch can add by chance: the accidental flips. */
+  kick: 7,
+
+  /** Snack arc over the pit, fitted to simulated flights (x from the lip, truck-centre height above the lip's ground). */
+  arcX: [210, 305, 400, 495, 590, 685, 780, 875, 970, 1065, 1160, 1255],
+  arcY: [133, 164, 188, 205, 215, 217, 212, 200, 181, 154, 121, 80],
+
+  // --- the show ---
+  /** The fireworks start when the truck is this far before the lip (px). */
+  skyLead: 560,
+  /** Seconds between rockets, and how long a rocket takes to climb to its letter. */
+  rocketGap: 0.07,
+  rocketClimb: 0.7,
+  /** Letter dot grid: spacing between dots and between letters (px). */
+  dot: 12,
+  letterAdvance: 84,
+  /** Height of the lettering centre above the lip. */
+  skyHeight: 250,
+  /** Seconds the lettering lingers. */
+  skyLife: 4.2,
+  /** Pyro fountains burn this long (s) once triggered, starting this far (px) before the truck arrives. */
+  pyroTime: 1.8,
+  pyroLead: 380,
+
+  // --- scoring and safety ---
+  /** BONUS for landing the jump, plus per parked car flown over, and per flip. */
+  clearBonus: 1000,
+  carBonus: 150,
+  flipBonus: 500,
+  /** No damage from bumps while surging and for this long after the landing (s). */
+  grace: 2.5,
+  /** A truck left upside down during the show is set back on its wheels after this long (s). */
+  rightAfter: 0.9,
+  /** Rivals do not spawn from this far before the stage until the landing (px). */
+  noSpawnBefore: 1800,
+} as const;
+
 /** Art pass (Phase 5): pre-rendered trucks, biomes, and particle effects. */
 export const ART = {
   /**

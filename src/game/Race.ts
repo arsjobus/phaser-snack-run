@@ -1,9 +1,11 @@
-import { BASE_Y, COLLISION, LANES, OBSTACLE_KINDS, RIVALS } from '../config';
+import { BASE_Y, COLLISION, LANES, OBSTACLE_KINDS, RIVALS, STUNT } from '../config';
 import { collideTrucks, damageForImpact } from './Collision';
 import { sameLane } from './Lanes';
 import type { ObstacleField, ObstacleKind } from './Obstacles';
 import { Rival, RIVAL_STYLES } from './Rival';
 import { Rng } from './Rng';
+import { StageLocator } from './Show';
+import { padAt } from './Stunt';
 import type { Terrain } from './Terrain';
 import type { TruckPhysics } from './TruckPhysics';
 import type { Wreck, WreckField } from './Wrecks';
@@ -67,6 +69,8 @@ export class Race {
   private playerTarget: number = LANES.startLane;
   /** Race time of the last side-swipe per blocking vehicle (for the cooldown). */
   private sideLast = new Map<string, number>();
+  private stages: StageLocator;
+  private rivalStages = new Map<number, StageLocator>();
 
   constructor(
     seed: number,
@@ -77,6 +81,7 @@ export class Race {
   ) {
     this.rng = new Rng((seed ^ 0x51ed270b) >>> 0);
     this.startX = startX;
+    this.stages = new StageLocator(startX);
   }
 
   /** How many rivals the course should hold at `meters`. */
@@ -157,8 +162,17 @@ export class Race {
 
   /** Step every rival's body by one fixed physics step. */
   stepPhysics(dt: number): void {
+    if (this.rivalStages.size > 16) this.rivalStages.clear();
     for (const r of this.rivals) {
       this.terrain.ensure(r.truck.x + 600);
+      // Boost pads (Phase 9) work for every vehicle on the road.
+      if (r.truck.grounded) {
+        let loc = this.rivalStages.get(r.id);
+        if (!loc) this.rivalStages.set(r.id, (loc = new StageLocator(this.startX)));
+        const stage = loc.at(r.truck.x);
+        const pad = padAt(stage, r.truck.x);
+        if (pad) r.truck.hitPad(pad.id, this.terrain);
+      }
       r.step(dt, this.terrain);
     }
   }
@@ -267,6 +281,7 @@ export class Race {
       const lane = Math.round(r.laneF);
       this.wrecks.addFromRival(t.x, Math.atan(this.terrain.slopeAt(t.x)), r.style, t.vx, lane);
       this.rivals.splice(this.rivals.indexOf(r), 1);
+      this.rivalStages.delete(r.id);
       const at = { x: t.x, y: t.y, lane: r.laneF };
       events.push({ type: 'wrecked', rivalId: r.id, number: r.number, ...at });
       if (this.time - r.lastPlayerHit <= RIVALS.takedownWindow) {
@@ -402,10 +417,14 @@ export class Race {
     }
     this.spawnTimer = Math.max(0, this.spawnTimer - dt);
     if (this.spawnTimer > 0 || this.rivals.length >= this.wanted(meters)) return;
+    // No new rivals on or just before a stage: the show is for the player.
+    if (this.stages.onStage(player.x, STUNT.noSpawnBefore)) return;
     this.spawnTimer = RIVALS.spawnCooldown;
     // Half the time one arrives from behind at speed, otherwise it is waiting up the road.
     if (this.rng.next() < 0.5) {
-      this.add(player.x + this.rng.range(RIVALS.aheadMin, RIVALS.aheadMax), Math.max(200, player.speed - 100));
+      const ahead = player.x + this.rng.range(RIVALS.aheadMin, RIVALS.aheadMax);
+      if (this.stages.onStage(ahead, 200)) return;
+      this.add(ahead, Math.max(200, player.speed - 100));
     } else {
       this.add(player.x - RIVALS.behind, Math.max(300, player.speed + 160));
     }
