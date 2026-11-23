@@ -431,7 +431,7 @@ export const STUNT = {
   /** Flat road after the landing ramp. */
   runout: 192,
   /** Clear flat road after the stunt landing (metres). */
-  clearRunoutMeters: 100,
+  clearRunoutMeters: 75,
 
   // --- the surge ---
   /** Seconds a pad keeps the surge alive (the clock stops while airborne). */
