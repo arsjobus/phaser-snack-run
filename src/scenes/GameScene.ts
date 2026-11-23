@@ -145,6 +145,8 @@ export class GameScene extends Phaser.Scene {
   private overAt = 0;
   private startX = GAMEPLAY.startX;
   private lastBeepTick = -1;
+  private showCameraFocus = false;
+  private cameraFocus = 0;
 
   constructor() {
     super('Game');
@@ -162,6 +164,8 @@ export class GameScene extends Phaser.Scene {
     this.bestAir = 0;
     this.flippedTimer = 0;
     this.overAt = 0;
+    this.showCameraFocus = false;
+    this.cameraFocus = 0;
     this.paused = false;
     this.pauseLayer = null;
     this.gameOverButtonLayer = null;
@@ -515,8 +519,12 @@ export class GameScene extends Phaser.Scene {
 
   private updateCamera(dt: number): void {
     const cam = this.cameras.main;
-    const tx = this.truck.x + this.truck.vx * CAMERA.lookAhead - VIEW_W * CAMERA.xAnchor;
-    const ty = this.truck.y - VIEW_H * CAMERA.yAnchor;
+    const targetFocus = this.showCameraFocus ? 1 : 0;
+    this.cameraFocus += (targetFocus - this.cameraFocus) * (1 - Math.exp(-CAMERA.yLerp * dt));
+    const xAnchor = CAMERA.xAnchor + (0.5 - CAMERA.xAnchor) * this.cameraFocus;
+    const yAnchor = CAMERA.yAnchor + (0.5 - CAMERA.yAnchor) * this.cameraFocus;
+    const tx = this.truck.x + this.truck.vx * CAMERA.lookAhead - VIEW_W * xAnchor;
+    const ty = this.truck.y - VIEW_H * yAnchor;
     cam.scrollX = tx;
     cam.scrollY += (ty - cam.scrollY) * (1 - Math.exp(-CAMERA.yLerp * dt));
   }
@@ -758,6 +766,7 @@ export class GameScene extends Phaser.Scene {
     const t = this.truck;
     switch (e.type) {
       case 'pad': {
+        this.showCameraFocus = true;
         this.audio.boost(e.count);
         const k = shakeScale(this.settings);
         if (k > 0) this.cameras.main.shake(110, 0.004 * k);
@@ -775,6 +784,7 @@ export class GameScene extends Phaser.Scene {
         this.bannerText('SHOW TIME!', '#ffe066', 1300);
         break;
       case 'landed': {
+        this.showCameraFocus = false;
         const points = e.points > 0 ? this.run.score.addBonus(e.points) : 0;
         if (e.cleared) {
           this.audio.showLanded();
