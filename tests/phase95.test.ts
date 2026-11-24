@@ -30,9 +30,10 @@ describe('the show camera', () => {
     expect(f.timeScale).toBeCloseTo(1, 6);
   });
 
-  it('centres on the truck from before the first pad, without slow motion yet', () => {
+  it('centres on the truck the moment it hits the first boost, without slow motion yet', () => {
     const cam = new ShowCam();
-    const f = run(cam, layout.pads[0].x0 - STUNT.camLead + 10, 1);
+    expect(run(cam, layout.pads[0].x0 - 200, 1).focus).toBeLessThan(0.01);
+    const f = run(cam, layout.pads[0].x0 + STUNT.camLead + 10, 1);
     expect(f.focus).toBeGreaterThan(0.95);
     expect(f.timeScale).toBeCloseTo(1, 2);
     expect(CAMERA.focusXAnchor).toBe(0.5); // dead centre horizontally
@@ -47,13 +48,24 @@ describe('the show camera', () => {
     expect(over.timeScale).toBeLessThan(STUNT.slowScale + 0.02);
   });
 
-  it('holds the framing and slow motion after the landing, then lets go', () => {
+  it('gives the framing back in mid air, before the landing wall', () => {
+    const cam = new ShowCam();
+    run(cam, layout.lipX, 1);
+    const over = run(cam, layout.pitX1 - STUNT.camRelease - 20, 0.5);
+    expect(over.focus).toBeGreaterThan(0.95); // still centred over the pit
+    const late = run(cam, layout.pitX1 - STUNT.camRelease + 20, 2);
+    expect(late.focus).toBeLessThan(0.1); // normal offset again, truck not yet down
+    expect(layout.pitX1 - STUNT.camRelease).toBeLessThan(layout.pitX1);
+  });
+
+  it('slows less than before (a little faster) and keeps the slow motion after the landing, then lets go', () => {
+    expect(STUNT.slowScale).toBeGreaterThan(0.5);
+    expect(STUNT.slowScale).toBeLessThan(0.85);
     const cam = new ShowCam();
     run(cam, layout.lipX, 1);
     cam.landed();
     const during = run(cam, layout.landX1 + 200, STUNT.slowHold * 0.5, true);
-    expect(during.focus).toBeGreaterThan(0.9);
-    expect(during.timeScale).toBeLessThan(0.6);
+    expect(during.timeScale).toBeLessThan(STUNT.slowScale + 0.1);
     const after = run(cam, layout.landX1 + 600, STUNT.slowHold + 3, true);
     expect(after.timeScale).toBeGreaterThan(0.97);
     expect(after.focus).toBeLessThan(0.1);

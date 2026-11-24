@@ -7,6 +7,11 @@
  * (hairline seams). This shake instead nudges only the world's scroll, always by an integer
  * number of pixels, so nothing is ever drawn between pixels and the screen-fixed layers (sky, HUD)
  * never leave the screen.
+ *
+ * The shake is sideways only. A vertical jolt moves the whole world up and down against the
+ * screen-fixed HUD, so the hard-edged dirt bands above the HUD (and the HUD's own rim) visibly
+ * judder on every bump. Sideways, those bands (flat colour, uniform along x) do not read as moving
+ * at all, while trucks, tufts, ruts and the backdrop still take the hit.
  */
 export type ShakeRand = () => number;
 
@@ -38,12 +43,11 @@ export class ScreenShake {
     this.left = this.total = this.amp = 0;
   }
 
-  /** Advance `dt` seconds and return this frame's offset: whole pixels only. */
+  /** Advance `dt` seconds and return this frame's offset: whole pixels, sideways only (`y` is always 0). */
   update(dt: number): { x: number; y: number } {
     if (this.left <= 0) return { x: 0, y: 0 };
     const a = this.amplitude;
     this.left = Math.max(0, this.left - dt);
-    const jitter = () => Math.round((this.rand() * 2 - 1) * a);
-    return { x: jitter(), y: Math.round(jitter() * 0.6) };
+    return { x: Math.round((this.rand() * 2 - 1) * a), y: 0 };
   }
 }

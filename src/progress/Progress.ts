@@ -150,6 +150,21 @@ export function writeSave(store: KeyValueStore, save: SaveData): boolean {
   }
 }
 
+/**
+ * Erase everything that was saved (coins, upgrades, paint, scores, stats, achievements) and write the
+ * fresh save. Settings and key bindings live elsewhere and are kept. Returns the new, empty save.
+ */
+export function resetProgress(store: KeyValueStore): SaveData {
+  const fresh = emptySave();
+  try {
+    store.removeItem(PROGRESSION.saveKey);
+  } catch {
+    // a store that refuses removal still gets the empty save written below
+  }
+  writeSave(store, fresh);
+  return fresh;
+}
+
 // ---- the garage -------------------------------------------------------------------------------
 
 /** Coins for the NEXT level of an upgrade, or null when it is maxed. Level n costs base * growth^n (to the nearest 5). */

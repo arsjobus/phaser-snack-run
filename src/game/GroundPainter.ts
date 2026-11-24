@@ -11,7 +11,9 @@ import {
   RUT_CELL,
   RUT_DEPTHS,
   RUT_PAIR,
+  crackShape,
   groundDetails,
+  isFlatKind,
   hash01,
   lensOutline,
   puddleSite,
@@ -281,8 +283,57 @@ export class GroundPainter {
     return x >= s.x0 - 400;
   }
 
+  /**
+   * Two passes: everything that LIES on the ground (cracks, ripples, puddles, drifts) first, then the
+   * things that stand on it (pebbles, grit, stones, clods). Sorting by depth alone let a crack or a
+   * ripple in a nearer row paint straight over a rock further away; now a rock always sits on top.
+   */
   private details(biome: Biome, xa: number, xb: number): void {
-    for (const d of groundDetails(biome.id, xa, xb, this.detail)) this.detailOne(biome, d);
+    const all = groundDetails(biome.id, xa, xb, this.detail);
+    for (const d of all) if (isFlatKind(d.kind)) this.detailOne(biome, d);
+    for (const d of all) if (!isFlatKind(d.kind)) this.detailOne(biome, d);
+  }
+
+  /** A filled ribbon along `pts` (already on screen), `w(i)` wide at point i, closing to a point where w = 0. */
+  private ribbon(pts: { x: number; y: number }[], w: (i: number) => number, color: number, alpha = 1): void {
+    const g = this.g;
+    const left: { x: number; y: number }[] = [];
+    const right: { x: number; y: number }[] = [];
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[Math.max(0, i - 1)];
+      const b = pts[Math.min(pts.length - 1, i + 1)];
+      const tx = b.x - a.x;
+      const ty = b.y - a.y;
+      const len = Math.hypot(tx, ty) || 1;
+      const nx = -ty / len;
+      const ny = tx / len;
+      const hw = w(i) / 2;
+      left.push({ x: pts[i].x + nx * hw, y: pts[i].y + ny * hw });
+      right.push({ x: pts[i].x - nx * hw, y: pts[i].y - ny * hw });
+    }
+    g.fillStyle(color, alpha);
+    g.beginPath();
+    left.forEach((p, i) => (i === 0 ? g.moveTo(p.x, p.y) : g.lineTo(p.x, p.y)));
+    for (let i = right.length - 1; i >= 0; i--) g.lineTo(right[i].x, right[i].y);
+    g.closePath();
+    g.fillPath();
+  }
+
+  /**
+   * A dried-mud crack: every branch is a tapered ribbon that follows the terrain, drawn in three flat
+   * layers: a pale lip along the lower edge, the dark crack, and a darker core in the wide part.
+   */
+  private crack(biome: Biome, d: Detail, sc: number): void {
+    const c = biome.ground;
+    const lip = mixColor(c.crust, 0xffffff, 0.14);
+    const dark = shade(c.crustShadow, 0.62);
+    const core = shade(c.crustShadow, 0.38);
+    for (const branch of crackShape(d.seed)) {
+      const pts = branch.map((p) => ({ x: d.x + p.x * sc, y: this.h(d.x + p.x * sc) - laneLift(d.f) + p.dy * sc }));
+      this.ribbon(pts.map((p) => ({ x: p.x, y: p.y + 1.1 * sc })), (i) => (branch[i].w > 0 ? branch[i].w * sc + 1.6 * sc : 0), lip);
+      this.ribbon(pts, (i) => branch[i].w * sc, dark);
+      this.ribbon(pts, (i) => branch[i].w * sc * 0.42, core);
+    }
   }
 
   /** A flat, outlined rock or clod: dark outline, one body colour, one lighter top facet (no highlights). */
@@ -336,21 +387,7 @@ export class GroundPainter {
         break;
       }
       case 'crack': {
-        // Dried-mud cracks: a short zigzag with two branches, lying on the ground at its depth.
-        g.lineStyle(1.4 * sc, shade(c.crustShadow, 0.8), 0.85);
-        g.beginPath();
-        const len = (16 + d.seed * 12) * sc;
-        const yy = (dx: number, dy: number) => this.h(x + dx) - laneLift(d.f) + dy * sc;
-        g.moveTo(x - len, yy(-len, 0));
-        g.lineTo(x - len * 0.5, yy(-len * 0.5, -2));
-        g.lineTo(x - len * 0.1, yy(-len * 0.1, 1.5));
-        g.lineTo(x + len * 0.4, yy(len * 0.4, -1.5));
-        g.lineTo(x + len, yy(len, 1));
-        g.moveTo(x - len * 0.1, yy(-len * 0.1, 1.5));
-        g.lineTo(x + len * 0.05, yy(len * 0.05, 4.5));
-        g.moveTo(x + len * 0.4, yy(len * 0.4, -1.5));
-        g.lineTo(x + len * 0.55, yy(len * 0.55, -4.5));
-        g.strokePath();
+        this.crack(biome, d, sc);
         break;
       }
       case 'puddle': {

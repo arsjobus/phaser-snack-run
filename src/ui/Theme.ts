@@ -145,7 +145,7 @@ export const rowY = (top: number, step: number, i: number): number => top + i * 
  * The spacing every list in the menus follows (garage rows, achievements, settings): rows are
  * separated by at least `rowGap` px, and text starts `padX` px inside its plate.
  */
-export const LIST = { rowGap: 8, padX: 16 } as const;
+export const LIST = { rowGap: 8, padX: 24 } as const;
 
 /** Rows of a list laid out between `top` and `bottom`: each is at most `maxH` tall, `LIST.rowGap` apart. */
 export function listRows(top: number, bottom: number, n: number, maxH: number): { h: number; step: number; y: (i: number) => number } {
@@ -156,3 +156,15 @@ export function listRows(top: number, bottom: number, n: number, maxH: number): 
 
 /** Wraps a menu cursor by `d` over `n` items. */
 export const wrapIndex = (i: number, d: number, n: number): number => (n <= 0 ? 0 : (((i + d) % n) + n) % n);
+
+/** Where text may sit inside a plate of width `w` centred at `cx`: `LIST.padX` in from each edge. */
+export function plateInner(cx: number, w: number): { left: number; right: number } {
+  return { left: cx - w / 2 + LIST.padX, right: cx + w / 2 - LIST.padX };
+}
+
+/** Pages of a list shown `per` at a time: how many, and the item indexes of page `page` (clamped). */
+export function paginate(total: number, per: number, page: number): { pages: number; page: number; from: number; to: number } {
+  const pages = Math.max(1, Math.ceil(total / Math.max(1, per)));
+  const p = Math.max(0, Math.min(pages - 1, page));
+  return { pages, page: p, from: p * per, to: Math.min(total, p * per + per) };
+}

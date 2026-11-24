@@ -12,10 +12,12 @@ export interface ShowFraming {
 /**
  * The show camera (pure TypeScript). The player's jump over the pit used to be over in a blink and
  * the camera trailed the truck, so the truck drifted off centre and the lettering got a glimpse.
- * Now, from `camLead` before the first pad the framing eases onto the truck (centred, no look-ahead,
- * a fast vertical follow), from `slowLead` before the lip the game slows to `slowScale`, and both
- * hold for `slowHold` real seconds after the landing so the CRUNCH finale and the cars below are
- * seen. A truck that never reaches the stage (or a run that ends) releases both at once.
+ * Now the framing goes onto the truck (centred, no look-ahead, a fast vertical follow) the moment
+ * it hits the first boost pad, and lets go again `camRelease` px before the landing wall, while the
+ * truck is still in the air, so the normal view is back by touchdown. From `slowLead` before the lip
+ * the game slows to `slowScale` and holds for `slowHold` real seconds after the landing so the CRUNCH
+ * finale and the cars below are seen. A truck that never reaches the stage (or a run that ends)
+ * releases both at once.
  */
 export class ShowCam {
   focus = 0;
@@ -42,7 +44,7 @@ export class ShowCam {
   update(dt: number, x: number, layout: StuntLayout | null, over: boolean, landed: boolean): ShowFraming {
     this.clock += dt;
     const holding = this.clock < this.holdUntil;
-    const inFrame = !over && layout !== null && x >= layout.pads[0].x0 - STUNT.camLead && (x < layout.landX1 || holding);
+    const inFrame = !over && layout !== null && x >= layout.pads[0].x0 + STUNT.camLead && x < layout.pitX1 - STUNT.camRelease;
     const inSlow = !over && layout !== null && x >= layout.lipX - STUNT.slowLead && !(landed && !holding) && (x < layout.landX1 || holding);
 
     const rate = inFrame ? CAMERA.focusRise : CAMERA.focusFall;

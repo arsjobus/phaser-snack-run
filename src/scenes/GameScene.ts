@@ -822,7 +822,7 @@ export class GameScene extends Phaser.Scene {
         if (e.with === 'obstacle' && e.kind) this.popup(e.x, y - 50, e.kind.toUpperCase() + '!', '#ffb066');
         if (hard) {
           const k = shakeScale(this.settings);
-          if (k > 0) this.shake.kick(0.14, Math.min(0.012, 0.004 + e.impact / 60000) * k * VIEW_W);
+          if (k > 0) this.shake.kick(0.16, Math.min(0.016, 0.005 + e.impact / 50000) * k * VIEW_W);
           if (!this.stunt.immune(this.truck)) for (const ev of this.run.hurt(e.damage)) this.onRunEvent(ev);
         }
         break;

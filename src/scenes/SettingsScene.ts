@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { PadEdges, firstPad, padButtons } from '../input/Gamepad';
-import { INK, LIST, UI, wrapIndex } from '../ui/Theme';
+import { INK, LIST, UI, plateInner, wrapIndex } from '../ui/Theme';
 import { backButton, bottomBar, flatBackdrop, label, rowPlate, topBar, type Layer } from '../ui/Ui';
 import { defaultStore, type KeyValueStore } from '../progress/Storage';
 import {
@@ -199,7 +199,8 @@ export class SettingsScene extends Phaser.Scene {
       const y = 124 + j * step;
       const on = i === this.row;
       const lx = cx - w / 2 + LIST.padX;
-      const vx = cx + 30; // where the value starts
+      const inner = plateInner(cx, w);
+      const vx = r.kind === 'slider' ? cx + 8 : cx + 30; // where the value starts (a slider's track starts earlier so its percentage fits)
       if (r.kind === 'back') {
         // The Back button looks exactly like the Credits one: wide, yellow, with its key hint.
         backButton(this, this.layer, cx, y + 14, () => this.back(), on);
@@ -228,7 +229,7 @@ export class SettingsScene extends Phaser.Scene {
           g.fillStyle(UI.green, 1);
           g.fillRect(vx, y - 6, 130 * v, 12);
           this.layer.add(g);
-          this.text(cx + w / 2 - 14, y, `${Math.round(v * 100)}%`, 16, col, 1);
+          this.text(inner.right, y, `${Math.round(v * 100)}%`, 16, col, 1);
           break;
         }
         case 'toggle':
@@ -242,7 +243,7 @@ export class SettingsScene extends Phaser.Scene {
         case 'bind': {
           this.text(lx, y, ACTION_LABELS[r.action], 16, col);
           const waiting = this.rebinding === r.action;
-          this.text(cx + w / 2 - 14, y, waiting ? 'PRESS A KEY' : bindingText(this.settings.bindings, r.action), 14, waiting ? INK.title : INK.cyan, 1, true);
+          this.text(inner.right, y, waiting ? 'PRESS A KEY' : bindingText(this.settings.bindings, r.action), 14, waiting ? INK.title : INK.cyan, 1, true);
           break;
         }
         case 'reset':

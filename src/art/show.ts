@@ -104,25 +104,96 @@ export function drawPyroStand(g: G): void {
 }
 
 /**
- * The stage's entrance arch: two posts and a hazard-striped beam with a BOOST sign. 300x214, drawn
- * behind the road like the checkpoint gates.
+ * The stage's entrance arch: two braced posts and a hazard-striped beam carrying a BOOST sign.
+ * The sign is a dark plate with a red rim, lettering with a dark outline and a hot drop shadow, and
+ * a pair of red chevrons on each side pointing the way the road goes (the same chevrons the pads on
+ * the road wear). 300x214, drawn behind the road like the checkpoint gates.
  */
 export function drawBoostArch(g: G): void {
-  g.fillStyle(0x222222, 1);
-  g.fillRect(4, 28, 10, 186);
-  g.fillRect(286, 28, 10, 186);
+  const RED = 0xd2392b;
+  const HOT = 0xff7a2e;
+  const GOLD = 0xffd23f;
+  // Posts, with a base plate and a diagonal brace under each end of the beam.
   g.fillStyle(OUT, 1);
-  g.fillRect(0, 10, 300, 44);
-  g.fillStyle(0xffd23f, 1);
-  g.fillRect(3, 13, 294, 38);
+  g.fillRect(2, 30, 14, 184);
+  g.fillRect(284, 30, 14, 184);
+  g.fillRect(0, 204, 20, 10);
+  g.fillRect(280, 204, 20, 10);
+  g.fillStyle(0x3a3f4a, 1);
+  g.fillRect(5, 30, 8, 184);
+  g.fillRect(287, 30, 8, 184);
+  g.fillStyle(0x59606e, 1);
+  g.fillRect(5, 30, 3, 184); // lit edge
+  g.fillRect(287, 30, 3, 184);
+  g.fillStyle(0x2a2e36, 1);
+  g.fillRect(2, 206, 16, 6);
+  g.fillRect(282, 206, 16, 6);
+  g.lineStyle(5, OUT, 1);
+  g.lineBetween(14, 76, 40, 56);
+  g.lineBetween(286, 76, 260, 56);
+  g.lineStyle(2, 0x59606e, 1);
+  g.lineBetween(14, 76, 40, 56);
+  g.lineBetween(286, 76, 260, 56);
+
+  // The beam: outline, yellow body, black hazard stripes.
   g.fillStyle(OUT, 1);
-  for (let x = 3; x < 297; x += 24) g.fillTriangle(x, 51, x + 12, 51, x + 12, 13); // hazard stripes
+  g.fillRect(0, 4, 300, 56);
+  g.fillStyle(GOLD, 1);
+  g.fillRect(3, 7, 294, 50);
   g.fillStyle(OUT, 1);
-  g.fillRect(60, 18, 180, 28);
-  g.fillStyle(0x1b1e23, 1);
-  g.fillRect(63, 21, 174, 22);
+  for (let x = 3; x < 297; x += 24) g.fillTriangle(x, 57, x + 12, 57, x + 12, 7);
+
+  // The sign: a plate over the middle of the beam with a red rim and rivets.
+  g.fillStyle(OUT, 1);
+  g.fillRoundedRect(40, 0, 220, 64, 8);
+  g.fillStyle(RED, 1);
+  g.fillRoundedRect(44, 4, 212, 56, 6);
+  g.fillStyle(0xe85a48, 1);
+  g.fillRect(48, 6, 204, 4); // lit top edge of the rim
+  g.fillStyle(0x15181e, 1);
+  g.fillRoundedRect(50, 11, 200, 42, 4);
+  g.fillStyle(0x20252d, 1);
+  g.fillRect(52, 13, 196, 10); // one flat lighter band across the top of the face
+  g.fillStyle(0x9aa3b5, 1);
+  for (const [rx, ry] of [[48, 8], [252, 8], [48, 56], [252, 56]]) g.fillCircle(rx, ry, 2);
+
+  // Lettering: outline, hot drop shadow, then the gold letters on top.
   const text = 'BOOST';
-  drawPixelText(g, text, Math.round(150 - pixelTextWidth(text, 4) / 2), 24, 4, 0xffd23f);
-  g.fillStyle(0xff5a4a, 1); // bulbs
-  for (let x = 68; x < 236; x += 22) g.fillCircle(x, 54, 3);
+  const scale = 5;
+  const tx = Math.round(150 - pixelTextWidth(text, scale) / 2);
+  const ty = 16;
+  g.fillStyle(OUT, 1);
+  for (const [ox, oy] of [[-2, -2], [2, -2], [-2, 2], [2, 2], [0, -2], [0, 2], [-2, 0], [2, 0], [2, 4], [0, 4], [4, 4]]) {
+    drawPixelText(g, text, tx + ox, ty + oy, scale, OUT);
+  }
+  drawPixelText(g, text, tx + 3, ty + 3, scale, HOT);
+  drawPixelText(g, text, tx, ty, scale, GOLD);
+
+  // Chevrons either side of the word: two pointing right, red on the dark face (the road's arrows).
+  const chevron = (x: number, color: number) => {
+    const y0 = 17;
+    const y1 = 47;
+    const tip = 12;
+    const th = 7;
+    const pts = (dx: number) => [
+      { x: x + dx, y: y0 },
+      { x: x + dx + tip, y: (y0 + y1) / 2 },
+      { x: x + dx, y: y1 },
+      { x: x + dx + th, y: y1 },
+      { x: x + dx + tip + th, y: (y0 + y1) / 2 },
+      { x: x + dx + th, y: y0 },
+    ];
+    g.fillStyle(color, 1);
+    g.fillPoints(pts(0), true);
+  };
+  for (const x of [58, 74]) chevron(x, 0xe8402e);
+  for (const x of [208, 224]) chevron(x, 0xe8402e);
+
+  // Bulbs along the underside of the beam.
+  for (let x = 62; x <= 238; x += 22) {
+    g.fillStyle(OUT, 1);
+    g.fillCircle(x, 64, 5);
+    g.fillStyle(x % 44 === 0 ? 0xffe9a0 : 0xff5a4a, 1);
+    g.fillCircle(x, 64, 3.4);
+  }
 }

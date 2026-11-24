@@ -83,8 +83,8 @@ export const CAMERA = {
   yLerp: 4, // per second
   lookAhead: 0.18, // seconds of velocity added to x target
   /** The show camera (Phase 9.5): how fast it settles on the truck, and where the truck sits (fractions of the screen). */
-  focusRise: 6, // per second, easing the framing in
-  focusFall: 2.5, // per second, easing it back out after the landing
+  focusRise: 9, // per second, easing the framing in (fast: the camera goes straight to the truck)
+  focusFall: 3.2, // per second, easing it back out to the normal offset in mid air
   focusYLerp: 10, // vertical follow speed while focused, so the climb never leaves the frame
   focusXAnchor: 0.5,
   focusYAnchor: 0.56,
@@ -450,11 +450,13 @@ export const STUNT = {
   /** Flat road after the landing ramp. */
   runout: 192,
   // --- the show camera (Phase 9.5) ---
-  /** The framing locks on the truck this far before the first pad (px). */
-  camLead: 520,
+  /** The framing locks on the truck this far past the start of the first pad (px): 0 = the moment it hits the first boost. */
+  camLead: 0,
+  /** The framing lets go this far before the landing wall (px), while the truck is still in the air, so the normal view is back by touchdown. */
+  camRelease: 340,
   /** Slow motion: it starts this far before the lip (px), runs at this game speed, and eases in/out at `slowRate` per second. */
   slowLead: 420,
-  slowScale: 0.5,
+  slowScale: 0.68,
   slowRate: 5,
   /** The slow motion and the framing hold this long (real seconds) after the landing so the finale is seen. */
   slowHold: 1.4,

@@ -124,6 +124,78 @@ export function lensOutline(
   return { top, bottom };
 }
 
+/** One point of a crack: `x` along the ground, `dy` off the ground line (both unscaled px), `w` the crack's width there. */
+export interface CrackPt {
+  x: number;
+  dy: number;
+  w: number;
+}
+
+/**
+ * The shape of one dried-mud crack (pure geometry; the painter bends it over the terrain and scales
+ * it by depth). A main fissure runs along the ground with a few kinks and two or three branches
+ * leave it, each branch with a small twig on the longer ones. Every width profile is smooth and every
+ * free end closes to a point: the main crack is widest in the middle and falls to exactly 0 at both
+ * ends (`sin^0.8`), a branch starts at about 60% of the width where it leaves its parent and falls
+ * to exactly 0 at its tip. The first point of a branch lies on its parent's centreline.
+ */
+export function crackShape(seed: number): CrackPt[][] {
+  const k = Math.floor(seed * 1_000_000) + 3;
+  const r = (i: number) => hash01(k, 900 + i);
+  const half = 20 + r(0) * 16;
+  const maxW = 2.6 + r(1) * 1.4;
+  const n = 14;
+  const main: CrackPt[] = [];
+  let dy = 0;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    // A gentle random walk with the odd sharper kink, so it reads as a fracture and not a wave.
+    dy += (r(10 + i) - 0.5) * (r(30 + i) > 0.8 ? 5.5 : 2.2);
+    dy *= 0.88;
+    main.push({ x: -half + 2 * half * t, dy, w: i === 0 || i === n ? 0 : maxW * Math.pow(Math.sin(Math.PI * t), 0.8) });
+  }
+  const out: CrackPt[][] = [main];
+  const branches = 2 + (r(2) > 0.5 ? 1 : 0);
+  for (let b = 0; b < branches; b++) {
+    const root = 3 + Math.floor((r(50 + b) * (n - 6)));
+    const from = main[root];
+    const dir = b % 2 === 0 ? -1 : 1; // alternate sides of the main crack
+    const along = r(60 + b) > 0.5 ? 1 : -1;
+    const reach = half * (0.45 + r(70 + b) * 0.4);
+    const spread = (7 + r(80 + b) * 8) * dir;
+    const m = 8;
+    const pts: CrackPt[] = [];
+    for (let i = 0; i <= m; i++) {
+      const t = i / m;
+      const wobble = (r(100 + b * 12 + i) - 0.5) * 2.6 * t;
+      pts.push({
+        x: from.x + along * reach * t,
+        dy: from.dy + spread * Math.pow(t, 0.85) + wobble,
+        w: i === m ? 0 : from.w * 0.6 * Math.pow(1 - t, 1.1),
+      });
+    }
+    out.push(pts);
+    if (b === 0 && r(95) > 0.35) {
+      // A twig off the first branch, roughly in the opposite direction, a third of its length.
+      const at = pts[Math.floor(m * 0.55)];
+      const tw: CrackPt[] = [];
+      for (let i = 0; i <= 5; i++) {
+        const t = i / 5;
+        tw.push({
+          x: at.x - along * reach * 0.3 * t,
+          dy: at.dy + spread * 0.4 * t,
+          w: i === 5 ? 0 : at.w * 0.7 * (1 - t),
+        });
+      }
+      out.push(tw);
+    }
+  }
+  return out;
+}
+
+/** Standing details sit on top of everything that lies flat, whatever their depth: see `GroundPainter.details`. */
+export const isFlatKind = (kind: DetailKind): boolean => FLAT_KINDS.has(kind);
+
 function pickKind(biome: BiomeId, r: number, far: boolean): DetailKind {
   const w = DETAIL_WEIGHTS[biome];
   const kinds = (Object.keys(w) as DetailKind[]).filter((k) => !far || FAR_KINDS.has(k));

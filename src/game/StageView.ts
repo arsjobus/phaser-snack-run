@@ -4,6 +4,7 @@ import { showCarKey } from '../art/show';
 import type { AudioSystem } from '../audio/AudioSystem';
 import { emitBurst, emitFlame, emitFountain, emitJet, SkyShow } from './Fireworks';
 import { laneDepth, laneProject, laneScale, laneShade } from './Lanes';
+import { PAD_COLORS, PAD_FAR, PAD_NEAR, chevronLit, chevronOutline, chevronStarts, padY } from './PadArt';
 import { ParticleSystem, particleFade, particleRadius } from './Particles';
 import { StageLocator } from './Show';
 import type { PadSpot, StuntLayout } from './Stunt';
@@ -115,7 +116,7 @@ export class StageView {
     this.arches.clear();
   }
 
-  /** The pads: dark panels across the whole field with a wave of yellow chevrons running over them. */
+  /** The pads: dark panels across the whole field with a wave of red chevrons running over them. */
   private drawPads(stage: StuntLayout, left: number, right: number, seconds: number): void {
     const g = this.pads;
     const T = this.terrain;
@@ -126,39 +127,26 @@ export class StageView {
   }
 
   private drawPad(g: Phaser.GameObjects.Graphics, T: Terrain, pad: PadSpot, seconds: number): void {
-    const near = -0.15;
-    const far = 3.25;
     const steps = 4;
     const xs: number[] = [];
     for (let i = 0; i <= steps; i++) xs.push(pad.x0 + ((pad.x1 - pad.x0) * i) / steps);
-    const yAt = (x: number, lane: number) => T.heightAt(x) - lane * 15 + 1;
-    const top = xs.map((x) => new Phaser.Geom.Point(x, yAt(x, far)));
-    const bottom = xs.map((x) => new Phaser.Geom.Point(x, yAt(x, near))).reverse();
+    const yAt = (x: number, lane: number) => padY(T.heightAt(x), lane);
+    const top = xs.map((x) => new Phaser.Geom.Point(x, yAt(x, PAD_FAR)));
+    const bottom = xs.map((x) => new Phaser.Geom.Point(x, yAt(x, PAD_NEAR))).reverse();
     const outline = [...top, ...bottom];
-    g.fillStyle(0x111111, 1);
+    g.fillStyle(PAD_COLORS.outline, 1);
     g.fillPoints(outline, true);
-    g.fillStyle(0x2a2e36, 1);
+    g.fillStyle(PAD_COLORS.panel, 1);
     const inset = (p: Phaser.Geom.Point, i: number) => new Phaser.Geom.Point(p.x, p.y + (i < xs.length ? 2 : -2));
     g.fillPoints(outline.map(inset), true);
-    // Chevrons: three > shapes, lit one after the other (a wave towards the ramp).
-    const w = pad.x1 - pad.x0;
-    for (let k = 0; k < 3; k++) {
-      const xa = pad.x0 + 10 + k * (w / 3.2);
-      const cw = 22;
-      const t = 11;
-      const ya = (lane: number, x: number) => yAt(x, lane);
-      const pts = [
-        new Phaser.Geom.Point(xa, ya(far - 0.35, xa)),
-        new Phaser.Geom.Point(xa + cw, ya((far + near) / 2, xa + cw)),
-        new Phaser.Geom.Point(xa, ya(near + 0.35, xa)),
-        new Phaser.Geom.Point(xa + t, ya(near + 0.35, xa + t)),
-        new Phaser.Geom.Point(xa + cw + t, ya((far + near) / 2, xa + cw + t)),
-        new Phaser.Geom.Point(xa + t, ya(far - 0.35, xa + t)),
-      ];
-      const lit = 0.5 + 0.5 * Math.sin(seconds * 12 - k * 1.6);
-      g.fillStyle(lit > 0.5 ? 0xffd23f : 0xb8861a, 1);
+    // Red chevrons, centred across the field, lit one after the other (a wave towards the ramp).
+    chevronStarts(pad.x1 - pad.x0).forEach((xa, k) => {
+      const pts = chevronOutline(pad.x0 + xa, 26, 13).map((p) => new Phaser.Geom.Point(p.x, yAt(p.x, p.lane)));
+      g.fillStyle(chevronLit(k, seconds) ? PAD_COLORS.lit : PAD_COLORS.dim, 1);
       g.fillPoints(pts, true);
-    }
+      g.lineStyle(2, PAD_COLORS.outline, 1);
+      g.strokePoints(pts, true);
+    });
   }
 
   /** Cars, stands and the arch: created while on screen, destroyed when left behind. */

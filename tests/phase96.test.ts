@@ -44,8 +44,14 @@ describe('Screen shake', () => {
     for (let i = 0; i < 12; i++) {
       const o = s.update(1 / 60);
       expect(Math.abs(o.x)).toBeLessThanOrEqual(10);
-      expect(Math.abs(o.y)).toBeLessThanOrEqual(6);
+      expect(o.y).toBe(0);
     }
+  });
+
+  it('never moves the world vertically, so the dirt bands above the HUD stay put', () => {
+    const s = new ScreenShake(() => 0.77);
+    s.kick(0.3, 14);
+    for (let i = 0; i < 20; i++) expect(Math.abs(s.update(1 / 60).y)).toBe(0);
   });
 });
 
