@@ -26,8 +26,16 @@ function makeSky(scene: Phaser.Scene, b: Biome): void {
   tex.refresh();
 }
 
+/**
+ * Transparent rows added under every layer. The layers tile vertically, so a sample that falls
+ * just above a sprite's top edge wraps to the texture's bottom row; that row is solid colour
+ * (trees, bushes, hills), which drew a thin line across the whole sky at 2x. The padding is
+ * transparent, so the wrap lands on nothing. The sprites still draw only their original height.
+ */
+export const WRAP_PAD = 2;
+
 function bake(scene: Phaser.Scene, g: G, key: string, w: number, h: number): void {
-  g.generateTexture(key, w, h);
+  g.generateTexture(key, w, h + WRAP_PAD);
   g.destroy();
   // Nearest filtering stops the opaque bottom row bleeding into the top edge when tiles wrap.
   scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);

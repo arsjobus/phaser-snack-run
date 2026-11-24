@@ -24,9 +24,10 @@ import { AudioSystem, biomeIndex } from '../audio/AudioSystem';
 import { biomeAtX, biomeChangesAt, type Biome } from '../game/Biomes';
 import { checkpointMeters } from '../game/Checkpoint';
 import { truckCircles } from '../game/Collision';
-import { PlayerLane, laneDepth, laneLift, laneProject, laneScale, laneShade } from '../game/Lanes';
+import { PlayerLane, canChangeLane, laneDepth, laneLift, laneProject, laneScale, laneShade } from '../game/Lanes';
 import { obstacleCircles } from '../game/Obstacles';
-import { emitCrash, emitDust, emitLanding, emitMud, emitSmoke, sprayRate } from '../game/Effects';
+import { emitCrash, emitDust, emitLanding, emitMud, emitSmoke, landingPoints, sprayRate } from '../game/Effects';
+import { ScreenShake } from '../game/Shake';
 import { ParticleSystem, particleFade, particleRadius } from '../game/Particles';
 import { TrackMarks } from '../game/TrackMarks';
 import { ShowCam } from '../game/ShowCam';
@@ -61,6 +62,7 @@ import { defaultStore, type KeyValueStore } from '../progress/Storage';
 import { FONT_BODY, FONT_DISPLAY } from '../ui/Fonts';
 import { INK, UI } from '../ui/Theme';
 import { button, label, panel, rankBadge, type Layer } from '../ui/Ui';
+import { applyView, toLogical } from '../ui/Resolution';
 
 const FIXED_DT = 1 / 60 / PHYSICS.substeps;
 const GATE_X = GAMEPLAY.startX + 420;
@@ -137,6 +139,9 @@ export class GameScene extends Phaser.Scene {
   private marks!: Phaser.GameObjects.Graphics;
 
   private acc = 0;
+  private shake = new ScreenShake();
+  /** The camera's un-shaken vertical follow position. */
+  private followY = SCROLL_Y0;
   private seed = 0;
   private debug = false;
   private bestAir = 0;
@@ -151,6 +156,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
+    applyView(this);
     // Scene instances are reused on restart, so reset every piece of run state here.
     this.acc = 0;
     this.debug = false;
@@ -313,6 +319,8 @@ export class GameScene extends Phaser.Scene {
 
     this.terrain.ensure(this.startX + VIEW_W + 1500);
     const cam = this.cameras.main;
+    this.shake.reset();
+    this.followY = SCROLL_Y0;
     cam.setScroll(this.truck.x - VIEW_W * CAMERA.xAnchor, SCROLL_Y0);
   }
 
@@ -344,9 +352,14 @@ export class GameScene extends Phaser.Scene {
         ];
   }
 
-  /** Away from the camera / towards it. Held, so the drift is smooth. */
-  private readLaneDir(): -1 | 0 | 1 {
-    return this.run.over ? 0 : laneDirOf(this.held);
+  /** Away from the camera / towards it. Held, so the drift is smooth. Needs gas (or reverse) and a truck that is not rolled over. */
+  private readLaneDir(input: InputState): -1 | 0 | 1 {
+    if (this.run.over) return 0;
+    const t = this.truck;
+    const throttle = t.surge > 0 ? 1 : input.throttle; // a boost pad forces the gas on
+    const wheelsDown = t.wheelContacts.filter((c) => c.inContact).length;
+    if (!canChangeLane({ throttle, brake: input.brake, wheelsDown, flipped: t.flipped })) return 0;
+    return laneDirOf(this.held);
   }
 
   /** Pushes the effects quality (ground detail, particle density) into the systems that use it. */
@@ -361,7 +374,7 @@ export class GameScene extends Phaser.Scene {
   /** Reads keyboard, pad and touch into one `held` state and returns the pad's one-shot buttons. */
   private pollInput(): ReturnType<PadEdges['update']> {
     const pad = firstPad();
-    const fingers = this.input.manager.pointers.filter((p) => p.isDown).map((p) => ({ x: p.x, y: p.y }));
+    const fingers = this.input.manager.pointers.filter((p) => p.isDown).map((p) => ({ x: toLogical(p.x), y: toLogical(p.y) }));
     const showTouch = touchVisible(this.settings.touch, this.sys.game.device.input.touch, this.touchedOnce) && !this.run.over;
     this.touchView.setVisible(showTouch);
     this.held = mergeHeld(
@@ -419,7 +432,7 @@ export class GameScene extends Phaser.Scene {
     const input = this.readInput();
     // Depth: hold Up/Down to drift. A vehicle alongside stops the drift, and rubbing it hurts.
     const limits = this.race.depthLimits(this.truck, this.lane.f);
-    const laneStep = this.lane.update(dt, this.readLaneDir(), limits.lo, limits.hi);
+    const laneStep = this.lane.update(dt, this.readLaneDir(this.readInput()), limits.lo, limits.hi);
     if (laneStep.changedFrom !== null) this.onLaneChanged(laneStep.changedFrom);
     if (laneStep.blocked) {
       const by = laneStep.blocked === 'hi' ? limits.hiBy : limits.loBy;
@@ -515,8 +528,11 @@ export class GameScene extends Phaser.Scene {
     // The look-ahead pushes the truck off centre at speed, so it fades out as the show camera takes over.
     const tx = this.truck.x + this.truck.vx * CAMERA.lookAhead * (1 - f) - VIEW_W * xAnchor;
     const ty = this.truck.y - VIEW_H * yAnchor;
-    cam.scrollX = tx;
-    cam.scrollY += (ty - cam.scrollY) * (1 - Math.exp(-(CAMERA.yLerp + (CAMERA.focusYLerp - CAMERA.yLerp) * f) * realDt));
+    // Follow with the un-shaken scroll, then add the shake as whole pixels on top (see Shake.ts).
+    this.followY += (ty - this.followY) * (1 - Math.exp(-(CAMERA.yLerp + (CAMERA.focusYLerp - CAMERA.yLerp) * f) * realDt));
+    const off = this.shake.update(realDt);
+    cam.scrollX = tx + off.x;
+    cam.scrollY = this.followY + off.y;
   }
 
   /** The backdrop follows the screen centre, so it has changed by the time the new ground arrives. */
@@ -758,7 +774,7 @@ export class GameScene extends Phaser.Scene {
       case 'pad': {
         this.audio.boost(e.count);
         const k = shakeScale(this.settings);
-        if (k > 0) this.cameras.main.shake(110, 0.004 * k);
+        if (k > 0) this.shake.kick(0.11, 0.004 * k * VIEW_W);
         this.bannerText(e.count === 1 ? 'BOOST!' : `BOOST x${e.count}`, '#ff9f45', 500);
         this.stageView.sparks(t.x, laneProject(this.terrain.heightAt(t.x), t.y + 20, this.lane.f), 0xffd23f, 14);
         break;
@@ -806,7 +822,7 @@ export class GameScene extends Phaser.Scene {
         if (e.with === 'obstacle' && e.kind) this.popup(e.x, y - 50, e.kind.toUpperCase() + '!', '#ffb066');
         if (hard) {
           const k = shakeScale(this.settings);
-          if (k > 0) this.cameras.main.shake(140, Math.min(0.012, 0.004 + e.impact / 60000) * k);
+          if (k > 0) this.shake.kick(0.14, Math.min(0.012, 0.004 + e.impact / 60000) * k * VIEW_W);
           if (!this.stunt.immune(this.truck)) for (const ev of this.run.hurt(e.damage)) this.onRunEvent(ev);
         }
         break;
@@ -1035,7 +1051,9 @@ export class GameScene extends Phaser.Scene {
     this.bestAir = Math.max(this.bestAir, airTime);
     if (airTime > 0.12) {
       const t = this.truck;
-      emitLanding(this.particles, Math.random, this.biome, t.x, this.terrain.heightAt(t.x), t.speed, airTime);
+      // Dust leaves from where each wheel actually touched down, drawn in the player's own lane.
+      const spots = landingPoints(t.wheelContacts, (x) => this.terrain.heightAt(x), laneLift(this.lane.f));
+      for (const p of spots) emitLanding(this.particles, Math.random, this.biome, p.x, p.y, t.speed, airTime, 1 / spots.length);
     }
     this.audio.land(airTime);
     const bonus = this.run.onLanded(airTime);

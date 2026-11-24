@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { ART, TRUCK } from "../config";
 import { makeBackdrops } from "../art/backdrops";
+import { artAssets, artPath } from "../art/manifest";
 import { SFX_KEYS, sfxCacheKey, sfxUrl } from "../audio/sfx";
 import {
   OBSTACLE_ART,
@@ -45,6 +46,13 @@ export class BootScene extends Phaser.Scene {
         loadingLabel.textContent = `LOADING ${percent}%`;
       if (loadingProgress) loadingProgress.style.width = `${percent}%`;
       loadingBar?.setAttribute("aria-valuenow", String(percent));
+    });
+
+    // Vehicle parts, pickups, hazards and props are SVG files in public/art (see ASSETS.md). A file
+    // that is missing or fails to load is drawn from code instead (see `bake`), so the game still runs.
+    for (const a of artAssets()) this.load.svg(a.key, artPath(a));
+    this.load.on("loaderror", (file: Phaser.Loader.File) => {
+      if (file.type === "svg") console.warn(`Art file ${file.url} did not load; drawing ${file.key} from code.`);
     });
 
     this.load.audio("bgm", "audio/bgm.mp3");
@@ -107,6 +115,7 @@ export class BootScene extends Phaser.Scene {
     h: number,
     draw: (g: Phaser.GameObjects.Graphics) => void,
   ): void {
+    if (this.textures.exists(key)) return; // the SVG loaded: use it
     const g = this.make.graphics({ x: 0, y: 0 }, false);
     draw(g);
     g.generateTexture(key, w, h);

@@ -66,11 +66,26 @@ export function emitDust(ps: ParticleSystem, rand: Rand, biome: Biome, x: number
   }
 }
 
-/** Wheels landing after air time: a dust ring and a spray of mud, bigger for longer jumps. */
-export function emitLanding(ps: ParticleSystem, rand: Rand, biome: Biome, x: number, y: number, vx: number, airTime: number): void {
+/**
+ * Where landing dust should appear: the ground under each wheel that touched down, lifted by the
+ * lane the truck is in (the same offset the rolling-wheel spray uses). If no wheel is flagged
+ * (a body landing) the lowest wheel stands in, so the dust never appears at the truck's centre.
+ */
+export function landingPoints(
+  wheels: readonly { inContact: boolean; x: number; y: number }[],
+  heightAt: (x: number) => number,
+  lift: number,
+): { x: number; y: number }[] {
+  let pick = wheels.filter((w) => w.inContact);
+  if (pick.length === 0 && wheels.length > 0) pick = [wheels.reduce((a, b) => (b.y > a.y ? b : a))];
+  return pick.map((w) => ({ x: w.x, y: heightAt(w.x) - lift }));
+}
+
+/** Wheels landing after air time: a dust ring and a spray of mud, bigger for longer jumps. `share` splits one landing between wheels. */
+export function emitLanding(ps: ParticleSystem, rand: Rand, biome: Biome, x: number, y: number, vx: number, airTime: number, share = 1): void {
   const t = clamp(airTime / 1.2, 0, 1);
-  const dust = Math.round(6 + 14 * t);
-  const mud = Math.round(5 + 11 * t);
+  const dust = Math.max(2, Math.round((6 + 14 * t) * (0.5 + 0.5 * share)));
+  const mud = Math.max(2, Math.round((5 + 11 * t) * (0.5 + 0.5 * share)));
   emitDust(ps, rand, biome, x, y, vx, dust, 1 + 0.5 * t);
   emitMud(ps, rand, biome, x, y, vx, mud);
   for (let i = 0; i < dust / 2; i++) {

@@ -48,6 +48,15 @@ Before every second checkpoint (the biome borders: 2nd, 4th, 6th...) the last te
 
 Every one-shot effect is an mp3 in `public/audio/` (`snack.mp3`, `fuel.mp3`, `boost.mp3`, `thud-hard.mp3`, ...). To change one, drop your own mp3 over it with the same name (or edit its `file` in `src/audio/sfx.ts`); `volume` in that file is its playback level. The game pitches some of them on the fly: `snack` climbs the scale with the combo, `boost` rises with each pad and `rocket` varies a little. Check the licence of anything you add and list it in `ASSETS.md`. `npm test` fails if a listed file is missing.
 
+## What's in Phase 9.6 (fixes)
+
+- **Biome transitions:** the old backdrop fades out while the new one fades in (no pop at the end), and the road's dirt colours ease into the next biome's over `BIOMES.groundBlend` px around the gate instead of cutting.
+- **No screen-tear lines when you crash:** the shake is now whole-pixel and moves only the world (`src/game/Shake.ts`), so the sky and HUD never slide off the screen edge and nothing is sampled between pixels.
+- **Landing dust** comes from the ground under each wheel that touched down, in the player's own lane.
+- **Lane changes** need gas or reverse (`LANES.minDriveToSteer`), and are refused when the truck is rolled over with no wheel on the ground.
+- **Crisp text:** the canvas is rendered at 2x (`src/ui/Resolution.ts`, chosen from the window size) and text is rasterised at the same factor, so it is no longer stretched by the browser.
+- **SVG art:** vehicle parts, pickups, road hazards and props live in `public/art/` as SVG and are loaded at start-up (`npm run art:export` regenerates them; see `public/art/README.md`).
+
 ## What's in Phase 8.5 (feedback)
 
 - **Flat road:** no gradients; puddles, mud and berms are shapes that follow the terrain and stay on the road.

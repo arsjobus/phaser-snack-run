@@ -18,6 +18,7 @@ import { defaultStore, type KeyValueStore } from '../progress/Storage';
 import { PadEdges, firstPad, padButtons } from '../input/Gamepad';
 import { INK, LIST, UI, listRows, rowY, wrapIndex } from '../ui/Theme';
 import { bottomBar, button, coinIcon, flatBackdrop, label, panel, pips, rankBadge, rowPlate, topBar, type Layer } from '../ui/Ui';
+import { applyView } from '../ui/Resolution';
 
 const TABS = ['UPGRADES', 'PAINT', 'SCORES', 'ACHIEVEMENTS'] as const;
 type Tab = (typeof TABS)[number];
@@ -45,6 +46,7 @@ export class GarageScene extends Phaser.Scene {
   }
 
   create(): void {
+    applyView(this);
     this.save = loadSave(this.store);
     this.tab = 'UPGRADES';
     this.row = 0;

@@ -157,3 +157,34 @@ export function biomeSegments(x0: number, x1: number, startX: number): BiomeSegm
     n++;
   }
 }
+
+/** Blend two 0xRRGGBB colours (t = 0 gives a, 1 gives b). */
+export function mixColor(a: number, b: number, t: number): number {
+  const ch = (sh: number) => Math.round(((a >> sh) & 255) * (1 - t) + ((b >> sh) & 255) * t);
+  return (ch(16) << 16) | (ch(8) << 8) | ch(0);
+}
+
+/** The world x of the biome border (a gate) within `half` px of x, or null. */
+export function biomeBorderNear(x: number, startX: number, half: number): number | null {
+  const segs = biomeSegments(x - half, x + half, startX);
+  return segs.length > 1 ? segs[0].x1 : null;
+}
+
+const smooth = (t: number): number => t * t * (3 - 2 * t);
+
+/**
+ * Ground colours at world x. Away from a border they are the biome's own; within `width / 2` of one
+ * they ease from the previous biome's colours into the next one's, so the dirt changes colour over
+ * a stretch of road instead of cutting at the gate.
+ */
+export function groundPaletteAt(x: number, startX: number, width: number): Biome['ground'] {
+  const half = width / 2;
+  const border = biomeBorderNear(x, startX, half);
+  if (border === null) return biomeAtX(x, startX).ground;
+  const from = biomeAtX(border - 1, startX).ground;
+  const to = biomeAtX(border + 1, startX).ground;
+  const t = smooth(Math.max(0, Math.min(1, (x - (border - half)) / width)));
+  const out = {} as Biome['ground'];
+  for (const k of Object.keys(from) as (keyof Biome['ground'])[]) out[k] = mixColor(from[k], to[k], t);
+  return out;
+}

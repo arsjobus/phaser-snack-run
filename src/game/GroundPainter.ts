@@ -1,7 +1,8 @@
 import type Phaser from 'phaser';
 import { LANES, VIEW_H, VIEW_W } from '../config';
 import { shade } from '../art/trucks';
-import { biomeSegments, type Biome } from './Biomes';
+import { BIOMES } from '../config';
+import { biomeSegments, groundPaletteAt, mixColor, type Biome } from './Biomes';
 import {
   FIELD_DEPTH,
   FLAT_FIELD,
@@ -23,6 +24,9 @@ import { nextStuntAfter } from './Stunt';
 import type { Terrain } from './Terrain';
 
 type G = Phaser.GameObjects.Graphics;
+type StripFn = (color: number, top: number, bot: number | null, xa: number, xb: number, alpha?: number) => void;
+/** Width of one flat-colour slice of the blended ground (px). */
+const BLEND_SLICE = 16;
 
 const TUFT_SPACING = 72;
 /** The ground is drawn in steps of this many px (finer than the terrain samples: the track is a spline). */
@@ -33,11 +37,7 @@ const MUD_CELL = 130;
 /** The dark outline the rest of the art uses (trucks, props): ground edges get it too. */
 const OUTLINE = 0x1a120a;
 
-/** Blend two 0xRRGGBB colours (t = 0 gives a, 1 gives b). */
-export function mixColor(a: number, b: number, t: number): number {
-  const ch = (sh: number) => Math.round(((a >> sh) & 255) * (1 - t) + ((b >> sh) & 255) * t);
-  return (ch(16) << 16) | (ch(8) << 8) | ch(0);
-}
+export { mixColor };
 
 /**
  * Paints the terrain in flat, outlined colour like the rest of the art (no gradients): the
@@ -103,35 +103,70 @@ export class GroundPainter {
     };
 
     const segments = forced ? [{ biome: forced, x0, x1 }] : biomeSegments(x0, x1, this.startX);
+    const half = BIOMES.groundBlend / 2;
     for (const seg of segments) {
-      const c = seg.biome.ground;
       const { x0: xa, x1: xb } = seg;
       // Flat, cel-shaded like the rest of the art: every layer is ONE solid colour with a dark
       // outline where it meets the next, and no gradients, vignettes, haze or glints.
       //   cross-section (the slab of dirt under the near lane) -> dark outline -> foreground
       //   -> the dirt field behind the near lane -> outline at the tree line.
-      strip(c.deep, 0, null, xa, xb); // the slab: one colour all the way down
-      const fgBottom = -laneLift(-FOREGROUND_DEPTH - 1);
-      strip(c.dirt, 15, null, xa, xb); // the foreground: a flat step in front of the lip
-      strip(shade(c.dirt, 0.82), 15 + (fgBottom - 15) * 0.55, null, xa, xb); // one hard step towards the HUD
-      // The field behind the near lane: a single flat colour, with three hard-edged furrow bands (no blend).
-      const far = -laneLift(FIELD_DEPTH);
-      strip(c.crust, far, 0, xa, xb);
-      for (let i = 0; i < FURROWS; i++) {
-        const fa = FIELD_DEPTH * ((i * 2 + 1) / (FURROWS * 2));
-        const fb = fa + FIELD_DEPTH / (FURROWS * 2) - 0.12;
-        strip(shade(c.crust, 0.94), -laneLift(fb), -laneLift(fa), xa, xb);
+      // Near a biome border the colours ease into the next biome's over `BIOMES.groundBlend` px:
+      // that stretch is painted in 16 px slices, each one flat colour; the rest is painted whole.
+      for (const [sa, sb, blended] of forced ? [[xa, xb, false] as const] : this.blendSpans(xa, xb, half)) {
+        if (!blended) {
+          this.base(strip, seg.biome.ground, sa, sb);
+          continue;
+        }
+        for (let a = sa; a < sb; ) {
+          const b = Math.min(sb, (Math.floor(a / BLEND_SLICE) + 1) * BLEND_SLICE);
+          this.base(strip, groundPaletteAt((a + b) / 2, this.startX, BIOMES.groundBlend), a, b);
+          a = b;
+        }
       }
-      strip(OUTLINE, far - 2, far + 1.5, xa, xb); // contact line with the tree line
-      strip(c.crust, 0, 10, xa, xb); // the near lane's crust
-      strip(c.crustShadow, 10, 15, xa, xb); // its shaded edge
-      strip(OUTLINE, -1.5, 1.5, xa, xb); // the lip outline
-      strip(OUTLINE, 15, 18, xa, xb); // outline under the slab's step
       this.mud(seg.biome, xa, xb);
       this.ruts(seg.biome, xa, xb);
       this.details(seg.biome, xa, xb);
       this.tufts(seg.biome, xa, xb);
     }
+  }
+
+  /** Splits [xa, xb] into spans that are inside a biome-border blend zone (true) or plain (false). */
+  private blendSpans(xa: number, xb: number, half: number): [number, number, boolean][] {
+    const segs = biomeSegments(xa - half, xb + half, this.startX);
+    const out: [number, number, boolean][] = [];
+    let at = xa;
+    for (let i = 0; i < segs.length - 1; i++) {
+      const border = segs[i].x1;
+      const a = Math.max(border - half, xa);
+      const b = Math.min(border + half, xb);
+      if (b <= a) continue;
+      if (a > at) out.push([at, a, false]);
+      out.push([a, b, true]);
+      at = b;
+    }
+    if (at < xb) out.push([at, xb, false]);
+    return out;
+  }
+
+  /** The ground layers (slab, foreground, field, near crust and their outlines) over [xa, xb] in one palette. */
+  private base(strip: StripFn, c: Biome['ground'], xa: number, xb: number): void {
+    strip(c.deep, 0, null, xa, xb); // the slab: one colour all the way down
+    const fgBottom = -laneLift(-FOREGROUND_DEPTH - 1);
+    strip(c.dirt, 15, null, xa, xb); // the foreground: a flat step in front of the lip
+    strip(shade(c.dirt, 0.82), 15 + (fgBottom - 15) * 0.55, null, xa, xb); // one hard step towards the HUD
+    // The field behind the near lane: a single flat colour, with three hard-edged furrow bands (no blend).
+    const far = -laneLift(FIELD_DEPTH);
+    strip(c.crust, far, 0, xa, xb);
+    for (let i = 0; i < FURROWS; i++) {
+      const fa = FIELD_DEPTH * ((i * 2 + 1) / (FURROWS * 2));
+      const fb = fa + FIELD_DEPTH / (FURROWS * 2) - 0.12;
+      strip(shade(c.crust, 0.94), -laneLift(fb), -laneLift(fa), xa, xb);
+    }
+    strip(OUTLINE, far - 2, far + 1.5, xa, xb); // contact line with the tree line
+    strip(c.crust, 0, 10, xa, xb); // the near lane's crust
+    strip(c.crustShadow, 10, 15, xa, xb); // its shaded edge
+    strip(OUTLINE, -1.5, 1.5, xa, xb); // the lip outline
+    strip(OUTLINE, 15, 18, xa, xb); // outline under the slab's step
   }
 
   /**

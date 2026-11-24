@@ -387,10 +387,13 @@ export function drawTruck(
 export function makeTruckTextures(scene: Phaser.Scene): string[] {
   const keys: string[] = [];
   const build = (key: string, kind: BodyKind, paint: Paint, number: number | null, wheel: number, seed: number) => {
-    const g = scene.make.graphics({ x: 0, y: 0 }, false);
-    drawTruck(g, kind, paint, number, wheel, seed);
-    g.generateTexture(key, ART.truckW, ART.truckH);
-    g.destroy();
+    // A truck loaded from its SVG file (public/art/vehicles) is used as it is; the drawing code is the fallback.
+    if (!scene.textures.exists(key)) {
+      const g = scene.make.graphics({ x: 0, y: 0 }, false);
+      drawTruck(g, kind, paint, number, wheel, seed);
+      g.generateTexture(key, ART.truckW, ART.truckH);
+      g.destroy();
+    }
     keys.push(key);
   };
   for (const skin of SKINS) build(playerTruckKey(skin.id), 'suv', skin.paint, null, PLAYER_WHEEL, 1);

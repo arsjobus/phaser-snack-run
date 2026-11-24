@@ -15,6 +15,7 @@ import { defaultStore } from '../progress/Storage';
 import { MENU_GATE, MENU_ITEMS, type MenuId } from '../ui/MenuModel';
 import { INK, wrapIndex } from '../ui/Theme';
 import { button, label, logoPlate, type Layer } from '../ui/Ui';
+import { applyView } from '../ui/Resolution';
 
 /**
  * The start screen: the game's own scenery (forest backdrop, the real road painter, the truck
@@ -35,6 +36,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   create(): void {
+    applyView(this);
     this.index = 0;
     this.t = 0;
     this.bodies = [];

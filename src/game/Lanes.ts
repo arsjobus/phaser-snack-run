@@ -22,6 +22,26 @@ export const laneDepth = (f: number, offset = 0): number => LANES.depthBase - LA
 /** True when two lane positions are close enough for the things in them to touch. */
 export const sameLane = (a: number, b: number, band: number = LANES.hitBand): boolean => Math.abs(a - b) < band;
 
+/** What the lane gate needs to know about the truck this frame. */
+export interface SteerState {
+  /** Throttle and brake after the engine cut-out (0..1). Either one counts: forwards or reverse. */
+  throttle: number;
+  brake: number;
+  /** Wheels touching the ground right now. */
+  wheelsDown: number;
+  /** The truck is lying on its roof or side. */
+  flipped: boolean;
+}
+
+/**
+ * Lanes are changed by driving across them, so the truck needs enough gas (forwards or reverse),
+ * and a truck that has rolled over with not even one wheel on the ground cannot change lanes at all.
+ */
+export function canChangeLane(s: SteerState): boolean {
+  if (s.flipped && s.wheelsDown === 0) return false;
+  return Math.max(s.throttle, s.brake) >= LANES.minDriveToSteer;
+}
+
 /** What a depth move did this frame. */
 export interface LaneStep {
   /** The whole lane the player just left (the nearest lane changed), or null. */

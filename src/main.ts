@@ -8,14 +8,16 @@ import { GarageScene } from './scenes/GarageScene';
 import { MenuScene } from './scenes/MenuScene';
 import { SettingsScene } from './scenes/SettingsScene';
 import { loadFonts } from './ui/Fonts';
+import { initRenderScale } from './ui/Resolution';
 
 // The fonts load first, so every canvas text is measured with the real glyphs (never rejects).
 void loadFonts().then(() => {
+  const R = initRenderScale();
   new Phaser.Game({
     type: Phaser.AUTO,
     parent: 'game',
-    width: VIEW_W,
-    height: VIEW_H,
+    width: VIEW_W * R,
+    height: VIEW_H * R,
     backgroundColor: '#7fb7e6',
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
     scene: [BootScene, MenuScene, GameScene, GarageScene, SettingsScene, CreditsScene, ArtScene],

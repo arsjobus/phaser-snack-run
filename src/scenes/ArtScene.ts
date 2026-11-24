@@ -11,6 +11,7 @@ import { tireRise } from '../game/Tires';
 import { Terrain } from '../game/Terrain';
 import { bodyOrigin } from '../game/TruckView';
 import { FONT_BODY } from '../ui/Fonts';
+import { applyView } from '../ui/Resolution';
 
 /**
  * Developer art preview (open `/?art`, or `/?art=desert` for a biome): the whole truck set standing
@@ -23,6 +24,7 @@ export class ArtScene extends Phaser.Scene {
   }
 
   create(): void {
+    applyView(this);
     const param = new URLSearchParams(window.location.search).get('art') ?? '';
     const biome: Biome = BIOME_LIST.find((b) => b.id === param) ?? BIOME_LIST[0];
     const startX = 200;

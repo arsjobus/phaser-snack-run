@@ -128,6 +128,8 @@ export const LANES = {
   /** Depth speed (lanes per second) of the player while Up/Down is held, and how fast it eases in. */
   moveSpeed: 2.1,
   moveEase: 10,
+  /** Gas or brake (0..1, analog on a pad) needed to change lanes: the truck must be driven across, not slid. */
+  minDriveToSteer: 0.2,
   /** Share of its speed the player rebounds with when a lane change hits another vehicle. */
   rebound: 0.35,
   /** Another vehicle blocks a depth move when its x is closer than this (px): the trucks overlap. */
@@ -538,6 +540,8 @@ export const BIOMES = {
   checkpointsPer: 2,
   /** Seconds the backdrop takes to cross-fade once the screen centre passes the border. */
   fadeSeconds: 1.6,
+  /** Width (px) of the strip centred on a biome border where the ground colours blend into the next biome's. */
+  groundBlend: 360,
 } as const;
 
 /** Particles, mud spray and tire tracks. */

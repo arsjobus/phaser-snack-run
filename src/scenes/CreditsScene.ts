@@ -4,6 +4,7 @@ import { ALL_CREDITS, GAME_TITLE } from '../credits';
 import { PadEdges, firstPad, padButtons } from '../input/Gamepad';
 import { INK } from '../ui/Theme';
 import { backButton, bottomBar, flatBackdrop, label, logoPlate, panel, topBar, type Layer } from '../ui/Ui';
+import { applyView } from '../ui/Resolution';
 
 /**
  * Credits: who made the game and what it is built with (the text lives in `src/credits.ts`).
@@ -17,6 +18,7 @@ export class CreditsScene extends Phaser.Scene {
   }
 
   create(): void {
+    applyView(this);
     this.edges = new PadEdges();
     flatBackdrop(this);
     const layer: Layer = this.add.container(0, 0);

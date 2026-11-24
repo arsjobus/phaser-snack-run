@@ -24,6 +24,17 @@ const SPECS: readonly LayerSpec[] = [
 ];
 
 /**
+ * Alpha of the incoming and outgoing backdrop at fade progress 0..1 (eased). The outgoing one
+ * holds until the incoming one is about half in, then fades out, so the two together never leave
+ * a gap showing the sky through the hills.
+ */
+export function crossfadeAlphas(progress: number): [number, number] {
+  const p = Math.max(0, Math.min(1, progress));
+  const e = p * p * (3 - 2 * p);
+  return [e, Math.max(0, Math.min(1, 2 * (1 - e)))];
+}
+
+/**
  * Five tiling layers behind the terrain, one set per biome. The current biome's set is opaque;
  * when the biome changes the new set fades in on top of it, then the old one is hidden.
  */
@@ -78,7 +89,11 @@ export class Parallax {
     if (!this.calm) this.t += dt;
     if (this.previous) {
       this.fade = Math.min(1, this.fade + dt / BIOMES.fadeSeconds);
-      this.each(this.current, (sp) => sp.setAlpha(this.fade));
+      const [inA, outA] = crossfadeAlphas(this.fade);
+      // The sky is opaque, so the new one simply fades in over the old one; every other layer has
+      // see-through gaps, so the old one fades out while the new one fades in (no pop at the end).
+      this.each(this.current, (sp) => sp.setAlpha(inA));
+      this.each(this.previous, (sp, i) => sp.setAlpha(SPECS[i].layer === 'sky' ? 1 : outA));
       if (this.fade >= 1) {
         this.each(this.previous, (sp) => sp.setAlpha(0));
         this.each(this.current, (sp, i) => sp.setDepth(SPECS[i].depth));

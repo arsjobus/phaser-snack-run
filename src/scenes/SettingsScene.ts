@@ -15,6 +15,7 @@ import {
   type Action,
   type Settings,
 } from '../settings/Settings';
+import { applyView } from '../ui/Resolution';
 
 /** How many rows sit in the left column of the settings screen. */
 const LEFT_ROWS = 8;
@@ -54,6 +55,7 @@ export class SettingsScene extends Phaser.Scene {
   }
 
   create(): void {
+    applyView(this);
     this.settings = loadSettings(this.store);
     this.row = 0;
     this.rebinding = null;

@@ -1,0 +1,889 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="144"
+   height="136"
+   viewBox="0 0 144 136"
+   version="1.1"
+   id="svg106"
+   sodipodi:docname="rival-5-monster.svg"
+   inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs106" />
+  <sodipodi:namedview
+     id="namedview106"
+     pagecolor="#505050"
+     bordercolor="#eeeeee"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#505050"
+     inkscape:zoom="12.235294"
+     inkscape:cx="84.713943"
+     inkscape:cy="15.487981"
+     inkscape:window-width="1920"
+     inkscape:window-height="1050"
+     inkscape:window-x="0"
+     inkscape:window-y="38"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg106" />
+  <rect
+     x="42.040268"
+     y="2.5076923"
+     width="4"
+     height="18"
+     fill="#8a8f99"
+     id="rect72" />
+  <rect
+     x="14.5"
+     y="77.9"
+     width="115"
+     height="11"
+     fill="#111111"
+     id="rect1" />
+  <rect
+     x="16"
+     y="79.4"
+     width="112"
+     height="8"
+     fill="#2a2a2d"
+     id="rect2" />
+  <rect
+     x="18.5"
+     y="84.9"
+     width="107"
+     height="5"
+     fill="#111111"
+     id="rect3" />
+  <rect
+     x="20"
+     y="86.4"
+     width="104"
+     height="2"
+     fill="#3c3c40"
+     id="rect4" />
+  <rect
+     x="54.5"
+     y="83.9"
+     width="35"
+     height="9"
+     fill="#111111"
+     id="rect5" />
+  <rect
+     x="56"
+     y="85.4"
+     width="32"
+     height="6"
+     fill="#555a63"
+     id="rect6" />
+  <line
+     x1="30"
+     y1="101.2"
+     x2="114"
+     y2="101.2"
+     fill="none"
+     stroke="#111111"
+     stroke-width="5"
+     id="line6" />
+  <line
+     x1="30"
+     y1="101.2"
+     x2="114"
+     y2="101.2"
+     fill="none"
+     stroke="#8a8f99"
+     stroke-width="3"
+     id="line7" />
+  <circle
+     cx="56"
+     cy="101.2"
+     r="4.5"
+     fill="#111111"
+     id="circle7" />
+  <circle
+     cx="88"
+     cy="101.2"
+     r="4.5"
+     fill="#111111"
+     id="circle8" />
+  <circle
+     cx="56"
+     cy="101.2"
+     r="2.8"
+     fill="#555a63"
+     id="circle9" />
+  <circle
+     cx="88"
+     cy="101.2"
+     r="2.8"
+     fill="#555a63"
+     id="circle10" />
+  <line
+     x1="30"
+     y1="101.2"
+     x2="60"
+     y2="83.4"
+     fill="none"
+     stroke="#111111"
+     stroke-width="7"
+     id="line10" />
+  <line
+     x1="30"
+     y1="101.2"
+     x2="60"
+     y2="83.4"
+     fill="none"
+     stroke="#3c3c40"
+     stroke-width="4"
+     id="line11" />
+  <line
+     x1="18"
+     y1="80.4"
+     x2="26"
+     y2="97.2"
+     fill="none"
+     stroke="#111111"
+     stroke-width="6"
+     id="line12" />
+  <line
+     x1="18"
+     y1="80.4"
+     x2="26"
+     y2="97.2"
+     fill="none"
+     stroke="#c9ccd2"
+     stroke-width="2"
+     id="line13" />
+  <line
+     x1="18.96"
+     y1="82.42"
+     x2="19.52"
+     y2="83.59"
+     fill="none"
+     stroke="#e8a020"
+     stroke-width="4"
+     id="line14" />
+  <line
+     x1="19.76"
+     y1="84.1"
+     x2="20.32"
+     y2="85.27"
+     fill="none"
+     stroke="#e8a020"
+     stroke-width="4"
+     id="line15" />
+  <line
+     x1="20.56"
+     y1="85.78"
+     x2="21.12"
+     y2="86.95"
+     fill="none"
+     stroke="#e8a020"
+     stroke-width="4"
+     id="line16" />
+  <line
+     x1="21.36"
+     y1="87.46"
+     x2="21.92"
+     y2="88.63"
+     fill="none"
+     stroke="#e8a020"
+     stroke-width="4"
+     id="line17" />
+  <line
+     x1="22.16"
+     y1="89.14"
+     x2="22.72"
+     y2="90.31"
+     fill="none"
+     stroke="#e8a020"
+     stroke-width="4"
+     id="line18" />
+  <line
+     x1="22.96"
+     y1="90.82"
+     x2="23.52"
+     y2="91.99"
+     fill="none"
+     stroke="#e8a020"
+     stroke-width="4"
+     id="line19" />
+  <line
+     x1="23.76"
+     y1="92.5"
+     x2="24.32"
+     y2="93.67"
+     fill="none"
+     stroke="#e8a020"
+     stroke-width="4"
+     id="line20" />
+  <circle
+     cx="30"
+     cy="101.2"
+     r="9"
+     fill="#111111"
+     id="circle20" />
+  <circle
+     cx="30"
+     cy="101.2"
+     r="7"
+     fill="#555a63"
+     id="circle21" />
+  <circle
+     cx="28"
+     cy="99.2"
+     r="2.4"
+     fill="#777b84"
+     id="circle22" />
+  <line
+     x1="114"
+     y1="101.2"
+     x2="84"
+     y2="83.4"
+     fill="none"
+     stroke="#111111"
+     stroke-width="7"
+     id="line22" />
+  <line
+     x1="114"
+     y1="101.2"
+     x2="84"
+     y2="83.4"
+     fill="none"
+     stroke="#3c3c40"
+     stroke-width="4"
+     id="line23" />
+  <line
+     x1="126"
+     y1="80.4"
+     x2="118"
+     y2="97.2"
+     fill="none"
+     stroke="#111111"
+     stroke-width="6"
+     id="line24" />
+  <line
+     x1="126"
+     y1="80.4"
+     x2="118"
+     y2="97.2"
+     fill="none"
+     stroke="#c9ccd2"
+     stroke-width="2"
+     id="line25" />
+  <line
+     x1="125.04"
+     y1="82.42"
+     x2="124.48"
+     y2="83.59"
+     fill="none"
+     stroke="#e8a020"
+     stroke-width="4"
+     id="line26" />
+  <line
+     x1="124.24"
+     y1="84.1"
+     x2="123.68"
+     y2="85.27"
+     fill="none"
+     stroke="#e8a020"
+     stroke-width="4"
+     id="line27" />
+  <line
+     x1="123.44"
+     y1="85.78"
+     x2="122.88"
+     y2="86.95"
+     fill="none"
+     stroke="#e8a020"
+     stroke-width="4"
+     id="line28" />
+  <line
+     x1="122.64"
+     y1="87.46"
+     x2="122.08"
+     y2="88.63"
+     fill="none"
+     stroke="#e8a020"
+     stroke-width="4"
+     id="line29" />
+  <line
+     x1="121.84"
+     y1="89.14"
+     x2="121.28"
+     y2="90.31"
+     fill="none"
+     stroke="#e8a020"
+     stroke-width="4"
+     id="line30" />
+  <line
+     x1="121.04"
+     y1="90.82"
+     x2="120.48"
+     y2="91.99"
+     fill="none"
+     stroke="#e8a020"
+     stroke-width="4"
+     id="line31" />
+  <line
+     x1="120.24"
+     y1="92.5"
+     x2="119.68"
+     y2="93.67"
+     fill="none"
+     stroke="#e8a020"
+     stroke-width="4"
+     id="line32" />
+  <circle
+     cx="114"
+     cy="101.2"
+     r="9"
+     fill="#111111"
+     id="circle32" />
+  <circle
+     cx="114"
+     cy="101.2"
+     r="7"
+     fill="#555a63"
+     id="circle33" />
+  <circle
+     cx="112"
+     cy="99.2"
+     r="2.4"
+     fill="#777b84"
+     id="circle34" />
+  <rect
+     x="10"
+     y="51.2"
+     width="124"
+     height="33.2"
+     rx="7"
+     fill="#111111"
+     id="rect34" />
+  <rect
+     x="12"
+     y="53.2"
+     width="120"
+     height="29.2"
+     rx="5"
+     fill="#1e1e21"
+     id="rect35" />
+  <polygon
+     points="9,82.4 9,82.4 9,82.4 9,82.4 9,78.19 9,73.78 12.1,70.2 17.76,67.56 23.78,65.94 30,65.4 36.22,65.94 42.24,67.56 47.9,70.2 53.01,73.78 57.42,78.19 61,82.4 63.64,82.4 65.26,82.4 65.8,82.4"
+     fill="#111111"
+     id="polygon35" />
+  <polygon
+     points="78.2,82.4 78.74,82.4 80.36,82.4 83,82.4 86.58,78.19 90.99,73.78 96.1,70.2 101.76,67.56 107.78,65.94 114,65.4 120.22,65.94 126.24,67.56 131.9,70.2 135,73.78 135,78.19 135,82.4 135,82.4 135,82.4 135,82.4"
+     fill="#111111"
+     id="polygon36" />
+  <rect
+     x="12"
+     y="32.507687"
+     width="120"
+     height="38"
+     rx="10"
+     fill="#111111"
+     id="rect36" />
+  <rect
+     x="42"
+     y="8.5076933"
+     width="58"
+     height="32"
+     rx="10"
+     fill="#111111"
+     id="rect37" />
+  <rect
+     x="14"
+     y="34.507679"
+     width="116"
+     height="34"
+     rx="8"
+     fill="#2a2a2e"
+     id="rect38" />
+  <rect
+     x="44"
+     y="10.507693"
+     width="54"
+     height="28"
+     rx="8"
+     fill="#2a2a2e"
+     id="rect39" />
+  <polygon
+     points="9,82.4 9,82.4 9,82.4 9,82.4 9,79.47 9,75.31 13.1,71.93 18.44,69.44 24.13,67.91 30,67.4 35.87,67.91 41.56,69.44 46.9,71.93 51.73,75.31 55.89,79.47 59.27,82.4 61.76,82.4 63.29,82.4 63.8,82.4"
+     fill="#2a2a2e"
+     id="polygon39" />
+  <polygon
+     points="80.2,82.4 80.71,82.4 82.24,82.4 84.73,82.4 88.11,79.47 92.27,75.31 97.1,71.93 102.44,69.44 108.13,67.91 114,67.4 119.87,67.91 125.56,69.44 130.9,71.93 135,75.31 135,79.47 135,82.4 135,82.4 135,82.4 135,82.4"
+     fill="#2a2a2e"
+     id="polygon40" />
+  <rect
+     x="19.929882"
+     y="35.507679"
+     width="104.14024"
+     height="3"
+     fill="#39393e"
+     id="rect40"
+     style="stroke-width:0.964274" />
+  <rect
+     x="14"
+     y="50.507679"
+     width="116"
+     height="5"
+     fill="#e8742a"
+     id="rect41" />
+  <polygon
+     points="14,48.2 26,48.2 18,57.2 "
+     fill="#e8742a"
+     id="polygon41"
+     transform="translate(0,6.845353)" />
+  <polygon
+     points="31,48.2 43,48.2 35,57.2 "
+     fill="#e8742a"
+     id="polygon42"
+     transform="translate(0,6.845353)" />
+  <polygon
+     points="48,48.2 60,48.2 52,57.2 "
+     fill="#e8742a"
+     id="polygon43"
+     transform="translate(0,6.845353)" />
+  <polygon
+     points="65,48.2 77,48.2 69,57.2 "
+     fill="#e8742a"
+     id="polygon44"
+     transform="translate(0,6.845353)" />
+  <polygon
+     points="82,48.2 94,48.2 86,57.2 "
+     fill="#e8742a"
+     id="polygon45"
+     transform="translate(0,6.845353)" />
+  <polygon
+     points="99,48.2 111,48.2 103,57.2 "
+     fill="#e8742a"
+     id="polygon46"
+     transform="translate(0,6.845353)" />
+  <polygon
+     points="116,48.2 128,48.2 120,57.2 "
+     fill="#e8742a"
+     id="polygon47"
+     transform="translate(0,6.845353)" />
+  <rect
+     x="50"
+     y="15.507692"
+     width="22"
+     height="16"
+     rx="3"
+     fill="#1b2b4a"
+     id="rect47" />
+  <rect
+     x="75"
+     y="15.507692"
+     width="20"
+     height="16"
+     rx="3"
+     fill="#1b2b4a"
+     id="rect48" />
+  <rect
+     x="52"
+     y="17.507694"
+     width="8"
+     height="4"
+     fill="#6fa8d6"
+     id="rect49" />
+  <rect
+     x="77"
+     y="17.507694"
+     width="7"
+     height="4"
+     fill="#6fa8d6"
+     id="rect50" />
+  <polygon
+     points="9,82.4 9,82.4 9,82.4 9,82.3 9,76.9 9,72.24 11.1,68.46 17.07,65.68 23.44,63.97 30,63.4 36.56,63.97 42.93,65.68 48.9,68.46 54.3,72.24 58.96,76.9 62.74,82.3 65.52,82.4 67.23,82.4 67.8,82.4"
+     fill="#1a1a1d"
+     id="polygon50" />
+  <polygon
+     points="9,82.4 9,82.4 9,82.4 9,82.4 9,79.47 9,75.31 13.1,71.93 18.44,69.44 24.13,67.91 30,67.4 35.87,67.91 41.56,69.44 46.9,71.93 51.73,75.31 55.89,79.47 59.27,82.4 61.76,82.4 63.29,82.4 63.8,82.4"
+     fill="#111111"
+     id="polygon51" />
+  <polygon
+     points="9,82.4 9,82.4 9,82.4 9,82.4 9,80.76 9.56,76.84 14.1,73.66 19.12,71.32 24.48,69.88 30,69.4 35.52,69.88 40.88,71.32 45.9,73.66 50.44,76.84 54.36,80.76 57.54,82.4 59.88,82.4 61.32,82.4 61.8,82.4"
+     fill="#120d0a"
+     id="polygon52" />
+  <polygon
+     points="9,82.4 9,82.4 9,82.4 9,82.4 9.47,82.4 12.77,80.67 16.6,77.99 20.83,76.02 25.35,74.81 30,74.4 34.65,74.81 39.17,76.02 43.4,77.99 47.23,80.67 50.53,82.4 53.21,82.4 55.18,82.4 56.39,82.4 56.8,82.4"
+     fill="#2a1d14"
+     id="polygon53" />
+  <polygon
+     points="9,82.4 9,82.4 9,82.4 9.39,82.4 11.77,82.4 14.7,82.4 18.1,80.59 21.86,78.84 25.87,77.76 30,77.4 34.13,77.76 38.14,78.84 41.9,80.59 45.3,82.4 48.23,82.4 50.61,82.4 52.36,82.4 53.44,82.4 53.8,82.4"
+     fill="#120d0a"
+     id="polygon54" />
+  <polygon
+     points="76.2,82.4 76.77,82.4 78.48,82.4 81.26,82.3 85.04,76.9 89.7,72.24 95.1,68.46 101.07,65.68 107.44,63.97 114,63.4 120.56,63.97 126.93,65.68 132.9,68.46 135,72.24 135,76.9 135,82.3 135,82.4 135,82.4 135,82.4"
+     fill="#1a1a1d"
+     id="polygon55" />
+  <polygon
+     points="80.2,82.4 80.71,82.4 82.24,82.4 84.73,82.4 88.11,79.47 92.27,75.31 97.1,71.93 102.44,69.44 108.13,67.91 114,67.4 119.87,67.91 125.56,69.44 130.9,71.93 135,75.31 135,79.47 135,82.4 135,82.4 135,82.4 135,82.4"
+     fill="#111111"
+     id="polygon56" />
+  <polygon
+     points="82.2,82.4 82.68,82.4 84.12,82.4 86.46,82.4 89.64,80.76 93.56,76.84 98.1,73.66 103.12,71.32 108.48,69.88 114,69.4 119.52,69.88 124.88,71.32 129.9,73.66 134.44,76.84 135,80.76 135,82.4 135,82.4 135,82.4 135,82.4"
+     fill="#120d0a"
+     id="polygon57" />
+  <polygon
+     points="87.2,82.4 87.61,82.4 88.82,82.4 90.79,82.4 93.47,82.4 96.77,80.67 100.6,77.99 104.83,76.02 109.35,74.81 114,74.4 118.65,74.81 123.17,76.02 127.4,77.99 131.23,80.67 134.53,82.4 135,82.4 135,82.4 135,82.4 135,82.4"
+     fill="#2a1d14"
+     id="polygon58" />
+  <polygon
+     points="90.2,82.4 90.56,82.4 91.64,82.4 93.39,82.4 95.77,82.4 98.7,82.4 102.1,80.59 105.86,78.84 109.87,77.76 114,77.4 118.13,77.76 122.14,78.84 125.9,80.59 129.3,82.4 132.23,82.4 134.61,82.4 135,82.4 135,82.4 135,82.4"
+     fill="#120d0a"
+     id="polygon59" />
+  <circle
+     cx="72"
+     cy="49.507679"
+     r="9.5"
+     fill="#111111"
+     id="circle59" />
+  <circle
+     cx="72"
+     cy="49.507679"
+     r="8"
+     fill="#ffe066"
+     id="circle60" />
+  <rect
+     x="69"
+     y="44.307678"
+     width="2"
+     height="2"
+     fill="#111111"
+     id="rect60" />
+  <rect
+     x="71"
+     y="44.307678"
+     width="2"
+     height="2"
+     fill="#111111"
+     id="rect61" />
+  <rect
+     x="73"
+     y="44.307678"
+     width="2"
+     height="2"
+     fill="#111111"
+     id="rect62" />
+  <rect
+     x="69"
+     y="46.307678"
+     width="2"
+     height="2"
+     fill="#111111"
+     id="rect63" />
+  <rect
+     x="69"
+     y="48.307678"
+     width="2"
+     height="2"
+     fill="#111111"
+     id="rect64" />
+  <rect
+     x="71"
+     y="48.307678"
+     width="2"
+     height="2"
+     fill="#111111"
+     id="rect65" />
+  <rect
+     x="73"
+     y="48.307678"
+     width="2"
+     height="2"
+     fill="#111111"
+     id="rect66" />
+  <rect
+     x="73"
+     y="50.307678"
+     width="2"
+     height="2"
+     fill="#111111"
+     id="rect67" />
+  <rect
+     x="69"
+     y="52.307678"
+     width="2"
+     height="2"
+     fill="#111111"
+     id="rect68" />
+  <rect
+     x="71"
+     y="52.307678"
+     width="2"
+     height="2"
+     fill="#111111"
+     id="rect69" />
+  <rect
+     x="73"
+     y="52.307678"
+     width="2"
+     height="2"
+     fill="#111111"
+     id="rect70" />
+  <rect
+     x="48"
+     y="6.5076933"
+     width="44"
+     height="4"
+     fill="#333333"
+     id="rect73" />
+  <rect
+     x="55.264431"
+     y="2.5076919"
+     width="6"
+     height="4"
+     fill="#fff7c2"
+     id="rect74" />
+  <rect
+     x="67.264397"
+     y="2.5076919"
+     width="6"
+     height="4"
+     fill="#fff7c2"
+     id="rect75" />
+  <rect
+     x="79.264397"
+     y="2.5076919"
+     width="6"
+     height="4"
+     fill="#fff7c2"
+     id="rect76" />
+  <rect
+     x="130"
+     y="46.507679"
+     width="8"
+     height="22"
+     fill="#333333"
+     id="rect78" />
+  <rect
+     x="124"
+     y="44.507679"
+     width="6"
+     height="8"
+     fill="#fff7c2"
+     id="rect79" />
+  <rect
+     x="125"
+     y="45.507679"
+     width="2"
+     height="3"
+     fill="#ffffff"
+     id="rect80" />
+  <rect
+     x="47.43"
+     y="54.627678"
+     width="1.88"
+     height="1.02"
+     fill="#6b4a2a"
+     fill-opacity="0.68"
+     id="rect81" />
+  <rect
+     x="94.74"
+     y="63.12"
+     width="1.58"
+     height="2.39"
+     fill="#6b4a2a"
+     fill-opacity="0.61"
+     id="rect82" />
+  <rect
+     x="51.87"
+     y="59.63"
+     width="2.83"
+     height="2.2"
+     fill="#6b4a2a"
+     fill-opacity="0.58"
+     id="rect83" />
+  <rect
+     x="129.71001"
+     y="59.257679"
+     width="2.47"
+     height="1.64"
+     fill="#4a3220"
+     fill-opacity="0.66"
+     id="rect84" />
+  <rect
+     x="41.299999"
+     y="56.197678"
+     width="2.1800001"
+     height="1.45"
+     fill="#4a3220"
+     fill-opacity="0.37"
+     id="rect85" />
+  <rect
+     x="51.59"
+     y="57.267677"
+     width="2.2"
+     height="1.8"
+     fill="#6b4a2a"
+     fill-opacity="0.57"
+     id="rect86" />
+  <rect
+     x="54.110001"
+     y="59.377678"
+     width="1.9299999"
+     height="1.02"
+     fill="#4a3220"
+     fill-opacity="0.61"
+     id="rect87" />
+  <rect
+     x="80.58"
+     y="59.5"
+     width="3.27"
+     height="1.56"
+     fill="#4a3220"
+     fill-opacity="0.39"
+     id="rect88" />
+  <rect
+     x="31.16"
+     y="55.79"
+     width="1.68"
+     height="2.11"
+     fill="#4a3220"
+     fill-opacity="0.65"
+     id="rect89" />
+  <rect
+     x="58.990002"
+     y="58.787678"
+     width="3.3900001"
+     height="1"
+     fill="#4a3220"
+     fill-opacity="0.37"
+     id="rect90" />
+  <rect
+     x="17.46"
+     y="61.87"
+     width="2.55"
+     height="1.28"
+     fill="#6b4a2a"
+     fill-opacity="0.51"
+     id="rect91" />
+  <rect
+     x="19.1"
+     y="60.19"
+     width="3.38"
+     height="1.38"
+     fill="#6b4a2a"
+     fill-opacity="0.68"
+     id="rect92" />
+  <rect
+     x="83.5"
+     y="67.32"
+     width="2.01"
+     height="2.31"
+     fill="#4a3220"
+     fill-opacity="0.68"
+     id="rect93" />
+  <rect
+     x="30.64"
+     y="70.06"
+     width="3.92"
+     height="1.36"
+     fill="#4a3220"
+     fill-opacity="0.44"
+     id="rect94" />
+  <rect
+     x="71.110001"
+     y="60.987679"
+     width="3.3699999"
+     height="1.1799999"
+     fill="#6b4a2a"
+     fill-opacity="0.49"
+     id="rect95" />
+  <rect
+     x="124.33"
+     y="60.14"
+     width="1.77"
+     height="1.71"
+     fill="#6b4a2a"
+     fill-opacity="0.69"
+     id="rect96" />
+  <rect
+     x="73.669998"
+     y="58.377678"
+     width="1.63"
+     height="1.54"
+     fill="#6b4a2a"
+     fill-opacity="0.44"
+     id="rect97" />
+  <rect
+     x="83.06"
+     y="68.46"
+     width="2.13"
+     height="1.06"
+     fill="#6b4a2a"
+     fill-opacity="0.43"
+     id="rect98" />
+  <rect
+     x="109.39"
+     y="55.527679"
+     width="1.96"
+     height="2.0599999"
+     fill="#4a3220"
+     fill-opacity="0.48"
+     id="rect99" />
+  <rect
+     x="41.66"
+     y="61.857677"
+     width="3.4100001"
+     height="1.54"
+     fill="#6b4a2a"
+     fill-opacity="0.5"
+     id="rect100" />
+  <rect
+     x="29.83"
+     y="61.61"
+     width="3.13"
+     height="1.13"
+     fill="#4a3220"
+     fill-opacity="0.51"
+     id="rect101" />
+  <rect
+     x="66.52"
+     y="72.19"
+     width="3.15"
+     height="2.33"
+     fill="#4a3220"
+     fill-opacity="0.42"
+     id="rect102" />
+  <rect
+     x="69.58"
+     y="70.04"
+     width="1.77"
+     height="1.12"
+     fill="#4a3220"
+     fill-opacity="0.4"
+     id="rect103" />
+  <rect
+     x="70.190002"
+     y="56.527679"
+     width="3.4100001"
+     height="1.75"
+     fill="#6b4a2a"
+     fill-opacity="0.59"
+     id="rect104" />
+  <rect
+     x="22.17"
+     y="52.54768"
+     width="2.4200001"
+     height="2.1300001"
+     fill="#6b4a2a"
+     fill-opacity="0.48"
+     id="rect105" />
+  <rect
+     x="27.790001"
+     y="55.517677"
+     width="3.05"
+     height="1.13"
+     fill="#4a3220"
+     fill-opacity="0.49"
+     id="rect106" />
+</svg>
