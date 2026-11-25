@@ -10,7 +10,11 @@ import { Terrain } from '../game/Terrain';
 import { tireRise } from '../game/Tires';
 import { bodyOrigin } from '../game/TruckView';
 import { PadEdges, firstPad, padButtons } from '../input/Gamepad';
-import { loadSave } from '../progress/Progress';
+import { CheatMatcher, applyCheat, type CheatId, type CheatKey } from '../progress/Cheats';
+import { isGodMode } from '../progress/Session';
+import { loadSave, writeSave } from '../progress/Progress';
+import { SFX, sfxCacheKey } from '../audio/sfx';
+import { loadSettings } from '../settings/Settings';
 import { defaultStore } from '../progress/Storage';
 import { MENU_GATE, MENU_ITEMS, type MenuId } from '../ui/MenuModel';
 import { INK, wrapIndex } from '../ui/Theme';
@@ -30,6 +34,11 @@ export class MenuScene extends Phaser.Scene {
   private bodies: { img: Phaser.GameObjects.Image; baseY: number; phase: number }[] = [];
   private edges = new PadEdges();
   private t = 0;
+  private cheats = new CheatMatcher();
+  /** Key events already handled: a slow frame can hand the same event to the scene twice. */
+  private seen = new WeakSet<KeyboardEvent>();
+  private toast: Phaser.GameObjects.Container | null = null;
+  private godBadge: Phaser.GameObjects.Container | null = null;
 
   constructor() {
     super('Menu');
@@ -41,9 +50,13 @@ export class MenuScene extends Phaser.Scene {
     this.t = 0;
     this.bodies = [];
     this.edges = new PadEdges();
+    this.cheats.reset();
+    this.toast = null;
+    this.godBadge = null;
     this.buildScenery();
     this.layer = this.add.container(0, 0).setDepth(20).setScrollFactor(0);
     this.draw();
+    this.drawGodBadge();
 
     const kb = this.input.keyboard!;
     kb.addCapture('UP,DOWN,LEFT,RIGHT,SPACE');
@@ -107,12 +120,22 @@ export class MenuScene extends Phaser.Scene {
     const e = this.edges.update(padButtons(firstPad()));
     if (e.left) this.move(-1);
     if (e.right) this.move(1);
+    // Secret codes: D-pad or stick directions (the arrow keys are fed in `onKey`).
+    if (e.up) this.cheatKey('U');
+    if (e.down) this.cheatKey('D');
+    if (e.left) this.cheatKey('L');
+    if (e.right) this.cheatKey('R');
     if (e.confirm) this.go(MENU_ITEMS[this.index].id);
     if (e.garage) this.go('garage');
     if (e.settings) this.go('settings');
   }
 
   private onKey(e: KeyboardEvent): void {
+    if (this.seen.has(e)) return;
+    this.seen.add(e);
+    // Secret codes use the arrow keys only (W, A, S and D still just move the selection).
+    const arrow: Record<string, CheatKey> = { ArrowUp: 'U', ArrowDown: 'D', ArrowLeft: 'L', ArrowRight: 'R' };
+    if (arrow[e.code]) this.cheatKey(arrow[e.code]);
     switch (e.code) {
       case 'ArrowLeft':
       case 'ArrowUp':
@@ -144,6 +167,40 @@ export class MenuScene extends Phaser.Scene {
         this.go('credits');
         break;
     }
+  }
+
+  /** Feeds an arrow press to the code matcher; a finished code applies, saves and plays its jingle. */
+  private cheatKey(k: CheatKey): void {
+    const id: CheatId | null = this.cheats.push(k);
+    if (!id) return;
+    const store = defaultStore();
+    const save = loadSave(store);
+    const result = applyCheat(save, id);
+    writeSave(store, save);
+    const settings = loadSettings(store);
+    this.sound.volume = settings.master;
+    // Switching god mode off plays the jingle a fourth lower.
+    this.sound.play(sfxCacheKey('cheat'), { volume: Math.min(1, SFX.cheat.volume * settings.sfx * 2), rate: id === 'god' && !result.on ? 0.75 : 1 });
+    this.showToast(result.message);
+    this.drawGodBadge();
+  }
+
+  private showToast(text: string): void {
+    this.toast?.destroy();
+    const l = this.add.container(0, 0).setDepth(25).setScrollFactor(0);
+    label(this, l, VIEW_W / 2, 176, text, 'display', 30, INK.title, 0.5, 5);
+    this.toast = l;
+    this.tweens.add({ targets: l, alpha: 0, delay: 1600, duration: 500, onComplete: () => l.destroy() });
+  }
+
+  /** A small badge under the best score while god mode is on, so a player who forgot knows why. */
+  private drawGodBadge(): void {
+    this.godBadge?.destroy();
+    this.godBadge = null;
+    if (!isGodMode()) return;
+    const l = this.add.container(0, 0).setDepth(20).setScrollFactor(0);
+    label(this, l, VIEW_W - 22, 50, 'GOD MODE', 'display', 14, '#7dff8a', 1, 3);
+    this.godBadge = l;
   }
 
   private move(d: number): void {

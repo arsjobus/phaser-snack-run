@@ -7,13 +7,14 @@ import { GameScene } from './scenes/GameScene';
 import { GarageScene } from './scenes/GarageScene';
 import { MenuScene } from './scenes/MenuScene';
 import { SettingsScene } from './scenes/SettingsScene';
+import { installPadFocus } from './input/Focus';
 import { loadFonts } from './ui/Fonts';
 import { initRenderScale } from './ui/Resolution';
 
 // The fonts load first, so every canvas text is measured with the real glyphs (never rejects).
 void loadFonts().then(() => {
   const R = initRenderScale();
-  new Phaser.Game({
+  const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent: 'game',
     width: VIEW_W * R,
@@ -22,4 +23,5 @@ void loadFonts().then(() => {
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
     scene: [BootScene, MenuScene, GameScene, GarageScene, SettingsScene, CreditsScene, ArtScene],
   });
+  installPadFocus(game);
 });

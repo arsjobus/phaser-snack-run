@@ -9,6 +9,8 @@ export interface Perks {
   burn: number;
   /** Damage taken multiplier (0.8 = 20% less). */
   damage: number;
+  /** God mode (a cheat): no damage, no fuel burn, the clock never ends the run, a rollover just rights the truck. */
+  god?: boolean;
 }
 
 export const NO_PERKS: Perks = { tank: 1, burn: 1, damage: 1 };

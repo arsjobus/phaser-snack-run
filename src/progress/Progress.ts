@@ -1,6 +1,7 @@
 import { PROGRESSION } from '../config';
 import { NO_PERKS, type Perks } from '../game/Perks';
 import type { EndReason, RunSummary } from '../game/Run';
+import { isGodMode } from './Session';
 import { DEFAULT_SKIN, SKINS, skinById } from './Skins';
 import type { KeyValueStore } from './Storage';
 
@@ -203,11 +204,14 @@ export function equipSkin(save: SaveData, id: string): boolean {
 /** The run multipliers for the upgrades bought so far. */
 export function perksFor(save: SaveData): Perks {
   const u = PROGRESSION.upgrades;
-  return {
+  const perks: Perks = {
     tank: 1 + u.tank.perLevel * save.upgrades.tank,
     burn: 1 - u.efficiency.perLevel * save.upgrades.efficiency,
     damage: 1 - u.armor.perLevel * save.upgrades.armor,
   };
+  // God mode: nothing burns fuel and nothing hurts.
+  // Session-only (see `Session.ts`): never read from or written to the save.
+  return isGodMode() ? { ...perks, burn: 0, damage: 0, god: true } : perks;
 }
 
 export { NO_PERKS };

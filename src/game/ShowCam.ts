@@ -13,8 +13,8 @@ export interface ShowFraming {
  * The show camera (pure TypeScript). The player's jump over the pit used to be over in a blink and
  * the camera trailed the truck, so the truck drifted off centre and the lettering got a glimpse.
  * Now the framing goes onto the truck (centred, no look-ahead, a fast vertical follow) the moment
- * it hits the first boost pad, and lets go again `camRelease` px before the landing wall, while the
- * truck is still in the air, so the normal view is back by touchdown. From `slowLead` before the lip
+ * it hits the first boost pad, and stays on it through the jump and the touchdown, then lets go
+ * `camHoldAfterLand` seconds after landing so the view eases back to the normal offset. From `slowLead` before the lip
  * the game slows to `slowScale` and holds for `slowHold` real seconds after the landing so the CRUNCH
  * finale and the cars below are seen. A truck that never reaches the stage (or a run that ends)
  * releases both at once.
@@ -23,17 +23,23 @@ export class ShowCam {
   focus = 0;
   timeScale = 1;
   private holdUntil = -Infinity;
+  private frameUntil = -Infinity;
+  /** Real time at which the truck first got past the pit's far edge (to release a truck that never lands). */
+  private passedPitAt = Infinity;
   private clock = 0;
 
   /** The truck landed the show jump: keep the framing and the slow motion a moment longer. */
   landed(): void {
     this.holdUntil = this.clock + STUNT.slowHold;
+    this.frameUntil = this.clock + STUNT.camHoldAfterLand;
   }
 
   reset(): void {
     this.focus = 0;
     this.timeScale = 1;
     this.holdUntil = -Infinity;
+    this.frameUntil = -Infinity;
+    this.passedPitAt = Infinity;
     this.clock = 0;
   }
 
@@ -44,7 +50,14 @@ export class ShowCam {
   update(dt: number, x: number, layout: StuntLayout | null, over: boolean, landed: boolean): ShowFraming {
     this.clock += dt;
     const holding = this.clock < this.holdUntil;
-    const inFrame = !over && layout !== null && x >= layout.pads[0].x0 + STUNT.camLead && x < layout.pitX1 - STUNT.camRelease;
+    if (layout === null || x < layout.pitX1) this.passedPitAt = Infinity;
+    else if (this.passedPitAt === Infinity) this.passedPitAt = this.clock;
+    // Framed from the first boost pad until the truck has landed on the far side, plus a short hold
+    // after touchdown (`camHoldAfterLand`) before the normal offset eases back. A truck that never lands
+    // (it stalls against the wall, or rolls on past the table) is released after `camStuckMax` seconds.
+    const stuck = this.clock - this.passedPitAt > STUNT.camStuckMax;
+    const wanted = layout !== null && (landed ? this.clock < this.frameUntil : x < layout.landX1 && !stuck);
+    const inFrame = !over && layout !== null && x >= layout.pads[0].x0 + STUNT.camLead && wanted;
     const inSlow = !over && layout !== null && x >= layout.lipX - STUNT.slowLead && !(landed && !holding) && (x < layout.landX1 || holding);
 
     const rate = inFrame ? CAMERA.focusRise : CAMERA.focusFall;

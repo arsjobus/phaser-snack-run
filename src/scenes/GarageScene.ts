@@ -18,7 +18,7 @@ import { dayKey } from '../progress/Day';
 import { defaultStore, type KeyValueStore } from '../progress/Storage';
 import { PadEdges, firstPad, padButtons } from '../input/Gamepad';
 import { INK, LIST, UI, listRows, paginate, plateInner, rowY, wrapIndex } from '../ui/Theme';
-import { bottomBar, button, coinIcon, flatBackdrop, label, panel, pips, rankBadge, rowPlate, topBar, type Layer } from '../ui/Ui';
+import { bottomBar, button, coinIcon, flatBackdrop, label, panel, pips, rowPlate, topBar, trophy, type Layer } from '../ui/Ui';
 import { applyView } from '../ui/Resolution';
 
 const TABS = ['UPGRADES', 'PAINT', 'SCORES', 'ACHIEVEMENTS'] as const;
@@ -340,7 +340,7 @@ export class GarageScene extends Phaser.Scene {
     this.save.highScores.forEach((h2, i) => {
       const y = rowY(top + 52, 21.5, i);
       const color = i === 0 ? INK.title : INK.soft;
-      rankBadge(this, this.layer, inL + 12, y, i + 1, 10);
+      trophy(this, this.layer, inL + 12, y + 1, i + 1, 19);
       this.text(cols.score, y, String(h2.score), 18, color, 1, true);
       this.text(cols.meters, y, `${h2.meters} m`, 16, color, 1);
       this.text(cols.snacks, y, String(h2.snacks), 16, color, 1);

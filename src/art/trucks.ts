@@ -267,30 +267,89 @@ export function drawTruck(
       break;
     }
     case 'monster': {
-      // Fenders hug the big tires; the body rides high above them.
+      // A show monster truck: a boxy pickup cab, a long hood with a blower scoop, a bed with a roll
+      // bar and chrome stacks, flame decals, a chrome bull bar and a light bar, all riding high on
+      // the huge tires (the fenders are flared right up around them). Everything stays below
+      // y = -50 so the roof gear is not cut off at the top of the sprite.
+      const chrome = 0xc9ccd2;
       const fr = R + 5;
+      const poly = (color: number, pts: [number, number][], outline = true): void => {
+        const P = pts.map(([x, y]) => ({ x: ox + x, y: oy + y }));
+        g.fillStyle(color, 1);
+        g.fillPoints(P, true);
+        if (outline) {
+          g.lineStyle(2, OUT, 1);
+          g.strokePoints(P, true);
+        }
+      };
       for (const wx of [-42, 42]) arch(OUT, wx, fr + 2);
+      // Chrome exhaust stacks first, so the cab and bed sit in front of their feet.
+      for (const sx of [-47, -41]) {
+        rect(OUT, sx - 1.5, -47, 7, 26);
+        rect(chrome, sx, -45, 4, 24);
+        rect(0xffffff, sx + 1, -43, 1, 16);
+        poly(0x555a63, [[sx - 1, -47], [sx + 5, -47], [sx + 4, -42], [sx, -42]]); // angled tip
+      }
+      // Lower body (frame, doors and bed side) with the raised hood and the cab on top.
       solid([
-        { x: -58, y: -24, w: 116, h: 34, r: 8, color: body },
-        { x: -28, y: -48, w: 54, h: 28, r: 8, color: body },
+        { x: -60, y: -24, w: 118, h: 34, r: 7, color: body },
+        { x: 12, y: -32, w: 46, h: 10, r: 4, color: body }, // hood
       ]);
-      for (const wx of [-42, 42]) arch(body, wx, fr);
-      rect(shade(body, 1.35), -56, -23, 112, 3);
-      rect(paint.stripe, -58, -8, 116, 5); // flame stripe base
-      for (let i = 0; i < 7; i++) g.fillTriangle(ox - 58 + i * 17, oy - 3, ox - 46 + i * 17, oy - 3, ox - 54 + i * 17, oy + 6);
-      round(GLASS, -22, -43, 22, 16, 3);
-      round(GLASS, 3, -43, 20, 16, 3);
-      rect(GLARE, -20, -41, 8, 4);
-      rect(GLARE, 5, -41, 7, 4);
+      poly(body, [[-36, -23], [-36, -42], [-8, -44], [14, -30], [14, -23]]); // the cab: a sloped windscreen
+      // Bed: dark inside, with a roll bar and a pair of lamps on it.
+      round(OUT, -62, -31, 24, 10, 3);
+      round(0x1a1a1f, -60, -29, 20, 6, 2);
+      line(3, OUT, -57, -29, -57, -40);
+      line(3, OUT, -57, -40, -40, -40);
+      line(1.5, chrome, -57, -29, -57, -40);
+      line(1.5, chrome, -57, -40, -40, -40);
+      rect(LAMP, -55, -43, 5, 3);
+      rect(LAMP, -47, -43, 5, 3);
+      // Windows: two panes with a pillar between them, and glare.
+      poly(GLASS, [[-31, -39], [-16, -39.5], [-16, -28], [-31, -28]]);
+      poly(GLASS, [[-12, -39.8], [-8, -40.2], [8, -30.5], [8, -28], [-12, -28]]);
+      rect(GLARE, -28, -37, 6, 3);
+      rect(GLARE, -10, -38, 5, 3);
+      // Door line, handle and the hood highlight.
+      line(2, OUT, -14, -27, -14, 4);
+      rect(OUT, -10, -21, 6, 2);
+      rect(paint.light, 15, -30, 40, 2);
+      // Rim light along the roof, the windscreen and the shoulder so the dark paint keeps its shape.
+      line(1.5, paint.light, -35, -41, -8, -43);
+      line(1.5, paint.light, -8, -43, 13, -29.5);
+      line(1.5, paint.light, -56, -22, -38, -22);
+      line(1.5, paint.light, 14, -22, 55, -22);
+      // Blower scoop on the hood.
+      round(OUT, 22, -37, 18, 9, 3);
+      round(0x1a1a1f, 24, -35, 14, 5, 2);
+      for (let i = 0; i < 4; i++) rect(0x555a63, 26 + i * 3, -35, 1, 5);
+      // Flame decals licking back from the front fender along the side.
+      rect(paint.stripe, -58, -7, 116, 4);
+      for (let i = 0; i < 4; i++) {
+        const fx = 54 - i * 18;
+        const tall = i % 2 === 0 ? 1 : 0.75;
+        const tongue = (dx: number, dy: number, k: number): [number, number][] =>
+          [[fx, -3], [fx - 1, -3 - 4 * k], [fx - 5 * k, -3 - 8 * k], [fx - 13 * k, -3 - 11 * k * tall], [fx - 9 * k, -3 - 5 * k], [fx - 12 * k, -3]].map(
+            ([x, y]) => [x + dx, y + dy],
+          );
+        poly(paint.stripe, tongue(0, 0, 1), false);
+        poly(0xffe066, tongue(-2, 0, 0.55), false);
+      }
+      // A light bar across the roof.
+      rect(OUT, -30, -49, 38, 7);
+      rect(DARK, -29, -48, 36, 5);
+      for (const lx of [-27, -17, -7, 3]) rect(LAMP, lx, -47, 6, 3);
       well(-42);
       well(42);
-      roundel(0, -9, 8);
-      rect(0x8a8f99, -38, -58, 4, 18); // exhaust stacks
-      rect(0x8a8f99, -31, -58, 4, 18);
-      rect(DARK, -24, -52, 44, 4); // roof lights
-      for (const lx of [-20, -8, 4, 16]) rect(LAMP, lx, -56, 6, 4);
-      rect(DARK, 58, -12, 8, 22); // bull bar
-      headlamp(52, -14);
+      roundel(-25, -11, 8);
+      // Front: chrome bull bar with a grille, and a pair of headlamps.
+      round(OUT, 56, -29, 11, 36, 3);
+      round(chrome, 57.5, -27.5, 8, 33, 2);
+      rect(0x555a63, 58, -20, 7, 3);
+      rect(0x555a63, 58, -12, 7, 3);
+      rect(0x555a63, 58, -4, 7, 3);
+      headlamp(51, -29);
+      headlamp(51, -19);
       break;
     }
     case 'jeep': {

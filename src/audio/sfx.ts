@@ -37,6 +37,8 @@ export const SFX = {
   /** Fanfare plus the bright stinger. */
   showLanded: { file: 'show-landed.mp3', volume: 0.26 },
   gameOver: { file: 'game-over.mp3', volume: 0.17 },
+  /** The secret-code jingle on the start screen. */
+  cheat: { file: 'cheat.mp3', volume: 0.3 },
 } as const satisfies Record<string, SfxDef>;
 
 export type SfxKey = keyof typeof SFX;

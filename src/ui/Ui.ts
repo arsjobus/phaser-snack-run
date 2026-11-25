@@ -256,3 +256,163 @@ export function logoPlate(scene: Phaser.Scene, layer: Layer, cx: number, cy: num
   label(scene, layer, cx, cy - h * 0.14, 'CRUNCH 4x4', 'display', Math.round(h * 0.42), '#b83a1a');
   label(scene, layer, cx, cy + h * 0.33, small, 'display', Math.round(h * 0.2), '#14224a');
 }
+
+// ---- trophies, the score plate and stat tiles (game over and the garage's high scores) ----------
+
+/** The colours of a trophy for a place: gold, silver and bronze on the podium, plain steel after that. */
+export function trophyColor(rank: number): number {
+  return rank <= 3 ? rankColor(rank) : UI.steel;
+}
+
+/**
+ * A trophy cup with the place on it. `h` is its height in px. The podium (1 to 3) gets the full cup with
+ * handles, a shine and the place in dark ink on the bowl (gold also gets sparkles); every later place
+ * gets a smaller steel cup so each row of a table still has its own little prize. `dim` greys it out
+ * for an empty slot.
+ */
+export function trophy(scene: Phaser.Scene, layer: Layer, x: number, y: number, rank: number, h = 26, dim = false): void {
+  const s = h / 26;
+  const podium = rank <= 3;
+  const base = dim ? tone(UI.steel, -0.35) : trophyColor(rank);
+  const dark = tone(base, -0.35);
+  const lite = tone(base, 0.55);
+  const g = scene.add.graphics();
+  const P = (pts: [number, number][]) => pts.map(([px, py]) => ({ x: x + px * s, y: y + py * s }));
+  const ink = (pts: [number, number][], color: number) => {
+    g.fillStyle(color, 1);
+    g.fillPoints(P(pts), true);
+    g.lineStyle(Math.max(1.5, 2 * s), UI.outline, 1);
+    g.strokePoints(P(pts), true);
+  };
+  // Handles first (behind the bowl): two rings out to the sides.
+  const hs = podium ? 1 : 0.8;
+  for (const side of [-1, 1]) {
+    g.lineStyle(Math.max(3, 5 * s), UI.outline, 1);
+    g.strokeCircle(x + side * 8.5 * s * hs, y - 6 * s, 3.8 * s * hs);
+    g.lineStyle(Math.max(1.5, 2.4 * s), dark, 1);
+    g.strokeCircle(x + side * 8.5 * s * hs, y - 6 * s, 3.8 * s * hs);
+  }
+  // Base block, stem, then the bowl.
+  ink([[-7, 10], [7, 10], [7, 13], [-7, 13]], dark);
+  ink([[-5, 7], [5, 7], [5, 10], [-5, 10]], base);
+  ink([[-1.8, 3], [1.8, 3], [2.4, 7], [-2.4, 7]], dark);
+  ink([[-8, -12], [8, -12], [6.5, -1], [3, 3], [-3, 3], [-6.5, -1]], base);
+  // Shine down the left of the bowl and a darker shoulder on the right.
+  g.fillStyle(lite, dim ? 0.4 : 1);
+  g.fillPoints(P([[-6, -10.5], [-3.6, -10.5], [-4.6, -2], [-5.6, -3]]), true);
+  g.fillStyle(dark, 1);
+  g.fillPoints(P([[5.2, -10.5], [6.6, -10.5], [5.4, -1.4], [3.8, 1.2], [3.2, 0.6]]), true);
+  layer.add(g);
+  if (podium && !dim) {
+    label(scene, layer, x, y - 6 * s, String(rank), 'display', Math.max(9, Math.round(11 * s)), INK.dark);
+    if (rank === 1) {
+      const sp = scene.add.graphics();
+      sp.fillStyle(UI.white, 1);
+      for (const [px, py, r] of [[-13, -13, 2.6], [12, -15, 3.2], [14, -4, 1.8]]) {
+        const cx = x + px * s;
+        const cy = y + py * s;
+        const rr = r * s;
+        sp.fillPoints(
+          [
+            { x: cx, y: cy - rr * 1.7 },
+            { x: cx + rr * 0.5, y: cy - rr * 0.5 },
+            { x: cx + rr * 1.7, y: cy },
+            { x: cx + rr * 0.5, y: cy + rr * 0.5 },
+            { x: cx, y: cy + rr * 1.7 },
+            { x: cx - rr * 0.5, y: cy + rr * 0.5 },
+            { x: cx - rr * 1.7, y: cy },
+            { x: cx - rr * 0.5, y: cy - rr * 0.5 },
+          ],
+          true,
+        );
+      }
+      layer.add(sp);
+    }
+  }
+}
+
+/**
+ * The big score plate on the game-over screen: hazard stripes along the top and bottom like the HUD's
+ * title bar, the word SCORE small on the left and the number big. Returns the number's text object so a
+ * caller can count it up.
+ */
+export function scorePlate(scene: Phaser.Scene, layer: Layer, x: number, y: number, w: number, h: number, value: string, hot: boolean): Phaser.GameObjects.Text {
+  const g = scene.add.graphics();
+  g.fillStyle(UI.outline, 1);
+  g.fillRoundedRect(x - 3, y - 3, w + 6, h + 6, 11);
+  g.fillStyle(hot ? UI.yellow : UI.rim, 1);
+  g.fillRoundedRect(x, y, w, h, 8);
+  g.fillStyle(UI.navy, 1);
+  g.fillRect(x + 4, y + 9, w - 8, h - 18);
+  g.fillStyle(UI.outline, 1);
+  for (const [sy] of [[y + 3], [y + h - 9]]) {
+    for (const poly of hazardStripes(x + 4, sy, w - 8, 6, 6)) g.fillPoints(poly, true);
+  }
+  layer.add(g);
+  label(scene, layer, x + 16, y + h / 2 + 1, 'SCORE', 'display', 13, INK.cyan, 0);
+  return label(scene, layer, x + w - 16, y + h / 2 + 2, value, 'display', 30, hot ? INK.title : INK.text, 1, 4);
+}
+
+export type StatGlyph = 'distance' | 'snack' | 'air' | 'combo' | 'flag' | 'takedown' | 'lanes' | 'close';
+
+/** A little flat icon for a stat tile, centred on (x, y), about 22 px across. */
+export function statGlyph(scene: Phaser.Scene, layer: Layer, x: number, y: number, kind: StatGlyph): void {
+  const g = scene.add.graphics();
+  const poly = (pts: [number, number][], color: number) => {
+    const P = pts.map(([px, py]) => ({ x: x + px, y: y + py }));
+    g.fillStyle(color, 1);
+    g.fillPoints(P, true);
+    g.lineStyle(1.5, UI.outline, 1);
+    g.strokePoints(P, true);
+  };
+  switch (kind) {
+    case 'distance':
+      poly([[-10, -7], [-2, -7], [3, 0], [-2, 7], [-10, 7], [-5, 0]], UI.cyan);
+      poly([[0, -7], [8, -7], [13, 0], [8, 7], [0, 7], [5, 0]], UI.white);
+      break;
+    case 'snack':
+      g.fillStyle(UI.outline, 1);
+      g.fillCircle(x, y, 10.5);
+      g.fillStyle(0xd9a05b, 1);
+      g.fillCircle(x, y, 9);
+      g.fillStyle(0x5a3418, 1);
+      for (const [px, py] of [[-3.5, -3], [3.5, -1.5], [-1, 4], [4, 5]]) g.fillCircle(x + px, y + py, 1.9);
+      break;
+    case 'air':
+      poly([[-11, 6], [-4, -1], [0, 4], [6, -6], [11, 6]], UI.yellowLight);
+      poly([[8, -9], [12, -3], [4, -3]], UI.white);
+      break;
+    case 'combo':
+      poly([[2, -11], [-7, 2], [-1, 2], [-3, 11], [8, -3], [1, -3]], UI.yellow);
+      break;
+    case 'flag':
+      g.lineStyle(3, UI.outline, 1);
+      g.lineBetween(x - 7, y - 10, x - 7, y + 10);
+      g.lineStyle(1.5, UI.white, 1);
+      g.lineBetween(x - 7, y - 10, x - 7, y + 10);
+      poly([[-6, -10], [10, -6], [-6, 0]], UI.green);
+      break;
+    case 'takedown':
+      poly([[0, -11], [3, -4], [11, -6], [6, 0], [11, 6], [3, 4], [0, 11], [-3, 4], [-11, 6], [-6, 0], [-11, -6], [-3, -4]], 0xff9f45);
+      break;
+    case 'lanes':
+      poly([[-6, -10], [-1, -3], [-4, -3], [-4, 9], [-8, 9], [-8, -3], [-11, -3]], UI.cyan);
+      poly([[6, 10], [11, 3], [8, 3], [8, -9], [4, -9], [4, 3], [1, 3]], UI.white);
+      break;
+    case 'close':
+      poly([[0, -11], [11, 9], [-11, 9]], UI.yellowLight);
+      g.fillStyle(UI.outline, 1);
+      g.fillRect(x - 1.3, y - 3, 2.6, 7);
+      g.fillCircle(x, y + 6.8, 1.6);
+      break;
+  }
+  layer.add(g);
+}
+
+/** A stat tile: a flat plate with an icon on the left, the number in the display face, a small caption under it. */
+export function statTile(scene: Phaser.Scene, layer: Layer, x: number, y: number, w: number, h: number, glyph: StatGlyph, value: string, caption: string, hot = false): void {
+  rowPlate(scene, layer, x + w / 2, y + h / 2, w, h, hot);
+  statGlyph(scene, layer, x + 22, y + h / 2, glyph);
+  label(scene, layer, x + 44, y + h / 2 - 6, value, 'display', 16, hot ? INK.title : INK.text, 0);
+  label(scene, layer, x + 44, y + h / 2 + 11, caption, 'body', 12, INK.dim, 0);
+}

@@ -48,14 +48,30 @@ describe('the show camera', () => {
     expect(over.timeScale).toBeLessThan(STUNT.slowScale + 0.02);
   });
 
-  it('gives the framing back in mid air, before the landing wall', () => {
+  it('stays on the truck through the jump and gives the framing back shortly after the landing', () => {
     const cam = new ShowCam();
     run(cam, layout.lipX, 1);
-    const over = run(cam, layout.pitX1 - STUNT.camRelease - 20, 0.5);
-    expect(over.focus).toBeGreaterThan(0.95); // still centred over the pit
-    const late = run(cam, layout.pitX1 - STUNT.camRelease + 20, 2);
-    expect(late.focus).toBeLessThan(0.1); // normal offset again, truck not yet down
-    expect(layout.pitX1 - STUNT.camRelease).toBeLessThan(layout.pitX1);
+    const air = run(cam, layout.pitX1 - 100, 0.5);
+    expect(air.focus).toBeGreaterThan(0.95); // still centred, truck not yet down
+    cam.landed();
+    const justLanded = run(cam, layout.landX0, STUNT.camHoldAfterLand * 0.5, true);
+    expect(justLanded.focus).toBeGreaterThan(0.9);
+    const later = run(cam, layout.landX0 + 200, STUNT.camHoldAfterLand + 2, true);
+    expect(later.focus).toBeLessThan(0.1); // normal offset again
+  });
+
+  it('does nothing on ordinary road, with no stage near at all', () => {
+    const cam = new ShowCam();
+    const f = cam.update(dt, 1234, null, false, false);
+    expect(f.focus).toBeCloseTo(0, 6);
+    expect(f.timeScale).toBeCloseTo(1, 6);
+  });
+
+  it('releases a truck that never lands', () => {
+    const cam = new ShowCam();
+    run(cam, layout.lipX, 1);
+    const stuck = run(cam, layout.pitX1 + 5, STUNT.camStuckMax + 3);
+    expect(stuck.focus).toBeLessThan(0.1);
   });
 
   it('slows less than before (a little faster) and keeps the slow motion after the landing, then lets go', () => {

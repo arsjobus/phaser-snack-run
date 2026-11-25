@@ -61,7 +61,7 @@ import { loadSave, perksFor, recordRun, writeSave, type RunResult, type SaveData
 import { defaultStore, type KeyValueStore } from '../progress/Storage';
 import { FONT_BODY, FONT_DISPLAY } from '../ui/Fonts';
 import { INK, UI } from '../ui/Theme';
-import { button, label, panel, rankBadge, type Layer } from '../ui/Ui';
+import { button, coinIcon, label, panel, rowPlate, scorePlate, statTile, trophy, type Layer, type StatGlyph } from '../ui/Ui';
 import { applyView, toLogical } from '../ui/Resolution';
 
 const FIXED_DT = 1 / 60 / PHYSICS.substeps;
@@ -486,8 +486,12 @@ export class GameScene extends Phaser.Scene {
       this.popup(this.truck.x, this.truck.y - 90, 'CREW TO THE RESCUE', '#9be0ff');
     }
     if (this.flippedTimer > GAMEPLAY.flipRecoverTime) {
-      for (const e of this.run.wreck()) this.onRunEvent(e);
-      this.flippedTimer = 0;
+      if (this.run.perks.god) {
+        this.recover(); // god mode: a rollover never wrecks the truck
+      } else {
+        for (const e of this.run.wreck()) this.onRunEvent(e);
+        this.flippedTimer = 0;
+      }
     }
 
     this.updateCamera(realDt);
@@ -1218,6 +1222,11 @@ export class GameScene extends Phaser.Scene {
   private bankRun(): RunResult & { achievements: Achievement[] } {
     if (this.banked) return this.banked;
     const summary = this.run.summary();
+    if (this.run.perks.god) {
+      // A god-mode run is just for fun: it banks no coins and makes no score table entry.
+      this.banked = { coins: 0, rank: null, newBestScore: false, newBestMeters: false, achievements: [] };
+      return this.banked;
+    }
     const result = recordRun(this.save, summary, this.day);
     const achievements = unlockAchievements(this.save, summary, this.day);
     writeSave(this.store, this.save);
@@ -1251,55 +1260,94 @@ export class GameScene extends Phaser.Scene {
     const s = this.run.score;
     this.tweens.killTweensOf(this.warn);
     this.warn.setAlpha(0);
-    const layer: Layer = this.add.container(0, 0).setScrollFactor(0).setDepth(30);
+    // Everything sits 14 px up so the panel and the controls line clear the HUD strip along the bottom.
+    const layer: Layer = this.add.container(0, -14).setScrollFactor(0).setDepth(30);
     const cx = VIEW_W / 2;
-    panel(this, layer, 70, 26, 820, 368);
+    panel(this, layer, 70, 22, 820, 446);
     const put = (x: number, y: number, text: string | string[], kind: 'display' | 'body', size: number, color: string, ox = 0.5) =>
       label(this, layer, x, y, text, kind, size, color, ox);
 
     const title = TITLES[this.run.endReason ?? 'fuel'];
-    put(cx, 62, title, 'display', 34, INK.red);
+    put(cx, 56, title, 'display', 34, INK.red);
     const sm = this.run.summary();
-    const left = 104;
-    put(left, 108, `SCORE ${s.total}${result.newBestScore ? '   NEW BEST!' : ''}`, 'display', 22, result.newBestScore ? INK.title : INK.text, 0);
-    put(
-      left,
-      200,
-      [
-        `${sm.meters} m${result.newBestMeters ? ' (best!)' : ''}   ${s.snacks} snacks`,
-        `best air ${this.bestAir.toFixed(2)} s   combo x${s.bestMultiplier} (${s.bestChain})`,
-        `checkpoints ${sm.checkpoints}   takedowns ${s.takedowns}`,
-        `lane changes ${sm.laneChanges}   close calls ${sm.nearMisses}`,
-        '',
-        `+${result.coins} COINS   bank ${this.save.coins}`,
-      ],
-      'body',
-      18,
-      INK.soft,
-      0,
-    );
 
-    // The high-score table: a medal per row, columns for score and distance, this run in yellow.
-    const tx = 510;
-    put(tx + 190, 96, 'TOP SCORES', 'display', 15, INK.cyan);
-    this.save.highScores.slice(0, 7).forEach((h, i) => {
-      const y = 126 + i * 27;
-      const mine = result.rank === i + 1;
-      if (mine) {
-        const g = this.add.graphics();
-        g.fillStyle(UI.navy, 1);
-        g.fillRoundedRect(tx - 8, y - 12, 392, 25, 6);
-        layer.add(g);
+    // Left: the run report. A striped score plate that counts up, then eight stat tiles with icons.
+    const lx = 104;
+    const colW = 190;
+    const scoreText = scorePlate(this, layer, lx, 84, colW * 2 + 10, 56, this.settings.reducedMotion ? String(s.total) : '0', result.newBestScore);
+    if (!this.settings.reducedMotion) {
+      const counter = { v: 0 };
+      this.tweens.add({
+        targets: counter,
+        v: s.total,
+        duration: 900,
+        ease: 'Cubic.easeOut',
+        onUpdate: () => scoreText.setText(String(Math.round(counter.v))),
+        onComplete: () => scoreText.setText(String(s.total)),
+      });
+    }
+    if (result.newBestScore) {
+      const g = this.add.graphics();
+      g.fillStyle(UI.outline, 1);
+      g.fillRoundedRect(lx + colW * 2 + 10 - 118, 70, 112, 24, 6);
+      g.fillStyle(UI.red, 1);
+      g.fillRoundedRect(lx + colW * 2 + 10 - 116, 72, 108, 20, 5);
+      layer.add(g);
+      put(lx + colW * 2 + 10 - 62, 82, 'NEW BEST!', 'display', 13, INK.text);
+    }
+    const tiles: [StatGlyph, string, string, boolean][] = [
+      ['distance', `${sm.meters} m`, result.newBestMeters ? 'distance (best!)' : 'distance', result.newBestMeters],
+      ['snack', String(s.snacks), 'snacks', false],
+      ['air', `${this.bestAir.toFixed(2)} s`, 'best air', false],
+      ['combo', `x${s.bestMultiplier}`, `best combo (${s.bestChain} chain)`, false],
+      ['flag', String(sm.checkpoints), 'checkpoints', false],
+      ['takedown', String(s.takedowns), 'takedowns', false],
+      ['lanes', String(sm.laneChanges), 'lane changes', false],
+      ['close', String(sm.nearMisses), 'close calls', false],
+    ];
+    tiles.forEach(([glyph, value, caption, hot], i) => {
+      statTile(this, layer, lx + (i % 2) * (colW + 10), 158 + Math.floor(i / 2) * 50, colW, 44, glyph, value, caption, hot);
+    });
+    // The coin strip: what the run earned and the bank (a god-mode run banks nothing).
+    rowPlate(this, layer, lx + colW + 5, 380, colW * 2 + 10, 28, false);
+    coinIcon(this, layer, lx + 20, 380, 9);
+    if (this.run.perks.god) {
+      put(lx + 40, 380, 'GOD MODE RUN: NOTHING BANKED', 'display', 14, INK.good, 0);
+    } else {
+      put(lx + 40, 380, `+${result.coins} COINS`, 'display', 16, INK.title, 0);
+      put(lx + colW * 2 + 10 - 12, 381, `BANK ${this.save.coins}`, 'body', 16, INK.soft, 1);
+    }
+
+    // Right: the high-score table. A trophy per row (gold, silver, bronze, then steel cups), empty slots
+    // dimmed, and this run's row lit up in yellow.
+    const tx = 520;
+    const rowW = 346;
+    trophy(this, layer, tx + 14, 92, 1, 22);
+    put(tx + 36, 92, 'TOP SCORES', 'display', 18, INK.cyan, 0);
+    put(tx + 178, 120, 'SCORE', 'body', 12, INK.dim, 1);
+    put(tx + 256, 120, 'DIST', 'body', 12, INK.dim, 1);
+    put(tx + 330, 120, 'SNACKS', 'body', 12, INK.dim, 1);
+    for (let i = 0; i < 7; i++) {
+      const y = 146 + i * 34;
+      const h = this.save.highScores[i];
+      const mine = !!h && result.rank === i + 1;
+      rowPlate(this, layer, tx + rowW / 2, y, rowW, 30, mine);
+      trophy(this, layer, tx + 24, y + 1, i + 1, 24, !h);
+      if (!h) {
+        put(tx + 178, y, '---', 'display', 15, INK.dim, 1);
+        continue;
       }
       const color = mine ? INK.title : INK.soft;
-      rankBadge(this, layer, tx + 8, y, i + 1, 10);
-      put(tx + 150, y, String(h.score), 'display', 16, color, 1);
-      put(tx + 250, y, `${h.meters} m`, 'body', 17, color, 1);
-    });
-    if (result.achievements.length) {
-      put(cx, 318, result.achievements.map((a) => `ACHIEVEMENT: ${a.name}  +${a.reward} coins`), 'body', 16, INK.title);
+      put(tx + 178, y, String(h.score), 'display', 17, color, 1);
+      put(tx + 256, y, `${h.meters} m`, 'body', 16, color, 1);
+      put(tx + 330, y, String(h.snacks), 'body', 16, color, 1);
     }
-    put(cx, 414, 'D-PAD / STICK SELECT   A / START CONFIRM   B BACK', 'body', 14, INK.dim);
+    if (result.achievements.length) {
+      const lines = result.achievements.slice(0, 2).map((a) => `ACHIEVEMENT: ${a.name}  +${a.reward} coins`);
+      if (result.achievements.length > 2) lines.push(`+${result.achievements.length - 2} more`);
+      put(tx + rowW / 2, 392, lines, 'body', 14, INK.title);
+    }
+    put(cx, 479, 'D-PAD / STICK SELECT   A / START CONFIRM   B BACK', 'body', 14, INK.dim);
     // Five tappable buttons; a tap on one does that button's job.
     const buttons: GameOverOption[] = [
       ['DRIVE AGAIN', 'SPACE', () => this.restart(), UI.yellow],
@@ -1309,7 +1357,7 @@ export class GameScene extends Phaser.Scene {
     ];
     this.gameOverSelection = 0;
     this.gameOverOptions = buttons;
-    this.gameOverButtonLayer = this.add.container(0, 0).setScrollFactor(0).setDepth(31);
+    this.gameOverButtonLayer = this.add.container(0, -14).setScrollFactor(0).setDepth(31);
     this.drawGameOverButtons();
     this.input.on('pointerdown', this.tapRestart, this);
   }
@@ -1324,10 +1372,10 @@ export class GameScene extends Phaser.Scene {
     const gap = 16;
     const x0 = VIEW_W / 2 - (this.gameOverOptions.length * w + (this.gameOverOptions.length - 1) * gap) / 2 + w / 2;
     this.gameOverOptions.forEach(([text, hint, go, accent], i) => {
-      put(x0 + i * (w + gap), 382, hint, 'body', 13, INK.dim);
+      put(x0 + i * (w + gap), 456, hint, 'body', 13, INK.dim);
       button(this, layer, {
         x: x0 + i * (w + gap),
-        y: 354,
+        y: 428,
         w,
         h: 40,
         text,

@@ -250,6 +250,16 @@ def game_over():
     return m
 
 
+def cheat():  # a classic "secret unlocked" jingle: a quick rising run, a held top note and a sparkle
+    m = Mix()
+    for i, midi in enumerate([60, 64, 67, 72, 76, 79]):
+        blip(m, "square", midi_to_hz(midi), 0.09, 0.1, i * 0.06)
+    blip(m, "triangle", midi_to_hz(84), 0.45, 0.16, 0.36)
+    blip(m, "sine", midi_to_hz(96), 0.3, 0.05, 0.4)
+    blip(m, "sine", midi_to_hz(103), 0.25, 0.04, 0.5)
+    return m
+
+
 SOUNDS = {
     "snack": snack,
     "fuel": fuel,
@@ -269,6 +279,7 @@ SOUNDS = {
     "burst": burst,
     "show-landed": show_landed,
     "game-over": game_over,
+    "cheat": cheat,
 }
 
 TARGET_PEAK = 0.9

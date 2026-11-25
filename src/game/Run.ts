@@ -120,7 +120,7 @@ export class RunModel {
           fuelAdded,
           points,
         });
-      } else if (CHECKPOINT.timeoutEndsRun) {
+      } else if (CHECKPOINT.timeoutEndsRun && !this.perks.god) {
         events.push({ type: 'timeup' });
         this.finish('time', events);
         return events;

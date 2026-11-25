@@ -452,8 +452,10 @@ export const STUNT = {
   // --- the show camera (Phase 9.5) ---
   /** The framing locks on the truck this far past the start of the first pad (px): 0 = the moment it hits the first boost. */
   camLead: 0,
-  /** The framing lets go this far before the landing wall (px), while the truck is still in the air, so the normal view is back by touchdown. */
-  camRelease: 340,
+  /** The framing stays on the truck this long (real seconds) after it lands on the far side, then eases back to the normal offset. */
+  camHoldAfterLand: 0.55,
+  /** A truck that never lands is released this long (real seconds) after passing the pit. */
+  camStuckMax: 2.5,
   /** Slow motion: it starts this far before the lip (px), runs at this game speed, and eases in/out at `slowRate` per second. */
   slowLead: 420,
   slowScale: 0.68,
