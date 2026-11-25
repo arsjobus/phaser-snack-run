@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import { t as tr } from '../i18n';
+import { achievementName } from '../i18n/names';
 import {
   BASE_Y,
   ART,
@@ -73,7 +75,7 @@ interface WreckSprite {
   smokeClock: number;
 }
 
-const TITLES = { fuel: 'OUT OF FUEL', time: 'TIME UP', wreck: 'WRECKED' } as const;
+const TITLE_KEYS = { fuel: 'game.over.fuel', time: 'game.over.time', wreck: 'game.over.wreck' } as const;
 
 /** How long the how-to-play text lingers after the first gas or brake input before it fades. */
 const HINT_FADE_DELAY_MS = 2500;
@@ -374,12 +376,12 @@ export class GameScene extends Phaser.Scene {
   private hintLines(): string[] {
     const k = (a: Action) => keyLabel(this.settings.bindings[a][0]);
     const touch = touchVisible(this.settings.touch, this.sys.game.device.input.touch, false);
-    const padHint = 'PAD A GAS · X BRAKE · UP/DOWN LANES · START / ESC PAUSE';
+    const padHint = tr('game.hint.pad');
     return touch
-      ? ['HOLD GAS to drive   BRAKE   ▲ ▼ drift across the field', 'Drift sideways to dodge rocks, logs and boulders · you cannot slip through other cars', padHint]
+      ? [tr('game.hint.touch'), tr('game.hint.dodge'), padHint]
       : [
-          `HOLD ${k('gas')} to accelerate   ${k('brake')} brake   ${k('far')} / ${k('near')} drift across the field (hold)   ${k('reset')} reset   ${k('mute')} mute   ${k('music')} music   O settings`,
-          'Drift sideways to dodge rocks, logs and boulders · you cannot slip through other cars',
+          tr('game.hint.keys', { gas: k('gas'), brake: k('brake'), far: k('far'), near: k('near'), mute: k('mute'), music: k('music') }),
+          tr('game.hint.dodge'),
           padHint,
         ];
   }
@@ -444,10 +446,9 @@ export class GameScene extends Phaser.Scene {
       else if (J(this.keys.G) || pad.garage) this.scene.start('Garage');
       else if (J(this.keys.O) || pad.settings) this.scene.start('Settings', { from: 'Game' });
       else if (J(this.keys.ESC) || (pad.back && this.time.now - this.overAt > 400)) this.scene.start('Menu');
-      else if (J(this.keys.SPACE) || J(this.keys.ENTER)) this.restart(); // R no longer restarts (it only resets the truck upright mid-run)
+      else if (J(this.keys.SPACE) || J(this.keys.ENTER)) this.restart(); // R does nothing: the manual reset-upright feature was removed
       else if (pad.confirm) this.activateGameOverSelection();
     } else {
-      if (pressed('reset') || pad.reset) this.recover();
       if (J(this.keys.ESC) || pad.start) {
         this.showPause();
         this.tracker.endFrame();
@@ -457,9 +458,9 @@ export class GameScene extends Phaser.Scene {
     if (pressed('debug')) this.debug = !this.debug;
     if (pressed('mute')) {
       this.sound.mute = !this.sound.mute;
-      this.flash(this.sound.mute ? 'SOUND OFF' : 'SOUND ON');
+      this.flash(this.sound.mute ? tr('game.soundOff') : tr('game.soundOn'));
     }
-    if (pressed('music') || pad.music) this.flash(this.audio.toggleMusic() ? 'MUSIC ON' : 'MUSIC OFF');
+    if (pressed('music') || pad.music) this.flash(this.audio.toggleMusic() ? tr('game.musicOn') : tr('game.musicOff'));
 
     // Fixed-step physics (substeps keep the stiff suspension stable)
     const input = this.readInput();
@@ -487,10 +488,10 @@ export class GameScene extends Phaser.Scene {
     this.terrain.prune(this.truck.x - 1800);
     for (const e of this.stunt.drain()) this.onShowEvent(e);
 
-    for (const e of this.run.update(dt, { x: this.truck.x, y: this.truck.y, speed: this.truck.speed, lane: this.lane.f })) {
+    for (const e of this.run.update(dt, { x: this.truck.x, y: this.truck.y, speed: this.truck.speed, lane: this.lane.f }, { gas: this.held.gas > 0, brake: this.held.brake > 0 })) {
       this.onRunEvent(e);
     }
-    for (const e of this.race.update(dt, this.truck, this.run.meters, !this.run.over, this.lane.f, this.lane.target)) {
+    for (const e of this.race.update(dt, this.truck, this.run.bestMeters, !this.run.over, this.lane.f, this.lane.target)) {
       this.onRaceEvent(e);
     }
     this.checkAchievements(dt);
@@ -516,7 +517,7 @@ export class GameScene extends Phaser.Scene {
     if (this.rightClock > STUNT.rightAfter) {
       this.recover();
       this.rightClock = 0;
-      this.popup(this.truck.x, this.truck.y - 90, 'CREW TO THE RESCUE', '#9be0ff');
+      this.popup(this.truck.x, this.truck.y - 90, tr('game.crew'), '#9be0ff');
     }
     if (this.flippedTimer > GAMEPLAY.flipRecoverTime) {
       if (this.run.perks.god) {
@@ -748,15 +749,15 @@ export class GameScene extends Phaser.Scene {
         }
         if (e.type === 'wrench') {
           this.audio.wrench();
-          const label = e.repaired > 0 ? `REPAIR -${Math.round(e.repaired * 100)}%` : 'WRENCH';
+          const label = e.repaired > 0 ? tr('game.repair', { n: Math.round(e.repaired * 100) }) : tr('game.wrench');
           this.popup(e.pickup.x, this.liftY(e.pickup.x, e.pickup.y, e.pickup.lane) - 24, label, e.repaired > 0 ? '#9be0ff' : '#c9ced6');
         } else if (e.type === 'snack') {
           this.audio.snack(e.multiplier);
-          const label = e.multiplier > 1 ? `+${e.points} x${e.multiplier}` : `+${e.points}`;
+          const label = e.multiplier > 1 ? tr('game.snackPop', { points: e.points, mult: e.multiplier }) : `+${e.points}`;
           this.popup(e.pickup.x, this.liftY(e.pickup.x, e.pickup.y, e.pickup.lane) - 18, label, '#ffe066');
         } else {
           this.audio.fuel();
-          this.popup(e.pickup.x, this.liftY(e.pickup.x, e.pickup.y, e.pickup.lane) - 24, `FUEL +${Math.round(e.added * 100)}%`, '#7dff8a');
+          this.popup(e.pickup.x, this.liftY(e.pickup.x, e.pickup.y, e.pickup.lane) - 24, tr('game.fuelPlus', { n: Math.round(e.added * 100) }), '#7dff8a');
           this.tweens.killTweensOf(this.warn);
           this.warn.setAlpha(0);
         }
@@ -768,12 +769,12 @@ export class GameScene extends Phaser.Scene {
       case 'empty':
         this.audio.empty();
         this.tweens.killTweensOf(this.warn);
-        this.warn.setText('OUT OF FUEL!').setAlpha(1);
+        this.warn.setText(tr('game.outOfFuelWarn')).setAlpha(1);
         break;
       case 'nearmiss': {
         this.audio.reward();
         const o = e.obstacle;
-        this.popup(this.truck.x + 40, this.liftY(o.x, o.y, o.lane) - 40, `CLOSE CALL +${e.points}`, '#9be0ff');
+        this.popup(this.truck.x + 40, this.liftY(o.x, o.y, o.lane) - 40, tr('game.closeCall', { n: e.points }), '#9be0ff');
         break;
       }
       case 'over':
@@ -782,7 +783,7 @@ export class GameScene extends Phaser.Scene {
         this.showGameOver(this.bankRun());
         break;
       case 'damage':
-        this.popup(this.truck.x, this.truck.y - 70, `DAMAGE +${Math.round(e.amount * 100)}%`, '#ff6a5a');
+        this.popup(this.truck.x, this.truck.y - 70, tr('game.damagePlus', { n: Math.round(e.amount * 100) }), '#ff6a5a');
         break;
       case 'miss':
       case 'timeup':
@@ -812,7 +813,7 @@ export class GameScene extends Phaser.Scene {
         this.audio.boost(e.count);
         const k = shakeScale(this.settings);
         if (k > 0) this.shake.kick(0.11, 0.004 * k * VIEW_W);
-        this.bannerText(e.count === 1 ? 'BOOST!' : `BOOST x${e.count}`, '#ff9f45', 500);
+        this.bannerText(e.count === 1 ? tr('game.boost') : tr('game.boostN', { n: e.count }), '#ff9f45', 500);
         this.stageView.sparks(t.x, laneProject(this.terrain.heightAt(t.x), t.y + 20, this.lane.f), 0xffd23f, 14);
         break;
       }
@@ -823,7 +824,7 @@ export class GameScene extends Phaser.Scene {
         this.stageView.startSky(e.layout);
         break;
       case 'launch':
-        this.bannerText('SHOW TIME!', '#ffe066', 1300);
+        this.bannerText(tr('game.showTime'), '#ffe066', 1300);
         break;
       case 'landed': {
         this.showCam.landed();
@@ -831,8 +832,8 @@ export class GameScene extends Phaser.Scene {
         if (e.cleared) {
           this.audio.showLanded();
           if (!this.settings.reducedMotion) this.cameras.main.flash(160, 255, 240, 190, false);
-          const lines = [`SHOW JUMP!  +${points} BONUS`, `${e.cars} CARS CLEARED`];
-          if (e.flips > 0) lines.push(e.flips > 1 ? `${e.flips} FLIPS!` : 'FLIP!');
+          const lines = [tr('game.showJump', { n: points }), tr('game.carsCleared', { n: e.cars })];
+          if (e.flips > 0) lines.push(e.flips > 1 ? tr('game.flips', { n: e.flips }) : tr('game.flip'));
           this.tweens.killTweensOf(this.cpToast);
           this.cpToast.setText(lines).setAlpha(1).setScale(1.3);
           this.tweens.add({ targets: this.cpToast, scale: 1, duration: 160 });
@@ -841,7 +842,7 @@ export class GameScene extends Phaser.Scene {
           this.stageView.sparks(t.x, y, 0xffe066, 30);
           this.stageView.sparks(t.x + 90, y - 30, 0x6fc4ff, 30);
         } else {
-          this.bannerText(points > 0 ? `FLIP!  +${points}` : 'SHORT!', '#ffb066', 1000);
+          this.bannerText(points > 0 ? tr('game.flipPlus', { n: points }) : tr('game.short'), '#ffb066', 1000);
         }
         break;
       }
@@ -856,7 +857,7 @@ export class GameScene extends Phaser.Scene {
         this.audio.thud(hard);
         emitDust(this.particles, Math.random, this.biome, e.x, y, 0, hard ? 8 : 4);
         if (hard) emitCrash(this.particles, Math.random, e.x, y - 8, Math.min(1, e.impact / 520), e.with === 'obstacle' ? 0x8c909a : 0xf2c200);
-        if (e.with === 'obstacle' && e.kind) this.popup(e.x, y - 50, e.kind.toUpperCase() + '!', '#ffb066');
+        if (e.with === 'obstacle' && e.kind) this.popup(e.x, y - 50, tr(`obstacle.${e.kind}`), '#ffb066');
         if (hard) {
           const k = shakeScale(this.settings);
           if (k > 0) this.shake.kick(0.16, Math.min(0.016, 0.005 + e.impact / 50000) * k * VIEW_W);
@@ -871,7 +872,7 @@ export class GameScene extends Phaser.Scene {
         if (e.impact > 200) {
           this.audio.thud(true);
           emitCrash(this.particles, Math.random, e.x, y - 8, Math.min(1, e.impact / 520), 0x8c909a);
-          this.popup(e.x, y - 50, `#${e.number} CRASH`, '#ffb066');
+          this.popup(e.x, y - 50, tr('game.crash', { n: e.number }), '#ffb066');
         }
         break;
       }
@@ -882,8 +883,8 @@ export class GameScene extends Phaser.Scene {
       case 'takedown': {
         const points = this.run.takedown();
         this.audio.takedown();
-        this.popup(e.x, this.liftY(e.x, e.y, e.lane) - 60, `TAKEDOWN #${e.number}  +${points}`, '#ff9f45');
-        this.toast.setText(`TAKEDOWN! +${points}`).setAlpha(1).setScale(1.3);
+        this.popup(e.x, this.liftY(e.x, e.y, e.lane) - 60, tr('game.takedownN', { n: e.number, points }), '#ff9f45');
+        this.toast.setText(tr('game.takedown', { points })).setAlpha(1).setScale(1.3);
         this.tweens.killTweensOf(this.toast);
         this.tweens.add({ targets: this.toast, scale: 1, duration: 150 });
         this.tweens.add({ targets: this.toast, alpha: 0, delay: 1000, duration: 500 });
@@ -1096,7 +1097,7 @@ export class GameScene extends Phaser.Scene {
     const bonus = this.run.onLanded(airTime);
     if (airTime < GAMEPLAY.minAirToast) return;
     this.toast
-      .setText(bonus > 0 ? `AIR ${airTime.toFixed(2)}s  +${bonus}` : `AIR ${airTime.toFixed(2)}s`)
+      .setText(bonus > 0 ? tr('game.airBonus', { t: airTime.toFixed(2), n: bonus }) : tr('game.air', { t: airTime.toFixed(2) }))
       .setAlpha(1)
       .setScale(1.25);
     this.tweens.killTweensOf(this.toast);
@@ -1149,7 +1150,7 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5, 1)
       .setDepth(0.5);
     const label = this.add
-      .text(x, y - 212 + (zone ? 28 : 35), `CHECKPOINT ${index}`, {
+      .text(x, y - 212 + (zone ? 28 : 35), tr('game.checkpointLabel', { n: index }), {
         fontFamily: FONT_DISPLAY,
         fontSize: '18px',
         fontStyle: 'normal',
@@ -1200,10 +1201,10 @@ export class GameScene extends Phaser.Scene {
     }
     const mins = Math.floor(timeAdded / 60);
     const secs = String(Math.round(timeAdded % 60)).padStart(2, '0');
-    const lines = [`CHECKPOINT ${index}!`, `+${mins}:${secs}  +${points} BONUS`];
-    if (fuelAdded > 0) lines.push(`FUEL +${Math.round(fuelAdded * 100)}%`);
+    const lines = [tr('game.checkpointBang', { n: index }), tr('game.timeBonus', { time: `${mins}:${secs}`, points })];
+    if (fuelAdded > 0) lines.push(tr('game.fuelPlus', { n: Math.round(fuelAdded * 100) }));
     const zone = biomeChangesAt(index);
-    if (zone) lines.push(`ENTERING ${zone.name.toUpperCase()}`);
+    if (zone) lines.push(tr('game.entering', { biome: tr(`biome.${zone.id}`).toUpperCase() }));
     this.tweens.killTweensOf(this.cpToast);
     this.cpToast.setText(lines).setAlpha(1).setScale(1.3);
     this.tweens.add({ targets: this.cpToast, scale: 1, duration: 160 });
@@ -1228,7 +1229,7 @@ export class GameScene extends Phaser.Scene {
     layer.add(this.add.rectangle(VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, 0x07121b, 0.72));
     layer.add(
       this.add
-        .text(VIEW_W / 2, VIEW_H / 2 - 18, 'PAUSED', {
+        .text(VIEW_W / 2, VIEW_H / 2 - 18, tr('game.paused'), {
           fontFamily: FONT_DISPLAY,
           fontSize: '42px',
           color: INK.title,
@@ -1239,7 +1240,7 @@ export class GameScene extends Phaser.Scene {
     );
     layer.add(
       this.add
-        .text(VIEW_W / 2, VIEW_H / 2 + 34, 'PRESS START OR ESC TO RESUME', {
+        .text(VIEW_W / 2, VIEW_H / 2 + 34, tr('game.resume'), {
           fontFamily: FONT_BODY,
           fontSize: '18px',
           color: '#ffffff',
@@ -1278,7 +1279,7 @@ export class GameScene extends Phaser.Scene {
     this.audio.reward();
     this.tweens.killTweensOf(this.achToast);
     this.achToast
-      .setText(fresh.map((a) => `ACHIEVEMENT: ${a.name}  +${a.reward} coins`))
+      .setText(fresh.map((a) => tr('ach.toast', { name: achievementName(a), reward: a.reward })))
       .setAlpha(1);
     this.tweens.add({ targets: this.achToast, alpha: 0, delay: 2200, duration: 600 });
   }
@@ -1300,7 +1301,7 @@ export class GameScene extends Phaser.Scene {
     const put = (x: number, y: number, text: string | string[], kind: 'display' | 'body', size: number, color: string, ox = 0.5) =>
       label(this, layer, x, y, text, kind, size, color, ox);
 
-    const title = TITLES[this.run.endReason ?? 'fuel'];
+    const title = tr(TITLE_KEYS[this.run.endReason ?? 'fuel']);
     put(cx, 50, title, 'display', 34, INK.red);
     const sm = this.run.summary();
 
@@ -1328,17 +1329,17 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(UI.red, 1);
       g.fillRoundedRect(bx + 2, 68, 110, 20, 6);
       layer.add(g);
-      put(bx + 57, 78, 'NEW BEST!', 'display', 13, INK.text);
+      put(bx + 57, 78, tr('game.newBest'), 'display', 13, INK.text);
     }
     const tiles: [StatGlyph, string, string, boolean][] = [
-      ['distance', `${sm.meters} m`, result.newBestMeters ? 'distance (best!)' : 'distance', result.newBestMeters],
-      ['snack', String(s.snacks), 'snacks', false],
-      ['air', `${this.bestAir.toFixed(2)} s`, 'best air', false],
-      ['combo', `x${s.bestMultiplier}`, `best combo (${s.bestChain} chain)`, false],
-      ['flag', String(sm.checkpoints), 'checkpoints', false],
-      ['takedown', String(s.takedowns), 'takedowns', false],
-      ['lanes', String(sm.laneChanges), 'lane changes', false],
-      ['close', String(sm.nearMisses), 'close calls', false],
+      ['distance', `${sm.meters} m`, result.newBestMeters ? tr('game.tile.distanceBest') : tr('game.tile.distance'), result.newBestMeters],
+      ['snack', String(s.snacks), tr('game.tile.snacks'), false],
+      ['air', `${this.bestAir.toFixed(2)} s`, tr('game.tile.bestAir'), false],
+      ['combo', `x${s.bestMultiplier}`, tr('game.tile.bestCombo', { chain: s.bestChain }), false],
+      ['flag', String(sm.checkpoints), tr('game.tile.checkpoints'), false],
+      ['takedown', String(s.takedowns), tr('game.tile.takedowns'), false],
+      ['lanes', String(sm.laneChanges), tr('game.tile.laneChanges'), false],
+      ['close', String(sm.nearMisses), tr('game.tile.closeCalls'), false],
     ];
     tiles.forEach(([glyph, value, caption, hot], i) => {
       const tx = L.left + (i % 2) * (L.tileW + L.tileColGap);
@@ -1351,10 +1352,10 @@ export class GameScene extends Phaser.Scene {
     const rowW = L.rightW;
     const edge = tx + rowW - 16; // the right-hand text edge, 16 px inside the rows
     podiumIcon(this, layer, tx + 18, 96);
-    put(tx + 42, 96, 'TOP SCORES', 'display', 18, INK.cyan, 0);
-    put(edge - 148, 118, 'SCORE', 'body', 12, INK.dim, 1);
-    put(edge - 72, 118, 'DIST', 'body', 12, INK.dim, 1);
-    put(edge, 118, 'SNACKS', 'body', 12, INK.dim, 1);
+    put(tx + 42, 96, tr('game.topScores'), 'display', 18, INK.cyan, 0);
+    put(edge - 148, 118, tr('garage.col.score'), 'body', 12, INK.dim, 1);
+    put(edge - 72, 118, tr('common.dist'), 'body', 12, INK.dim, 1);
+    put(edge, 118, tr('garage.col.snacks'), 'body', 12, INK.dim, 1);
     for (let i = 0; i < 7; i++) {
       const y = L.rowsTop + 15 + i * 34;
       const h = this.save.highScores[i];
@@ -1377,23 +1378,23 @@ export class GameScene extends Phaser.Scene {
     rowPlate(this, layer, L.left + L.totalW / 2, stripY, L.totalW, 30, false);
     coinIcon(this, layer, L.left + 22, stripY, 9);
     if (this.run.perks.god) {
-      put(L.left + 42, stripY, 'GOD MODE RUN: NOTHING BANKED', 'display', 14, INK.good, 0);
+      put(L.left + 42, stripY, tr('game.godRun'), 'display', 14, INK.good, 0);
     } else {
-      put(L.left + 42, stripY, `+${result.coins} COINS`, 'display', 16, INK.title, 0);
-      put(L.left + L.totalW - 16, stripY + 1, `BANK ${this.save.coins}`, 'body', 16, INK.soft, 1);
+      put(L.left + 42, stripY, tr('game.coinsPlus', { n: result.coins }), 'display', 16, INK.title, 0);
+      put(L.left + L.totalW - 16, stripY + 1, tr('game.bank', { n: this.save.coins }), 'body', 16, INK.soft, 1);
       if (result.achievements.length) {
         const first = result.achievements[0];
-        const more = result.achievements.length > 1 ? `  (+${result.achievements.length - 1} more)` : '';
-        put(L.left + L.totalW / 2, stripY + 1, `ACHIEVEMENT: ${first.name}  +${first.reward}${more}`, 'body', 14, INK.title);
+        const more = result.achievements.length > 1 ? '  ' + tr('game.moreAch', { n: result.achievements.length - 1 }) : '';
+        put(L.left + L.totalW / 2, stripY + 1, tr('ach.toastShort', { name: achievementName(first), reward: first.reward }) + more, 'body', 14, INK.title);
       }
     }
-    put(cx, 477, 'D-PAD / STICK SELECT   A / START CONFIRM   B BACK', 'body', 14, INK.dim);
+    put(cx, 477, tr('game.padHint'), 'body', 14, INK.dim);
     // Five tappable buttons; a tap on one does that button's job.
     const buttons: GameOverOption[] = [
-      ['DRIVE AGAIN', 'SPACE', () => this.restart(), UI.yellow],
-      ['GARAGE', 'G', () => this.scene.start('Garage'), UI.cyan],
-      ['SETTINGS', 'O', () => this.scene.start('Settings', { from: 'Game' }), UI.green],
-      ['MENU', 'ESC', () => this.scene.start('Menu'), UI.yellowLight],
+      [tr('game.driveAgain'), 'SPACE', () => this.restart(), UI.yellow],
+      [tr('menu.garage'), 'G', () => this.scene.start('Garage'), UI.cyan],
+      [tr('menu.settings'), 'O', () => this.scene.start('Settings', { from: 'Game' }), UI.green],
+      [tr('game.menu'), 'ESC', () => this.scene.start('Menu'), UI.yellowLight],
     ];
     this.gameOverSelection = 0;
     this.gameOverOptions = buttons;
@@ -1591,7 +1592,7 @@ export class GameScene extends Phaser.Scene {
       damage: r.damage.level,
       cpNext: r.checkpoints.nextIndex,
       cpTimeLeft: r.checkpoints.timeLeft,
-      cpProgress: r.checkpoints.progress(r.meters),
+      cpProgress: r.checkpoints.progress(r.bestMeters),
       multiplier: r.score.multiplier,
       meters: r.meters,
       speedKmh: Math.max(0, t.speed) / 6,
@@ -1602,11 +1603,11 @@ export class GameScene extends Phaser.Scene {
 
     const pos = this.race.position(t.x);
     this.posText
-      .setText(this.race.drafting ? [`POS ${pos.place}/${pos.of}`, 'DRAFT'] : `POS ${pos.place}/${pos.of}`)
+      .setText(this.race.drafting ? [tr('game.pos', { place: pos.place, of: pos.of }), tr('game.draft')] : tr('game.pos', { place: pos.place, of: pos.of }))
       .setColor(pos.place === 1 ? '#ffe066' : '#ffffff');
 
     const lines: string[] = [];
-    if (!r.over && t.airTime > 0) lines.push(`AIR ${t.airTime.toFixed(2)}s   BEST ${this.bestAir.toFixed(2)}s`);
+    if (!r.over && t.airTime > 0) lines.push(tr('game.airBest', { t: t.airTime.toFixed(2), best: this.bestAir.toFixed(2) }));
     if (this.debug) {
       lines.push(
         `angle ${t.angle.toFixed(2)}  vy ${t.vy.toFixed(0)}  grounded ${t.grounded}`,

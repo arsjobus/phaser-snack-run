@@ -6,7 +6,7 @@ import { ShowCam } from '../src/game/ShowCam';
 import { stuntLayout } from '../src/game/Stunt';
 import { Terrain } from '../src/game/Terrain';
 import { ACHIEVEMENTS } from '../src/progress/Achievements';
-import { UPGRADE_IDS, coinsForRun, emptySave, sanitizeSave, upgradeCost } from '../src/progress/Progress';
+import { UPGRADE_IDS, coinsForRun, emptySave, sanitizeSave, shopHoursAtReferencePace, totalShopCost, upgradeCost } from '../src/progress/Progress';
 import { SKINS } from '../src/progress/Skins';
 import { MENU_GATE } from '../src/ui/MenuModel';
 import { LIST, listRows } from '../src/ui/Theme';
@@ -161,7 +161,7 @@ describe('puddles', () => {
 describe('the economy', () => {
   const refRun: RunSummary = {
     score: 0, meters: 2150, snacks: 40, bestChain: 5, bestMultiplier: 2, bestAir: 0.5, takedowns: 1, checkpoints: 2,
-    nearMisses: 5, laneChanges: 10, crashes: 2, damageTaken: 0.4, cleanMeters: 500, endReason: 'fuel',
+    nearMisses: 5, laneChanges: 10, crashes: 2, damageTaken: 0.4, cleanMeters: 500, bestMeters: 2150, lowestMeters: 0, bestCoast: 0, endReason: 'fuel',
   };
   const perRun = coinsForRun(refRun);
 
@@ -170,17 +170,18 @@ describe('the economy', () => {
     expect(perRun).toBeLessThan(300);
   });
 
-  it('the first upgrade or paint takes a couple of runs, not one', () => {
+  it('the first upgrade or paint is within reach in a few minutes at the reference pace', () => {
     const cheapest = Math.min(...UPGRADE_IDS.map((id) => upgradeCost(id, 0) ?? Infinity), ...SKINS.filter((s) => s.cost > 0).map((s) => s.cost));
-    expect(cheapest / perRun).toBeGreaterThan(1); // one typical run is not enough
-    expect(cheapest / perRun).toBeLessThan(4);
+    const minutes = cheapest / PROGRESSION.pacing.coinsPerMinute;
+    expect(minutes).toBeGreaterThan(1); // 3 minutes of play (2000 coins) buys the first thing, not the shop
+    expect(minutes).toBeLessThan(6);
   });
 
-  it('unlocking everything takes about a hundred runs: a long haul, not months', () => {
-    let total = SKINS.reduce((a, s) => a + s.cost, 0);
-    for (const id of UPGRADE_IDS) for (let l = 0; l < PROGRESSION.upgrades[id].max; l++) total += upgradeCost(id, l) ?? 0;
-    expect(total / perRun).toBeGreaterThan(80);
-    expect(total / perRun).toBeLessThan(160);
+  it('unlocking everything from purchases takes 3 to 4 hours at 2000 coins per 3 minutes', () => {
+    const hours = shopHoursAtReferencePace();
+    expect(hours).toBeGreaterThanOrEqual(PROGRESSION.pacing.minHours);
+    expect(hours).toBeLessThanOrEqual(PROGRESSION.pacing.maxHours);
+    expect(totalShopCost()).toBeGreaterThan(2000 * 20); // far more than the first 3 minutes can pay for
   });
 
   it('paint costs rise with how fancy it is, and each upgrade level costs more than the last', () => {
@@ -200,9 +201,9 @@ describe('list spacing and the menus', () => {
     }
   });
 
-  it('there is a row of room for all the achievements, two to a row, with no daily one', () => {
+  it('there is a row of room for each page of achievements, two to a row, with no daily one', () => {
     expect(ACHIEVEMENTS.map((a) => a.id)).not.toContain('daily1');
-    const rows = listRows(148, 428, Math.ceil(ACHIEVEMENTS.length / 2), 40);
+    const rows = listRows(148, 428, 3, 58); // the garage shows six per page (ACH_PER_PAGE), three rows of two
     expect(rows.h).toBeGreaterThanOrEqual(30);
   });
 

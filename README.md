@@ -23,9 +23,9 @@ npm run dev        # http://localhost:5173
 
 ## Controls
 
-→/D gas (**hold it: there is no auto-gas**; let go and engine braking slows you down) · ←/A brake/reverse · **↑/W and ↓/S: hold to drift away from / towards the camera through the depth field** (Q/E also work) · R reset upright · M mute all · N music on/off · H debug overlay · SPACE/ENTER/tap restart after game over · **G** garage and **D** daily challenge / free run (game-over screen)
+→/D gas (**hold it: there is no auto-gas**; let go and engine braking slows you down) · ←/A brake/reverse · **↑/W and ↓/S: hold to drift away from / towards the camera through the depth field** (Q/E also work) · M mute all · N music on/off · H debug overlay · SPACE/ENTER/tap restart after game over · **G** garage and **D** daily challenge / free run (game-over screen)
 
-**Gamepad:** RT/A/stick right gas (triggers are analog) · LT/B/X/stick left brake · stick or D-pad up/down drift · Start/A restart · Y garage · Back settings · LB reset · RB music. **Touch:** GAS, BRAKE and ▲/▼ buttons appear on touch devices. **O** opens the settings (also from the garage) where every driving key can be rebound.
+**Gamepad:** RT/A/stick right gas (triggers are analog) · LT/B/X/stick left brake · stick or D-pad up/down drift · Start/A restart · Y garage · Back settings · RB music. **Touch:** GAS, BRAKE and ▲/▼ buttons appear on touch devices. **O** opens the settings (also from the garage) where every driving key can be rebound.
 
 There is no air control and no lean: the arrow keys steer through the field instead, and a gentle passive assist levels the truck in the air so it lands on its wheels.
 
@@ -56,6 +56,15 @@ Every one-shot effect is an mp3 in `public/audio/` (`snack.mp3`, `fuel.mp3`, `bo
 - **Lane changes** need gas or reverse (`LANES.minDriveToSteer`), and are refused when the truck is rolled over with no wheel on the ground.
 - **Crisp text:** the canvas is rendered at 2x (`src/ui/Resolution.ts`, chosen from the window size) and text is rasterised at the same factor, so it is no longer stretched by the browser.
 - **SVG art:** vehicle parts, pickups, road hazards and props live in `public/art/` as SVG and are loaded at start-up (`npm run art:export` regenerates them; see `public/art/README.md`).
+
+## What's new (balance, achievements, languages)
+
+- **Garage prices** are set for a long haul: the whole shop (every upgrade level plus all paint) costs about 146,000 coins, which is 3 to 4 hours at the reference pace of 2000 coins per 3 minutes (`PROGRESSION.pacing` in `src/config.ts`; a test fails if a price change leaves that window).
+- **Distance can go negative.** Reversing takes metres off the readout, and behind the start line it shows a minus sign. Checkpoints, race spawns and distance points follow the furthest point reached, so reversing never costs score or un-reaches a gate. A run that ends behind the line banks 0.
+- **Two hidden achievements** (shown as ??? in the garage until earned): *Hands Off* (100 m without pressing gas or brake) and *Backing Out* (-500 m behind the starting line; it takes about 1.4 tanks of fuel, so it needs a couple of tank upgrades).
+- **Legend of the Mud:** once every achievement (hidden ones included; `HIDDEN_COUNT_FOR_COMPLETION` in `src/progress/Achievements.ts`) is unlocked, the start screen changes: golden hour over the desert, a turning sunburst, stars, trophies, a gold-trimmed logo and a glowing champion truck.
+- **Languages:** every `src/i18n/locales/<code>.json` is a language (English, Spanish, French and German ship). The file must have `"meta.name"`; any key it lacks falls back to English. Pick the language in Settings. To add one, copy `en.json`, rename it and translate the values. The bundled fonts cover Latin-1 only, so languages with other scripts also need a font in `src/ui/Fonts.ts`.
+- **Removed:** the R reset-upright key and the pad's LB reset. (A crew still rights the truck automatically during the show jump, and god mode never wrecks on a rollover.)
 
 ## What's in Phase 8.5 (feedback)
 

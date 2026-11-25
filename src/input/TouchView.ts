@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import Phaser from 'phaser';
 import { TOUCH_BUTTONS, TOUCH_LAYOUT, type TouchButton } from './Touch';
 import type { Held } from './Controls';
@@ -18,7 +19,7 @@ export class TouchView {
       const r = TOUCH_LAYOUT[b];
       this.labels.push(
         scene.add
-          .text(r.x + r.w / 2, r.y + r.h / 2, LABELS[b], {
+          .text(r.x + r.w / 2, r.y + r.h / 2, (b === 'gas' ? t('touch.gas') : b === 'brake' ? t('touch.brake') : LABELS[b]), {
             fontFamily: FONT_DISPLAY,
             fontSize: b === 'gas' || b === 'brake' ? '26px' : '34px',
             fontStyle: 'normal',

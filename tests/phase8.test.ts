@@ -78,7 +78,7 @@ describe('Phase 8: settings', () => {
 
   it('repairs bindings: no clashes, no reserved keys, nothing left without a key', () => {
     const s = sanitizeSettings({
-      bindings: { gas: ['KeyX', 'Escape'], brake: ['KeyX'], far: [], near: 'KeyS', reset: ['Enter'], mute: [3, null] },
+      bindings: { gas: ['KeyX', 'Escape'], brake: ['KeyX'], far: [], near: 'KeyS', mute: [3, null] },
     });
     expect(valid(s.bindings)).toBe(true);
     expect(s.bindings.gas).toEqual(['KeyX']); // the first claim wins; Escape is reserved
@@ -90,15 +90,13 @@ describe('Phase 8: settings', () => {
     const b = setBinding(DEFAULT_BINDINGS, 'gas', 'KeyJ');
     expect(b.gas[0]).toBe('KeyJ');
     expect(valid(b)).toBe(true);
-    // Take R (the reset action's only key): reset gets gas's old primary key instead of nothing.
+    // R is just a key now: binding it moves nothing else.
     const c = setBinding(DEFAULT_BINDINGS, 'gas', 'KeyR');
     expect(c.gas[0]).toBe('KeyR');
-    expect(c.reset).toEqual(['ArrowRight']);
     expect(valid(c)).toBe(true);
-    expect(c.gas).not.toContain('ArrowRight');
     // Reserved keys are refused, the input is not mutated.
     expect(setBinding(DEFAULT_BINDINGS, 'gas', 'Escape')).toEqual(DEFAULT_BINDINGS);
-    expect(DEFAULT_BINDINGS.reset).toEqual(['KeyR']);
+    expect('reset' in DEFAULT_BINDINGS).toBe(false); // the R reset-upright feature is gone
     // A long random sequence of rebinds always leaves a valid map.
     let cur = setBinding(DEFAULT_BINDINGS, 'gas', 'KeyJ');
     const codes = ['KeyJ', 'KeyK', 'KeyR', 'ArrowUp', 'Space', 'KeyM', 'KeyA', 'Digit1'];

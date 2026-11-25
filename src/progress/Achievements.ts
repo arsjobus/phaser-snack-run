@@ -8,6 +8,8 @@ export interface Achievement {
   description: string;
   /** Coins paid once, when it unlocks. */
   reward: number;
+  /** Hidden extras show as "???" in the garage until they are earned. */
+  hidden?: boolean;
   /** Runs are checked against the run so far; profile achievements only look at the save (`run` is then null). */
   check: (save: SaveData, run: RunSummary | null) => boolean;
 }
@@ -111,7 +113,31 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     reward: 100,
     check: (s) => s.stats.coinsEarned >= 1000,
   },
+  {
+    id: 'coast100',
+    name: 'Hands Off',
+    description: 'Travel 100 m without pressing the gas or the brake',
+    reward: 250,
+    hidden: true,
+    check: (_s, r) => !!r && r.bestCoast >= 100,
+  },
+  {
+    id: 'reverse500',
+    name: 'Backing Out',
+    description: 'Reverse 500 m behind the starting line (-500 m)',
+    reward: 250,
+    hidden: true,
+    check: (_s, r) => !!r && r.lowestMeters <= -500,
+  },
 ];
+
+/** Hidden extras count toward "every achievement unlocked" (the special start screen). Flip to false to make them optional. */
+export const HIDDEN_COUNT_FOR_COMPLETION = true;
+
+/** True once every achievement that counts has been unlocked. */
+export function allAchievementsUnlocked(save: SaveData): boolean {
+  return ACHIEVEMENTS.every((a) => (a.hidden && !HIDDEN_COUNT_FOR_COMPLETION) || !!save.achievements[a.id]);
+}
 
 /**
  * Unlocks every achievement whose condition now holds (and that is not unlocked yet): records the

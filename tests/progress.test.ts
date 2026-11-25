@@ -41,6 +41,9 @@ function summary(over: Partial<RunSummary> = {}): RunSummary {
     crashes: 0,
     damageTaken: 0,
     cleanMeters: 500,
+    bestMeters: 500,
+    lowestMeters: 0,
+    bestCoast: 0,
     endReason: 'fuel',
     ...over,
   };
@@ -199,19 +202,23 @@ describe('Perks in a run', () => {
     const t = new Terrain(1);
     const stock = new RunModel(1, t, START);
     const armored = new RunModel(1, t, START, { tank: 1, burn: 1, damage: 0.6 });
-    stock.meters = armored.meters = 700;
+    const at = (r: RunModel, m: number) => {
+      r.meters = r.bestMeters = m;
+    };
+    at(stock, 700);
+    at(armored, 700);
     stock.hurt(0.2);
     armored.hurt(0.2);
     expect(armored.damage.level).toBeCloseTo(0.12, 6);
     expect(stock.damage.level).toBeCloseTo(0.2, 6);
     expect(stock.summary().crashes).toBe(1);
     expect(stock.summary().cleanMeters).toBe(700);
-    stock.meters = 900;
+    at(stock, 900);
     stock.hurt(0.1);
     expect(stock.summary().cleanMeters).toBe(700); // the first damage ends the clean streak
     expect(stock.summary().damageTaken).toBeCloseTo(0.3, 6);
     const clean = new RunModel(1, t, START);
-    clean.meters = 2500;
+    at(clean, 2500);
     expect(clean.summary().cleanMeters).toBe(2500);
     expect(clean.summary().crashes).toBe(0);
   });

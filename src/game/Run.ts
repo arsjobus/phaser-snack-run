@@ -51,6 +51,12 @@ export interface RunSummary {
   damageTaken: number;
   /** Metres driven before the first damage (the whole run if the truck was never hurt). */
   cleanMeters: number;
+  /** Furthest forward point reached (m from the start line, never below 0). */
+  bestMeters: number;
+  /** Furthest point reached in reverse, as a negative number (m from the start line, never above 0). */
+  lowestMeters: number;
+  /** Longest stretch driven (m, either direction) without touching the gas or the brake. */
+  bestCoast: number;
   endReason: EndReason | null;
 }
 
@@ -69,7 +75,19 @@ export class RunModel {
   over = false;
   endReason: EndReason | null = null;
   time = 0;
+  /**
+   * Distance from the start line in metres. It goes DOWN when the truck reverses and is negative
+   * behind the line. Checkpoints, race spawns and distance points follow `bestMeters` instead.
+   */
   meters = 0;
+  /** Furthest forward point reached (>= 0): reversing never un-reaches a checkpoint or costs score. */
+  bestMeters = 0;
+  /** Furthest point reached behind the start line (<= 0). */
+  lowestMeters = 0;
+  /** Metres covered (either direction) since the gas or brake was last pressed, and the best such stretch. */
+  coastMeters = 0;
+  bestCoast = 0;
+  private lastX: number;
   bestAir = 0;
   /** Counters for the summary. */
   nearMisses = 0;
@@ -85,6 +103,7 @@ export class RunModel {
     private startX: number,
     readonly perks: Perks = NO_PERKS,
   ) {
+    this.lastX = startX;
     this.fuel = new FuelTank(perks.tank, perks.burn);
     this.wrecks = new WreckField(seed, terrain, startX);
     this.obstacles = new ObstacleField(seed, terrain, startX, this.wrecks);
@@ -97,19 +116,33 @@ export class RunModel {
     return !this.over && !this.fuel.empty;
   }
 
-  update(dt: number, truck: TruckSample): RunEvent[] {
+  /**
+   * `pedals` says whether the gas or the brake is pressed this frame (the raw buttons, not what the
+   * engine does with them); it drives the "coast" achievement. Omit it and the stretch never counts.
+   */
+  update(dt: number, truck: TruckSample, pedals: { gas: boolean; brake: boolean } = { gas: true, brake: true }): RunEvent[] {
     const events: RunEvent[] = [];
     if (this.over) return events;
     this.time += dt;
 
-    this.meters = Math.max(this.meters, (truck.x - this.startX) / PX_PER_METER);
-    this.score.setDistance(this.meters);
+    this.meters = (truck.x - this.startX) / PX_PER_METER;
+    this.bestMeters = Math.max(this.bestMeters, this.meters);
+    this.lowestMeters = Math.min(this.lowestMeters, this.meters);
+    this.score.setDistance(this.bestMeters);
+
+    if (pedals.gas || pedals.brake) {
+      this.coastMeters = 0;
+    } else {
+      this.coastMeters += Math.abs(truck.x - this.lastX) / PX_PER_METER;
+      this.bestCoast = Math.max(this.bestCoast, this.coastMeters);
+    }
+    this.lastX = truck.x;
 
     const wasEmpty = this.fuel.empty;
-    this.fuel.update(dt, truck.speed, Math.max(0, (truck.x - this.startX) / PX_PER_METER));
+    this.fuel.update(dt, truck.speed, Math.max(0, this.meters));
     if (this.fuel.empty && !wasEmpty) events.push({ type: 'empty' });
 
-    for (const c of this.checkpoints.update(dt, this.meters)) {
+    for (const c of this.checkpoints.update(dt, this.bestMeters)) {
       if (c.type === 'reached') {
         const fuelAdded = this.fuel.add(CHECKPOINT.fuelBonus);
         const points = this.score.addBonus(c.points);
@@ -173,7 +206,7 @@ export class RunModel {
       events.push({ type: 'damage', amount: applied });
       this.crashes++;
       this.damageTaken += applied;
-      this.firstDamageMeters ??= this.meters;
+      this.firstDamageMeters ??= Math.max(0, this.bestMeters);
     }
     if (this.damage.wrecked) this.finish('wreck', events);
     return events;
@@ -223,6 +256,9 @@ export class RunModel {
     return {
       score: s.total,
       meters: Math.floor(this.meters),
+      bestMeters: Math.floor(this.bestMeters),
+      lowestMeters: Math.ceil(this.lowestMeters),
+      bestCoast: Math.floor(this.bestCoast),
       snacks: s.snacks,
       bestChain: s.bestChain,
       bestMultiplier: s.bestMultiplier,
@@ -233,7 +269,7 @@ export class RunModel {
       laneChanges: this.laneChanges,
       crashes: this.crashes,
       damageTaken: this.damageTaken,
-      cleanMeters: Math.floor(this.firstDamageMeters ?? this.meters),
+      cleanMeters: Math.floor(this.firstDamageMeters ?? Math.max(0, this.bestMeters)),
       endReason: this.endReason,
     };
   }

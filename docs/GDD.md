@@ -32,7 +32,6 @@ Drive → grab snacks and fuel → dodge or bump rivals → hit ramps for air �
 | ← / A | Brake, then reverse                   |
 | ↑ / W (or Q) | Hold: drift away from the camera, through the depth field |
 | ↓ / S (or E) | Hold: drift towards the camera |
-| R     | Reset upright                         |
 | Space / Enter / tap | Restart after game over |
 | G     | Garage (from the game-over screen)    |
 | M     | Mute all sound                        |

@@ -49,3 +49,9 @@ export class NeedleSpring {
     return this.value;
   }
 }
+
+/** The distance readout: at least four digits, and a minus sign when the truck is behind the start line. */
+export function formatDistance(meters: number): string {
+  const m = Math.trunc(meters);
+  return `${m < 0 ? '-' : ''}${String(Math.abs(m)).padStart(4, '0')} m`;
+}

@@ -5,7 +5,6 @@ import { backButton, bottomBar, flatBackdrop, label, rowPlate, topBar, type Laye
 import { defaultStore, type KeyValueStore } from '../progress/Storage';
 import {
   ACTIONS,
-  ACTION_LABELS,
   DEFAULT_BINDINGS,
   bindingText,
   cloneBindings,
@@ -16,14 +15,15 @@ import {
   type Settings,
 } from '../settings/Settings';
 import { applyView } from '../ui/Resolution';
+import { availableLocales, localeName, setLocale, t } from '../i18n';
 
 /** How many rows sit in the left column of the settings screen. */
-const LEFT_ROWS = 8;
+const LEFT_ROWS = 9;
 
 type Row =
   | { kind: 'slider'; label: string; get: () => number; set: (v: number) => void }
   | { kind: 'toggle'; label: string; get: () => boolean; set: (v: boolean) => void }
-  | { kind: 'choice'; label: string; options: string[]; get: () => string; set: (v: string) => void }
+  | { kind: 'choice'; label: string; options: string[]; get: () => string; set: (v: string) => void; show?: (v: string) => string }
   | { kind: 'bind'; action: Action }
   | { kind: 'reset' }
   | { kind: 'back' };
@@ -64,14 +64,16 @@ export class SettingsScene extends Phaser.Scene {
     this.layer = this.add.container(0, 0);
     const s = this.settings;
     this.rows = [
-      { kind: 'slider', label: 'Master volume', get: () => s.master, set: (v) => (s.master = v) },
-      { kind: 'slider', label: 'Music volume', get: () => s.music, set: (v) => (s.music = v) },
-      { kind: 'slider', label: 'Effects volume', get: () => s.sfx, set: (v) => (s.sfx = v) },
-      { kind: 'slider', label: 'Screen shake', get: () => s.shake, set: (v) => (s.shake = v) },
-      { kind: 'toggle', label: 'Reduced motion', get: () => s.reducedMotion, set: (v) => (s.reducedMotion = v) },
-      { kind: 'toggle', label: 'Colour-blind pickups', get: () => s.colorblind, set: (v) => (s.colorblind = v) },
-      { kind: 'choice', label: 'Effects quality', options: ['auto', 'full', 'reduced'], get: () => s.effects, set: (v) => (s.effects = v as Settings['effects']) },
-      { kind: 'choice', label: 'Touch controls', options: ['auto', 'on', 'off'], get: () => s.touch, set: (v) => (s.touch = v as Settings['touch']) },
+      { kind: 'slider', label: 'settings.master', get: () => s.master, set: (v) => (s.master = v) },
+      { kind: 'slider', label: 'settings.music', get: () => s.music, set: (v) => (s.music = v) },
+      { kind: 'slider', label: 'settings.sfx', get: () => s.sfx, set: (v) => (s.sfx = v) },
+      { kind: 'slider', label: 'settings.shake', get: () => s.shake, set: (v) => (s.shake = v) },
+      { kind: 'toggle', label: 'settings.reducedMotion', get: () => s.reducedMotion, set: (v) => (s.reducedMotion = v) },
+      { kind: 'toggle', label: 'settings.colorblind', get: () => s.colorblind, set: (v) => (s.colorblind = v) },
+      { kind: 'choice', label: 'settings.effects', options: ['auto', 'full', 'reduced'], get: () => s.effects, set: (v) => (s.effects = v as Settings['effects']), show: (v) => t(`common.${v}`) },
+      { kind: 'choice', label: 'settings.touch', options: ['auto', 'on', 'off'], get: () => s.touch, set: (v) => (s.touch = v as Settings['touch']), show: (v) => t(`common.${v}`) },
+      // Only languages that have a locale file in src/i18n/locales are listed.
+      { kind: 'choice', label: 'settings.language', options: availableLocales(), get: () => s.language, set: (v) => (s.language = v), show: (v) => localeName(v) },
       ...ACTIONS.map((action): Row => ({ kind: 'bind', action })),
       { kind: 'reset' },
       { kind: 'back' },
@@ -167,6 +169,7 @@ export class SettingsScene extends Phaser.Scene {
   }
 
   private commit(): void {
+    setLocale(this.settings.language);
     saveSettings(this.store, this.settings);
     this.draw();
   }
@@ -185,16 +188,16 @@ export class SettingsScene extends Phaser.Scene {
 
   private draw(): void {
     this.layer.removeAll(true);
-    topBar(this, this.layer, 'SETTINGS');
-    this.text(40, 90, 'SOUND AND SCREEN', 14, INK.cyan, 0, true);
-    this.text(500, 90, 'KEYS', 14, INK.cyan, 0, true);
+    topBar(this, this.layer, t('settings.title'));
+    this.text(40, 90, t('settings.sound'), 14, INK.cyan, 0, true);
+    this.text(500, 90, t('settings.keys'), 14, INK.cyan, 0, true);
     this.rows.forEach((r, i) => {
       const left = i < LEFT_ROWS;
       const j = left ? i : i - LEFT_ROWS;
       const cx = left ? 250 : 712;
       const w = 430;
       // Rows are `LIST.rowGap` apart (the same standard as the garage and the achievements).
-      const rowH = left ? 38 : 28;
+      const rowH = left ? 34 : 28;
       const step = rowH + LIST.rowGap;
       const y = 124 + j * step;
       const on = i === this.row;
@@ -219,7 +222,7 @@ export class SettingsScene extends Phaser.Scene {
       const col = on ? INK.text : INK.soft;
       switch (r.kind) {
         case 'slider': {
-          this.text(lx, y, r.label, 17, col);
+          this.text(lx, y, t(r.label), 17, col);
           const v = r.get();
           const g = this.add.graphics();
           g.fillStyle(UI.outline, 1);
@@ -233,24 +236,24 @@ export class SettingsScene extends Phaser.Scene {
           break;
         }
         case 'toggle':
-          this.text(lx, y, r.label, 17, col);
-          this.text(vx, y, r.get() ? 'ON' : 'OFF', 16, r.get() ? INK.good : INK.dim, 0, true);
+          this.text(lx, y, t(r.label), 17, col);
+          this.text(vx, y, r.get() ? t('common.on') : t('common.off'), 16, r.get() ? INK.good : INK.dim, 0, true);
           break;
         case 'choice':
-          this.text(lx, y, r.label, 17, col);
-          this.text(vx, y, r.get().toUpperCase(), 16, INK.cyan, 0, true);
+          this.text(lx, y, t(r.label), 17, col);
+          this.text(vx, y, (r.show ? r.show(r.get()) : r.get()).toUpperCase(), 16, INK.cyan, 0, true);
           break;
         case 'bind': {
-          this.text(lx, y, ACTION_LABELS[r.action], 16, col);
+          this.text(lx, y, t(`action.${r.action}`), 16, col);
           const waiting = this.rebinding === r.action;
-          this.text(inner.right, y, waiting ? 'PRESS A KEY' : bindingText(this.settings.bindings, r.action), 14, waiting ? INK.title : INK.cyan, 1, true);
+          this.text(inner.right, y, waiting ? t('settings.pressKey') : bindingText(this.settings.bindings, r.action), 14, waiting ? INK.title : INK.cyan, 1, true);
           break;
         }
         case 'reset':
-          this.text(lx, y, 'Reset keys to defaults', 16, col);
+          this.text(lx, y, t('settings.resetKeys'), 16, col);
           break;
       }
     });
-    bottomBar(this, this.layer, this.rebinding ? 'PRESS THE NEW KEY   ESC cancels' : 'UP/DOWN pick   LEFT/RIGHT change   ENTER change / rebind   ESC back   saved automatically');
+    bottomBar(this, this.layer, this.rebinding ? t('settings.hintRebind') : t('settings.hint'));
   }
 }

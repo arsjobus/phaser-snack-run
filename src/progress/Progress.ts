@@ -183,6 +183,21 @@ export function upgradeCost(id: UpgradeId, level: number): number | null {
   return Math.round((u.cost * Math.pow(u.growth, level)) / 5) * 5;
 }
 
+/** Coins needed to buy every upgrade level and every paint job (what "fully unlocked from purchases" costs). */
+export function totalShopCost(): number {
+  let total = 0;
+  for (const id of UPGRADE_IDS) {
+    for (let level = 0; level < PROGRESSION.upgrades[id].max; level++) total += upgradeCost(id, level) ?? 0;
+  }
+  for (const skin of SKINS) total += skin.cost;
+  return total;
+}
+
+/** Hours of play to earn `totalShopCost()` at the reference rate in `PROGRESSION.pacing`. */
+export function shopHoursAtReferencePace(): number {
+  return totalShopCost() / PROGRESSION.pacing.coinsPerMinute / 60;
+}
+
 /** Buys the next level of an upgrade. Returns false if it is maxed or the bank is short. */
 export function buyUpgrade(save: SaveData, id: UpgradeId): boolean {
   const cost = upgradeCost(id, save.upgrades[id]);
@@ -231,7 +246,7 @@ export function coinsForRun(s: RunSummary): number {
   const C = PROGRESSION.coins;
   const base =
     s.snacks * C.perSnack +
-    s.meters / C.meters +
+    Math.max(0, s.meters) / C.meters +
     s.checkpoints * C.perCheckpoint +
     s.takedowns * C.perTakedown +
     s.nearMisses * C.perNearMiss;
@@ -255,7 +270,7 @@ export function recordRun(save: SaveData, s: RunSummary, day: string): RunResult
   const coins = addCoins(save, earned); // what the bank took (less than `earned` when it is full)
 
   st.runs++;
-  st.meters += s.meters;
+  st.meters += Math.max(0, s.meters);
   st.snacks += s.snacks;
   st.takedowns += s.takedowns;
   st.nearMisses += s.nearMisses;
@@ -268,7 +283,7 @@ export function recordRun(save: SaveData, s: RunSummary, day: string): RunResult
 
   const entry: HighScore = {
     score: s.score,
-    meters: s.meters,
+    meters: Math.max(0, s.meters),
     snacks: s.snacks,
     date: day,
     reason: s.endReason,

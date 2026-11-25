@@ -17,9 +17,12 @@ import { SFX, sfxCacheKey } from '../audio/sfx';
 import { loadSettings } from '../settings/Settings';
 import { defaultStore } from '../progress/Storage';
 import { MENU_GATE, MENU_ITEMS, type MenuId } from '../ui/MenuModel';
-import { INK, wrapIndex } from '../ui/Theme';
-import { button, label, logoPlate, type Layer } from '../ui/Ui';
+import { INK, UI, wrapIndex } from '../ui/Theme';
+import { button, label, logoPlate, trophy, type Layer } from '../ui/Ui';
 import { applyView } from '../ui/Resolution';
+import { ACHIEVEMENTS, allAchievementsUnlocked } from '../progress/Achievements';
+import { MASTER, starField, sunRays } from '../ui/MasterMenu';
+import { t } from '../i18n';
 
 /**
  * The start screen: the game's own scenery (forest backdrop, the real road painter, the truck
@@ -39,6 +42,9 @@ export class MenuScene extends Phaser.Scene {
   private seen = new WeakSet<KeyboardEvent>();
   private toast: Phaser.GameObjects.Container | null = null;
   private godBadge: Phaser.GameObjects.Container | null = null;
+  /** Every achievement is unlocked: the special start screen is shown instead of the usual one. */
+  private master = false;
+  private rays: Phaser.GameObjects.Graphics | null = null;
 
   constructor() {
     super('Menu');
@@ -53,6 +59,8 @@ export class MenuScene extends Phaser.Scene {
     this.cheats.reset();
     this.toast = null;
     this.godBadge = null;
+    this.rays = null;
+    this.master = allAchievementsUnlocked(loadSave(defaultStore()));
     this.buildScenery();
     this.layer = this.add.container(0, 0).setDepth(20).setScrollFactor(0);
     this.draw();
@@ -66,7 +74,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private buildScenery(): void {
-    const biome = BIOME_LIST[0];
+    const biome = (this.master && BIOME_LIST.find((b) => b.id === MASTER.biome)) || BIOME_LIST[0];
     const startX = 200;
     const terrain = new Terrain(7);
     terrain.ensure(startX + 2000);
@@ -97,6 +105,7 @@ export class MenuScene extends Phaser.Scene {
       const cy = gy - 42;
       const baseY = laneProject(gy, cy, t.lane);
       const img = this.add.image(t.x, baseY, t.key).setOrigin(ox, oy).setScale(sc).setDepth(laneDepth(t.lane, 0.1));
+      if (this.master && t.key === PLAYER_TRUCK_KEY) img.setTint(MASTER.goldLight); // the champion's truck shines
       this.bodies.push({ img, baseY, phase: i * 1.7 });
       for (const w of TRUCK.wheels) {
         this.add
@@ -108,13 +117,42 @@ export class MenuScene extends Phaser.Scene {
     // Best score, from the save.
     const best = loadSave(defaultStore()).highScores[0];
     const l = this.add.container(0, 0).setDepth(20).setScrollFactor(0);
-    label(this, l, VIEW_W - 22, 24, best ? `BEST ${best.score}` : 'NO RUNS YET', 'display', 18, INK.title, 1, 4);
+    label(this, l, VIEW_W - 22, 24, best ? t('menu.best', { score: best.score }) : t('menu.noRuns'), 'display', 18, INK.title, 1, 4);
+    if (this.master) this.buildMasterScenery(gy);
+  }
+
+  /** The golden-hour dressing of the special screen: sun, turning sunburst, warm sky bands, stars and a glow under the truck. */
+  private buildMasterScenery(groundY: number): void {
+    const cx = VIEW_W / 2;
+    this.add.circle(cx, MASTER.sunY, MASTER.sunRadius, MASTER.gold, 0.35).setScrollFactor(0).setDepth(-9.5);
+    this.add.circle(cx, MASTER.sunY, MASTER.sunRadius * 0.7, MASTER.goldLight, 0.5).setScrollFactor(0).setDepth(-9.49);
+    this.rays = this.add.graphics().setScrollFactor(0).setDepth(-9.4);
+    const bands = this.add.graphics().setScrollFactor(0).setDepth(-5.5);
+    for (const [y, h, color, alpha] of MASTER.bands) {
+      bands.fillStyle(color, alpha);
+      bands.fillRect(0, y, VIEW_W, h);
+    }
+    for (const s of starField(MASTER.stars, VIEW_W, 14, 210)) {
+      const star = this.add.star(s.x, s.y, 4, s.size * 0.3, s.size, MASTER.goldLight).setScrollFactor(0).setDepth(-5).setAlpha(0.2);
+      this.tweens.add({ targets: star, alpha: 1, scale: 1.3, duration: 900, yoyo: true, repeat: -1, delay: s.delay, ease: 'Sine.easeInOut' });
+    }
+    // A warm pool of light on the road under the player's truck.
+    this.add.ellipse(480, groundY + 6, 230, 34, MASTER.gold, 0.28).setDepth(0.6);
+    this.add.ellipse(480, groundY + 6, 140, 20, MASTER.goldLight, 0.3).setDepth(0.61);
+  }
+
+  private drawRays(): void {
+    if (!this.rays) return;
+    this.rays.clear();
+    this.rays.fillStyle(MASTER.goldLight, 0.13);
+    for (const r of sunRays(VIEW_W / 2, MASTER.sunY, MASTER.rays, MASTER.rayReach, this.t * MASTER.raySpeed)) this.rays.fillTriangle(r.x1, r.y1, r.x2, r.y2, r.x3, r.y3);
   }
 
   update(_time: number, delta: number): void {
     const dt = delta / 1000;
     this.t += dt;
     this.parallax.update(150, SCROLL_Y0, dt);
+    this.drawRays();
     // Idle engines: the bodies rock a pixel on their suspension.
     for (const b of this.bodies) b.img.y = b.baseY + Math.sin(this.t * 7 + b.phase) * 0.8;
     const e = this.edges.update(padButtons(firstPad()));
@@ -181,7 +219,7 @@ export class MenuScene extends Phaser.Scene {
     this.sound.volume = settings.master;
     // Switching god mode off plays the jingle a fourth lower.
     this.sound.play(sfxCacheKey('cheat'), { volume: Math.min(1, SFX.cheat.volume * settings.sfx * 2), rate: id === 'god' && !result.on ? 0.75 : 1 });
-    this.showToast(result.message);
+    this.showToast(t(result.messageKey));
     this.drawGodBadge();
   }
 
@@ -199,7 +237,7 @@ export class MenuScene extends Phaser.Scene {
     this.godBadge = null;
     if (!isGodMode()) return;
     const l = this.add.container(0, 0).setDepth(20).setScrollFactor(0);
-    label(this, l, VIEW_W - 22, 50, 'GOD MODE', 'display', 14, '#7dff8a', 1, 3);
+    label(this, l, VIEW_W - 22, 50, t('menu.godMode'), 'display', 14, '#7dff8a', 1, 3);
     this.godBadge = l;
   }
 
@@ -225,9 +263,29 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
+  /** Gold-trimmed logo with a trophy on each side, the title of the special screen and the achievement tally. */
+  private drawMasterHeader(): void {
+    const cx = VIEW_W / 2;
+    const g = this.add.graphics();
+    // A gold frame around the usual plate, so it reads as a champion's badge.
+    g.fillStyle(UI.outline, 1);
+    g.fillRoundedRect(cx - 250, 38, 500, 108, 20);
+    g.fillStyle(MASTER.gold, 1);
+    g.fillRoundedRect(cx - 246, 42, 492, 100, 17);
+    g.fillStyle(MASTER.goldLight, 1);
+    g.fillRoundedRect(cx - 240, 46, 480, 10, 5);
+    this.layer.add(g);
+    logoPlate(this, this.layer, cx, 92, 460, 92, t('master.title'));
+    trophy(this, this.layer, cx - 292, 92, 1, 78);
+    trophy(this, this.layer, cx + 292, 92, 1, 78);
+    label(this, this.layer, cx, 172, t('master.subtitle'), 'display', 18, MASTER.goldInk, 0.5, 4);
+    label(this, this.layer, cx, 198, t('master.stats', { done: ACHIEVEMENTS.length, total: ACHIEVEMENTS.length }), 'body', 16, INK.soft, 0.5, 3);
+  }
+
   private draw(): void {
     this.layer.removeAll(true);
-    logoPlate(this, this.layer, VIEW_W / 2, 92, 460, 92, 'OFF-ROAD RACING');
+    if (this.master) this.drawMasterHeader();
+    else logoPlate(this, this.layer, VIEW_W / 2, 92, 460, 92, t('menu.subtitle'));
     const w = 200;
     const gap = 22;
     const x0 = VIEW_W / 2 - (MENU_ITEMS.length * w + (MENU_ITEMS.length - 1) * gap) / 2 + w / 2;
@@ -237,10 +295,10 @@ export class MenuScene extends Phaser.Scene {
         y: 476,
         w,
         h: 54,
-        text: m.text,
+        text: t(m.key),
         hint: m.hint,
         selected: i === this.index,
-        accent: m.accent,
+        accent: this.master ? MASTER.gold : m.accent,
         size: 20,
         onHover: () => {
           if (this.index !== i) {

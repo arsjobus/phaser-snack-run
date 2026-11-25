@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { VIEW_H, VIEW_W } from '../config';
+import { t } from '../i18n';
 import { INK, UI, checkerSquares, hazardStripes, rankColor, textStyle, type TextKind } from './Theme';
 
 /**
@@ -160,7 +161,7 @@ export function button(scene: Phaser.Scene, layer: Layer, b: ButtonSpec): void {
  * keyboard cursor is on it.
  */
 export const BACK_BUTTON = { w: 220, h: 44, size: 18 } as const;
-export function backButton(scene: Phaser.Scene, layer: Layer, x: number, y: number, onClick: () => void, focus = false, text = 'BACK'): void {
+export function backButton(scene: Phaser.Scene, layer: Layer, x: number, y: number, onClick: () => void, focus = false, text = t('common.back')): void {
   if (focus) {
     const g = scene.add.graphics();
     g.lineStyle(3, UI.white, 1);
@@ -379,7 +380,7 @@ export function scorePlate(scene: Phaser.Scene, layer: Layer, x: number, y: numb
     for (const poly of hazardStripes(x + 4, sy, w - 8, 6, 6)) g.fillPoints(poly, true);
   }
   layer.add(g);
-  label(scene, layer, x + 16, y + h / 2 + 1, 'SCORE', 'display', 13, INK.cyan, 0);
+  label(scene, layer, x + 16, y + h / 2 + 1, t('ui.score'), 'display', 13, INK.cyan, 0);
   return label(scene, layer, x + w - 16, y + h / 2 + 2, value, 'display', 30, hot ? INK.title : INK.text, 1, 4);
 }
 

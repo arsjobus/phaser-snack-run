@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { CHECKPOINT, FUEL, VIEW_H, VIEW_W } from '../config';
+import { t } from '../i18n';
 import { FONT_BODY, FONT_DISPLAY } from '../ui/Fonts';
-import { NeedleSpring, blinkLit, formatClock, needleAngle } from './HudModel';
+import { NeedleSpring, blinkLit, formatClock, formatDistance, needleAngle } from './HudModel';
 
 export const HUD_H = 72;
 
@@ -81,12 +82,12 @@ export class Hud {
       st.strokeRoundedRect(x, this.top + 6, w, 60, 14);
     }
 
-    this.texts.fuelTitle = this.dialFace(st, 222, 'FUEL', 'E', 'F', [
+    this.texts.fuelTitle = this.dialFace(st, 222, t('hud.fuel'), 'E', 'F', [
       [0, FUEL.low, RED],
       [FUEL.low, 0.5, YELLOW],
       [0.5, 1, GREEN],
     ]);
-    this.dialFace(st, 322, 'DAMAGE', '0', 'X', [
+    this.dialFace(st, 322, t('hud.damage'), '0', 'X', [
       [0, 0.5, GREEN],
       [0.5, 0.75, YELLOW],
       [0.75, 1, RED],
@@ -96,12 +97,12 @@ export class Hud {
     const cx0 = PANELS.clock[0];
     st.lineStyle(1, RIM, 0.35);
     st.lineBetween(cx0 + 84, this.top + 14, cx0 + 84, this.top + 44);
-    this.label(cx0 + 42, this.top + 15, 'C.P.', '#9fb4e8', 13, true);
-    this.label(cx0 + 127, this.top + 15, 'TIME', '#9fb4e8', 13, true);
+    this.label(cx0 + 42, this.top + 15, t('hud.cp'), '#9fb4e8', 13, true);
+    this.label(cx0 + 127, this.top + 15, t('hud.time'), '#9fb4e8', 13, true);
 
-    this.label(PANELS.distance[0] + 70, this.top + 15, 'DISTANCE', '#9fb4e8', 13, true);
-    this.label(PANELS.score[0] + 65, this.top + 15, 'SCORE', '#9fb4e8', 13, true);
-    this.label(PANELS.combo[0] + 45, this.top + 15, 'COMBO', '#9fb4e8', 13, true);
+    this.label(PANELS.distance[0] + 70, this.top + 15, t('hud.distance'), '#9fb4e8', 13, true);
+    this.label(PANELS.score[0] + 65, this.top + 15, t('hud.score'), '#9fb4e8', 13, true);
+    this.label(PANELS.combo[0] + 45, this.top + 15, t('hud.combo'), '#9fb4e8', 13, true);
 
     this.dyn = scene.add.graphics().setScrollFactor(0).setDepth(21);
     this.texts.cp = this.value(cx0 + 42, this.top + 38, 26);
@@ -229,7 +230,7 @@ export class Hud {
     t.clock.setColor(urgent ? (lit ? '#ff6a5a' : '#8a3028') : pulsing ? '#ffe066' : '#ffffff');
     t.combo.setText(s.multiplier > 1 ? `x${s.multiplier}` : '--');
     t.combo.setColor(s.multiplier >= 8 ? '#ff7a45' : s.multiplier > 1 ? '#ffe066' : '#6b7aa8');
-    t.dist.setText(String(Math.floor(s.meters)).padStart(4, '0') + ' m');
+    t.dist.setText(formatDistance(s.meters));
     t.speed.setText(`${Math.round(s.speedKmh)} km/h`);
     t.score.setText(String(s.score).padStart(6, '0'));
     t.bonus.setText(`BONUS ${s.bonus}`);

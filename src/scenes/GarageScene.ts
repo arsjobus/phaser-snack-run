@@ -20,6 +20,8 @@ import { PadEdges, firstPad, padButtons } from '../input/Gamepad';
 import { INK, LIST, UI, listRows, paginate, plateInner, rowY, wrapIndex } from '../ui/Theme';
 import { bottomBar, button, coinIcon, flatBackdrop, label, panel, pips, rowPlate, topBar, trophy, type Layer } from '../ui/Ui';
 import { applyView } from '../ui/Resolution';
+import { t } from '../i18n';
+import { achievementName, achievementText, skinName, upgradeBlurb, upgradeName } from '../i18n/names';
 
 const TABS = ['UPGRADES', 'PAINT', 'SCORES', 'ACHIEVEMENTS'] as const;
 type Tab = (typeof TABS)[number];
@@ -136,7 +138,7 @@ export class GarageScene extends Phaser.Scene {
     this.tab = 'UPGRADES';
     this.row = 0;
     this.achPage = 0;
-    this.message = 'Progress reset. Back to the start.';
+    this.message = t('garage.progressReset');
     this.draw();
   }
 
@@ -169,20 +171,20 @@ export class GarageScene extends Phaser.Scene {
     if (this.tab === 'UPGRADES') {
       const id = UPGRADE_IDS[this.row];
       const ok = buyUpgrade(this.save, id);
-      this.message = ok ? `${PROGRESSION.upgrades[id].name} upgraded!` : upgradeCost(id, this.save.upgrades[id]) === null ? 'Already maxed.' : 'Not enough coins.';
+      this.message = ok ? t('garage.upgraded', { name: upgradeName(id) }) : upgradeCost(id, this.save.upgrades[id]) === null ? t('garage.alreadyMaxed') : t('garage.notEnough');
     } else if (this.tab === 'PAINT') {
       const skin = SKINS[this.row];
       if (this.save.ownedSkins.includes(skin.id)) {
         equipSkin(this.save, skin.id);
-        this.message = `${skin.name} equipped.`;
+        this.message = t('garage.equipped', { name: skinName(skin) });
       } else {
-        this.message = buySkin(this.save, skin.id) ? `${skin.name} bought and equipped!` : 'Not enough coins.';
+        this.message = buySkin(this.save, skin.id) ? t('garage.boughtEquipped', { name: skinName(skin) }) : t('garage.notEnough');
       }
     } else {
       return;
     }
     const fresh = unlockAchievements(this.save, null, day);
-    if (fresh.length) this.message += '  ' + fresh.map((a) => `ACHIEVEMENT: ${a.name} +${a.reward}`).join('  ');
+    if (fresh.length) this.message += '  ' + fresh.map((a) => t('ach.toastShort', { name: achievementName(a), reward: a.reward })).join('  ');
     writeSave(this.store, this.save);
     this.draw();
   }
@@ -193,7 +195,7 @@ export class GarageScene extends Phaser.Scene {
 
   private draw(): void {
     this.layer.removeAll(true);
-    topBar(this, this.layer, 'GARAGE');
+    topBar(this, this.layer, t('garage.title'));
     // The coin icon says "bank" on its own: just the amount, with the same 24 px margin as the lists.
     this.text(VIEW_W - 24 - 40, 30, String(this.save.coins), 22, INK.good, 1, true);
     coinIcon(this, this.layer, VIEW_W - 24 - 14, 30, 12);
@@ -207,7 +209,7 @@ export class GarageScene extends Phaser.Scene {
         y: 102,
         w: tabW,
         h: 34,
-        text: name,
+        text: t(`garage.tab.${name}`),
         size: 15,
         selected: name === this.tab,
         onClick: () => {
@@ -229,13 +231,13 @@ export class GarageScene extends Phaser.Scene {
     const bw = 250;
     const gap = (COL_W - bw * 3) / 2;
     const bx = (i: number) => COL_L + bw / 2 + i * (bw + gap);
-    button(this, this.layer, { x: bx(0), y: 482, w: bw, h: 38, text: 'DRIVE', hint: 'SPACE', size: 16, selected: true, onClick: () => this.scene.start('Game') });
-    button(this, this.layer, { x: bx(1), y: 482, w: bw, h: 38, text: 'BACK TO MENU', hint: 'ESC', size: 16, onClick: () => this.scene.start('Menu') });
-    button(this, this.layer, { x: bx(2), y: 482, w: bw, h: 38, text: 'RESET PROGRESS', hint: 'R', size: 15, accent: UI.red, onClick: () => this.openConfirm() });
+    button(this, this.layer, { x: bx(0), y: 482, w: bw, h: 38, text: t('garage.drive'), hint: 'SPACE', size: 16, selected: true, onClick: () => this.scene.start('Game') });
+    button(this, this.layer, { x: bx(1), y: 482, w: bw, h: 38, text: t('garage.backToMenu'), hint: 'ESC', size: 16, onClick: () => this.scene.start('Menu') });
+    button(this, this.layer, { x: bx(2), y: 482, w: bw, h: 38, text: t('garage.resetProgress'), hint: 'R', size: 15, accent: UI.red, onClick: () => this.openConfirm() });
     bottomBar(
       this,
       this.layer,
-      this.confirming ? 'LEFT/RIGHT pick   ENTER choose   Y erase   N or ESC cancel' : `LEFT/RIGHT tab   UP/DOWN ${this.tab === 'ACHIEVEMENTS' ? 'page' : 'pick'}   ENTER buy / equip   R reset progress   O settings`,
+      this.confirming ? t('garage.hintConfirm') : this.tab === 'ACHIEVEMENTS' ? t('garage.hintPage') : t('garage.hintPick'),
     );
     if (this.confirming) this.drawConfirm();
   }
@@ -248,14 +250,14 @@ export class GarageScene extends Phaser.Scene {
     const h = 214;
     const cx = VIEW_W / 2;
     const cy = 270;
-    panel(this, this.layer, cx - w / 2, cy - h / 2, w, h, 'RESET PROGRESS');
+    panel(this, this.layer, cx - w / 2, cy - h / 2, w, h, t('garage.confirmTitle'));
     const inner = plateInner(cx, w);
     this.text(cx, cy - 46, 'Erase everything?', 26, INK.title, 0.5, true);
-    const body = this.text(cx, cy - 4, 'Your coins, upgrades, paint, high scores, stats and achievements are deleted. Settings and key bindings stay. This cannot be undone.', 16, INK.soft, 0.5);
+    const body = this.text(cx, cy - 4, t('garage.confirmBody'), 16, INK.soft, 0.5);
     body.setAlign('center').setWordWrapWidth(inner.right - inner.left);
     const bw = 220;
-    button(this, this.layer, { x: cx - bw / 2 - 10, y: cy + 64, w: bw, h: 40, text: 'KEEP IT', hint: 'N', size: 16, selected: this.confirmFocus === 0, onClick: () => this.closeConfirm() });
-    button(this, this.layer, { x: cx + bw / 2 + 10, y: cy + 64, w: bw, h: 40, text: 'ERASE ALL', hint: 'Y', size: 16, selected: this.confirmFocus === 1, accent: UI.red, onClick: () => this.eraseProgress() });
+    button(this, this.layer, { x: cx - bw / 2 - 10, y: cy + 64, w: bw, h: 40, text: t('garage.keepIt'), hint: 'N', size: 16, selected: this.confirmFocus === 0, onClick: () => this.closeConfirm() });
+    button(this, this.layer, { x: cx + bw / 2 + 10, y: cy + 64, w: bw, h: 40, text: t('garage.eraseAll'), hint: 'Y', size: 16, selected: this.confirmFocus === 1, accent: UI.red, onClick: () => this.eraseProgress() });
   }
 
   /** A price: the number with the snack-coin icon after it, right-aligned at `x`. */
@@ -291,16 +293,16 @@ export class GarageScene extends Phaser.Scene {
       const level = this.save.upgrades[id];
       const y = rows.y(i);
       this.rowBox(i, y, rows.h);
-      this.text(left, y - 11, u.name, 20, INK.text, 0, true);
-      this.text(left, y + 14, u.blurb, 15, INK.soft);
+      this.text(left, y - 11, upgradeName(id), 20, INK.text, 0, true);
+      this.text(left, y + 14, upgradeBlurb(id), 15, INK.soft);
       pips(this, this.layer, pipsX, y, level, u.max);
       const cost = upgradeCost(id, level);
       const afford = cost !== null && this.save.coins >= cost;
-      if (cost === null) this.text(right, y, 'MAXED', 18, INK.cyan, 1, true);
+      if (cost === null) this.text(right, y, t('common.maxed'), 18, INK.cyan, 1, true);
       else this.price(right, y, cost, afford ? INK.good : INK.bad);
     });
-    this.text(left, 376, 'Earn coins by driving: snacks, distance, checkpoints, takedowns and close calls.', 15, INK.dim);
-    this.text(left, 400, 'Each level costs more than the last, and the best paint jobs cost the most.', 15, INK.dim);
+    this.text(left, 376, t('garage.tip1'), 15, INK.dim);
+    this.text(left, 400, t('garage.tip2'), 15, INK.dim);
   }
 
   private drawPaint(): void {
@@ -312,9 +314,9 @@ export class GarageScene extends Phaser.Scene {
       const owned = this.save.ownedSkins.includes(skin.id);
       const worn = this.save.skin === skin.id;
       this.layer.add(this.add.image(left + 56, y + 4, playerTruckKey(skin.id)).setScale(0.5));
-      this.text(left + 140, y, skin.name, 20, INK.text, 0, true);
-      if (worn) this.text(right, y, 'EQUIPPED', 18, INK.cyan, 1, true);
-      else if (owned) this.text(right, y, 'OWNED', 18, INK.soft, 1, true);
+      this.text(left + 140, y, skinName(skin), 20, INK.text, 0, true);
+      if (worn) this.text(right, y, t('garage.equippedTag'), 18, INK.cyan, 1, true);
+      else if (owned) this.text(right, y, t('garage.owned'), 18, INK.soft, 1, true);
       else this.price(right, y, skin.cost, this.save.coins >= skin.cost ? INK.good : INK.bad);
     });
   }
@@ -328,15 +330,15 @@ export class GarageScene extends Phaser.Scene {
     const scoreW = 590;
     const lifeX = COL_L + scoreW + 24;
     const lifeW = COL_R - lifeX;
-    panel(this, this.layer, COL_L, top, scoreW, h, 'HIGH SCORES');
+    panel(this, this.layer, COL_L, top, scoreW, h, t('garage.highScores'));
     const inL = COL_L + LIST.padX;
     if (this.save.highScores.length === 0) this.text(inL, top + 52, 'No runs yet. Go drive!', 18, INK.soft);
     // Column heads, then one row per run: medal, score, distance, snacks, date.
     const cols = { score: inL + 190, meters: inL + 290, snacks: inL + 370, date: inL + 400 } as const;
-    this.text(cols.score, top + 28, 'SCORE', 13, INK.cyan, 1);
-    this.text(cols.meters, top + 28, 'DIST', 13, INK.cyan, 1);
-    this.text(cols.snacks, top + 28, 'SNACKS', 13, INK.cyan, 1);
-    this.text(cols.date, top + 28, 'DATE', 13, INK.cyan, 0);
+    this.text(cols.score, top + 28, t('garage.col.score'), 13, INK.cyan, 1);
+    this.text(cols.meters, top + 28, t('common.dist'), 13, INK.cyan, 1);
+    this.text(cols.snacks, top + 28, t('garage.col.snacks'), 13, INK.cyan, 1);
+    this.text(cols.date, top + 28, t('garage.col.date'), 13, INK.cyan, 0);
     this.save.highScores.forEach((h2, i) => {
       const y = rowY(top + 52, 21.5, i);
       const color = i === 0 ? INK.title : INK.soft;
@@ -346,11 +348,11 @@ export class GarageScene extends Phaser.Scene {
       this.text(cols.snacks, y, String(h2.snacks), 16, color, 1);
       this.text(cols.date, y, h2.date, 15, color, 0);
     });
-    panel(this, this.layer, lifeX, top, lifeW, h, 'LIFETIME');
+    panel(this, this.layer, lifeX, top, lifeW, h, t('garage.lifetime'));
     this.text(
       lifeX + LIST.padX,
       top + h / 2 + 4,
-      [`runs  ${st.runs}`, `distance  ${(st.meters / 1000).toFixed(1)} km`, `snacks  ${st.snacks}`, `takedowns  ${st.takedowns}`, `close calls  ${st.nearMisses}`, `lane changes  ${st.laneChanges}`, `best air  ${st.bestAir.toFixed(2)} s`, `best chain  ${st.bestChain}`, `coins earned  ${st.coinsEarned}`],
+      [t('garage.life.runs', { n: st.runs }), t('garage.life.distance', { n: (st.meters / 1000).toFixed(1) }), t('garage.life.snacks', { n: st.snacks }), t('garage.life.takedowns', { n: st.takedowns }), t('garage.life.closeCalls', { n: st.nearMisses }), t('garage.life.laneChanges', { n: st.laneChanges }), t('garage.life.bestAir', { n: st.bestAir.toFixed(2) }), t('garage.life.bestChain', { n: st.bestChain }), t('garage.life.coins', { n: st.coinsEarned })],
       17,
       INK.soft,
     );
@@ -361,12 +363,12 @@ export class GarageScene extends Phaser.Scene {
     const pg = paginate(ACHIEVEMENTS.length, ACH_PER_PAGE, this.achPage);
     this.achPage = pg.page;
     const headL = COL_L + LIST.padX;
-    this.text(headL, 148, `ACHIEVEMENTS  ${got} / ${ACHIEVEMENTS.length}`, 16, INK.cyan, 0, true);
+    this.text(headL, 148, t('garage.ach.header', { got, total: ACHIEVEMENTS.length }), 16, INK.cyan, 0, true);
     // Pager: PREV / NEXT with the page number between them, on the right edge of the column.
     const pw = 84;
-    button(this, this.layer, { x: COL_R - LIST.padX - pw / 2, y: 148, w: pw, h: 26, text: 'NEXT', size: 13, onClick: () => this.setAchPage(this.achPage + 1) });
-    this.text(COL_R - LIST.padX - pw - 52, 148, `PAGE ${pg.page + 1} / ${pg.pages}`, 14, INK.soft, 0.5, true);
-    button(this, this.layer, { x: COL_R - LIST.padX - pw - 104 - pw / 2, y: 148, w: pw, h: 26, text: 'PREV', size: 13, onClick: () => this.setAchPage(this.achPage - 1) });
+    button(this, this.layer, { x: COL_R - LIST.padX - pw / 2, y: 148, w: pw, h: 26, text: t('garage.ach.next'), size: 13, onClick: () => this.setAchPage(this.achPage + 1) });
+    this.text(COL_R - LIST.padX - pw - 52, 148, t('garage.ach.page', { page: pg.page + 1, pages: pg.pages }), 14, INK.soft, 0.5, true);
+    button(this, this.layer, { x: COL_R - LIST.padX - pw - 104 - pw / 2, y: 148, w: pw, h: 26, text: t('garage.ach.prev'), size: 13, onClick: () => this.setAchPage(this.achPage - 1) });
 
     // Three rows of two plates, 78 px tall so a name and a two-line description sit with a real gutter
     // above and below, `LIST.rowGap` apart both ways.
@@ -387,10 +389,11 @@ export class GarageScene extends Phaser.Scene {
       this.layer.add(g);
       const tx = inner.left + 34;
       const rewardRight = inner.right - 22;
-      this.text(tx, y - rows.h * 0.27, a.name, 17, done ? INK.title : INK.dim, 0, true);
+      const hide = !!a.hidden && !done;
+      this.text(tx, y - rows.h * 0.27, hide ? t('garage.ach.hiddenName') : achievementName(a), 17, done ? INK.title : INK.dim, 0, true);
       coinIcon(this, this.layer, inner.right - 8, y - rows.h * 0.27, 8);
       this.text(rewardRight, y - rows.h * 0.27, `+${a.reward}`, 15, done ? INK.good : INK.dim, 1, true);
-      const desc = this.text(tx, y + rows.h * 0.14, a.description, 14, done ? INK.soft : '#7684ad');
+      const desc = this.text(tx, y + rows.h * 0.14, hide ? t('garage.ach.hiddenDesc') : achievementText(a), 14, done ? INK.soft : '#7684ad');
       desc.setWordWrapWidth(inner.right - tx);
     });
   }

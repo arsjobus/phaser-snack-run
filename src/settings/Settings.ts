@@ -1,3 +1,4 @@
+import { DEFAULT_LOCALE, isLocaleAvailable } from '../i18n';
 import type { KeyValueStore } from '../progress/Storage';
 
 /** Player settings (Phase 8): volumes, comfort options, quality, touch and remappable keys. */
@@ -5,7 +6,7 @@ import type { KeyValueStore } from '../progress/Storage';
 export const SETTINGS_KEY = 'snack-run:settings';
 
 /** The rebindable in-run actions. Menu keys (Space/Enter, G, D, O, Esc) are fixed. */
-export const ACTIONS = ['gas', 'brake', 'far', 'near', 'reset', 'mute', 'music', 'debug'] as const;
+export const ACTIONS = ['gas', 'brake', 'far', 'near', 'mute', 'music', 'debug'] as const;
 export type Action = (typeof ACTIONS)[number];
 
 export const ACTION_LABELS: Record<Action, string> = {
@@ -13,7 +14,6 @@ export const ACTION_LABELS: Record<Action, string> = {
   brake: 'Brake / reverse',
   far: 'Drift away from camera',
   near: 'Drift towards camera',
-  reset: 'Reset upright',
   mute: 'Mute all',
   music: 'Music on/off',
   debug: 'Debug overlay',
@@ -27,7 +27,6 @@ export const DEFAULT_BINDINGS: Readonly<Bindings> = {
   brake: ['ArrowLeft', 'KeyA'],
   far: ['ArrowUp', 'KeyW', 'KeyQ'],
   near: ['ArrowDown', 'KeyS', 'KeyE'],
-  reset: ['KeyR'],
   mute: ['KeyM'],
   music: ['KeyN'],
   debug: ['KeyH'],
@@ -52,6 +51,8 @@ export interface Settings {
   colorblind: boolean;
   effects: EffectsLevel;
   touch: TouchMode;
+  /** Code of a language that has a locale file (`src/i18n/locales`). */
+  language: string;
   bindings: Bindings;
 }
 
@@ -64,6 +65,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   colorblind: false,
   effects: 'auto',
   touch: 'auto',
+  language: DEFAULT_LOCALE,
   bindings: DEFAULT_BINDINGS,
 };
 
@@ -94,6 +96,7 @@ export function sanitizeSettings(raw: unknown): Settings {
   s.colorblind = flag(r.colorblind, s.colorblind);
   s.effects = pick(r.effects, ['auto', 'full', 'reduced'] as const, s.effects);
   s.touch = pick(r.touch, ['auto', 'on', 'off'] as const, s.touch);
+  s.language = isLocaleAvailable(r.language) ? r.language : s.language;
   const rb = r.bindings && typeof r.bindings === 'object' ? (r.bindings as Record<string, unknown>) : {};
   // Every action keeps at least one key and no key runs two actions: the first claim on a key wins,
   // and an action left without keys gets its defaults that are still free.

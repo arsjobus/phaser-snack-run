@@ -609,8 +609,18 @@ export const PROGRESSION = {
    * with more fuel); efficiency = less fuel burned; armor = less damage taken.
    */
   upgrades: {
-    tank: { name: 'Tank size', blurb: '+20% capacity per level', max: 5, cost: 330, growth: 1.8, perLevel: 0.2 },
-    efficiency: { name: 'Fuel efficiency', blurb: '-7% fuel burned per level', max: 5, cost: 260, growth: 1.8, perLevel: 0.07 },
-    armor: { name: 'Damage resistance', blurb: '-8% damage taken per level', max: 5, cost: 310, growth: 1.8, perLevel: 0.08 },
+    tank: { name: 'Tank size', blurb: '+20% capacity per level', max: 5, cost: 1800, growth: 1.9, perLevel: 0.2 },
+    efficiency: { name: 'Fuel efficiency', blurb: '-7% fuel burned per level', max: 5, cost: 1400, growth: 1.9, perLevel: 0.07 },
+    armor: { name: 'Damage resistance', blurb: '-8% damage taken per level', max: 5, cost: 1600, growth: 1.9, perLevel: 0.08 },
+  },
+  /**
+   * Pacing target for the garage prices. A good early run banks about 2000 coins in 3 minutes, so the
+   * whole shop (every upgrade level plus every paint job) is priced to take 3 to 4 hours of play at
+   * that rate. `tests/economy.test.ts` fails if a price change drifts outside the window.
+   */
+  pacing: {
+    coinsPerMinute: 2000 / 3,
+    minHours: 3,
+    maxHours: 4,
   },
 } as const;

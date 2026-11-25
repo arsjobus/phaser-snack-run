@@ -52,6 +52,8 @@ export interface CheatResult {
   id: CheatId;
   /** The words for the toast on the start screen. */
   message: string;
+  /** Locale key of the same message (what the game shows). */
+  messageKey: string;
   /** For toggles: the new state. */
   on?: boolean;
 }
@@ -62,13 +64,13 @@ export function applyCheat(save: SaveData, id: CheatId): CheatResult {
     case 'god':
       // Not saved: this switch lasts for the page only, so a reload turns it off again.
       setGodMode(!isGodMode());
-      return { id, on: isGodMode(), message: isGodMode() ? 'GOD MODE ON' : 'GOD MODE OFF' };
+      return { id, on: isGodMode(), message: isGodMode() ? 'GOD MODE ON' : 'GOD MODE OFF', messageKey: isGodMode() ? 'cheat.godOn' : 'cheat.godOff' };
     case 'unlock':
       for (const u of UPGRADE_IDS) save.upgrades[u] = PROGRESSION.upgrades[u].max;
       for (const s of SKINS) if (!save.ownedSkins.includes(s.id)) save.ownedSkins.push(s.id);
-      return { id, message: 'EVERYTHING UNLOCKED' };
+      return { id, message: 'EVERYTHING UNLOCKED', messageKey: 'cheat.unlock' };
     case 'coins':
       save.coins = Math.max(save.coins, CHEAT_MAX_COINS);
-      return { id, message: 'MAX COINS' };
+      return { id, message: 'MAX COINS', messageKey: 'cheat.coins' };
   }
 }
