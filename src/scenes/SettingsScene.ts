@@ -39,7 +39,7 @@ type Row =
 export class SettingsScene extends Phaser.Scene {
   private store: KeyValueStore = defaultStore();
   private settings!: Settings;
-  private from = 'Game';
+  private from = 'Menu';
   private row = 0;
   private rebinding: Action | null = null;
   private layer!: Layer;
@@ -51,7 +51,7 @@ export class SettingsScene extends Phaser.Scene {
   }
 
   init(data?: { from?: string }): void {
-    this.from = data?.from ?? 'Game';
+    this.from = data?.from ?? 'Menu';
   }
 
   create(): void {
@@ -175,7 +175,7 @@ export class SettingsScene extends Phaser.Scene {
     this.input.keyboard?.off('keydown');
     if (this.from === 'Menu') this.scene.start('Menu');
     else if (this.from === 'Garage') this.scene.start('Garage');
-    else this.scene.start('Game');
+    else this.scene.start('Menu'); // from the game-over screen (or anywhere else): back to the start menu
   }
 
   /** Rows 0 to `LEFT_ROWS - 1` are the left column (sound and screen), the rest the right column (keys). */

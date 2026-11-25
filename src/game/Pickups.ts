@@ -112,8 +112,9 @@ export class PickupField {
   }
 
   /**
-   * Marks and returns the pickups within reach of (x, y). Snacks can be grabbed from any lane;
-   * fuel and wrenches also require the truck to be in the pickup's lane when `lane` is provided.
+   * Marks and returns the pickups within reach of (x, y). Snacks can be grabbed from any lane unless
+   * `PICKUPS.snacksFromAnyLane` is switched off; fuel and wrenches always require the truck to be in
+   * the pickup's lane when `lane` is provided.
    */
   collect(x: number, y: number, lane?: number, band = Infinity): Pickup[] {
     const got: Pickup[] = [];
@@ -121,7 +122,7 @@ export class PickupField {
     for (const p of this.items) {
       if (p.taken || p.missed) continue;
       if (lane !== undefined && Math.abs(p.lane - lane) >= band) continue;
-      if (lane !== undefined && p.kind !== 'snack' && !sameLane(p.lane, lane)) continue;
+      if (lane !== undefined && (p.kind !== 'snack' || !PICKUPS.snacksFromAnyLane) && !sameLane(p.lane, lane)) continue;
       const dx = p.x - x;
       const dy = p.y - y;
       if (dx * dx + dy * dy <= r2) {

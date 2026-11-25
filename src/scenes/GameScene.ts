@@ -61,7 +61,7 @@ import { loadSave, perksFor, recordRun, writeSave, type RunResult, type SaveData
 import { defaultStore, type KeyValueStore } from '../progress/Storage';
 import { FONT_BODY, FONT_DISPLAY } from '../ui/Fonts';
 import { INK, UI } from '../ui/Theme';
-import { button, coinIcon, label, panel, rowPlate, scorePlate, statTile, trophy, type Layer, type StatGlyph } from '../ui/Ui';
+import { button, coinIcon, label, panel, podiumIcon, rowPlate, scorePlate, statTile, trophy, type Layer, type StatGlyph } from '../ui/Ui';
 import { applyView, toLogical } from '../ui/Resolution';
 
 const FIXED_DT = 1 / 60 / PHYSICS.substeps;
@@ -74,6 +74,27 @@ interface WreckSprite {
 }
 
 const TITLES = { fuel: 'OUT OF FUEL', time: 'TIME UP', wreck: 'WRECKED' } as const;
+
+/** How long the how-to-play text lingers after the first gas or brake input before it fades. */
+const HINT_FADE_DELAY_MS = 2500;
+
+/**
+ * The game-over layout grid (px): a 764 px content box inside the panel, two columns with a 24 px
+ * gutter, and the rows of both columns ending on the same line.
+ */
+const GAME_OVER_GRID = {
+  left: 98,
+  totalW: 764,
+  leftW: 380,
+  right: 502,
+  rightW: 360,
+  tileW: 183,
+  tileColGap: 14,
+  tileRowGap: 8,
+  tileH: 46,
+  tilesTop: 150,
+  rowsTop: 124,
+} as const;
 
 export class GameScene extends Phaser.Scene {
   private terrain!: Terrain;
@@ -125,6 +146,8 @@ export class GameScene extends Phaser.Scene {
   private padEdges = new PadEdges();
   private touchView!: TouchView;
   private touchedOnce = false;
+  /** Set once the first gas or brake input has started the how-to-play text fading. */
+  private hintFading = false;
   private paused = false;
   private pauseLayer: Phaser.GameObjects.Container | null = null;
   private gameOverButtonLayer: Layer | null = null;
@@ -299,7 +322,8 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(10)
       .setAlpha(0);
-    this.tweens.add({ targets: this.hint, alpha: 0, delay: 9000, duration: 1200 });
+    // The how-to-play text stays until the player first gives gas or brake (see `fadeHintOnFirstInput`).
+    this.hintFading = false;
 
     const kb = this.input.keyboard!;
     // Driving keys are rebindable, so they are tracked by key code (see src/input); the menu keys are fixed.
@@ -336,6 +360,14 @@ export class GameScene extends Phaser.Scene {
       { gas: this.held.gas, brake: this.held.brake },
       this.run.engineOn, // a dry tank means no throttle and no brake torque
     );
+  }
+
+  /** Keeps the how-to-play text up until the player first presses gas or brake, then fades it out. */
+  private fadeHintOnFirstInput(): void {
+    if (this.hintFading || this.run.over || this.paused) return;
+    if (this.held.gas <= 0 && this.held.brake <= 0) return;
+    this.hintFading = true;
+    this.tweens.add({ targets: this.hint, alpha: 0, delay: HINT_FADE_DELAY_MS, duration: 1200 });
   }
 
   /** The control reminder under the action: the player's own keys, or the touch buttons. */
@@ -392,6 +424,7 @@ export class GameScene extends Phaser.Scene {
     const dt = realDt * this.showCam.timeScale;
     const J = Phaser.Input.Keyboard.JustDown;
     const pad = this.pollInput();
+    this.fadeHintOnFirstInput();
     const b = this.settings.bindings;
     const pressed = (a: Parameters<typeof actionPressed>[2]) => actionPressed(this.tracker, b, a);
     if (this.paused) {
@@ -411,7 +444,7 @@ export class GameScene extends Phaser.Scene {
       else if (J(this.keys.G) || pad.garage) this.scene.start('Garage');
       else if (J(this.keys.O) || pad.settings) this.scene.start('Settings', { from: 'Game' });
       else if (J(this.keys.ESC) || (pad.back && this.time.now - this.overAt > 400)) this.scene.start('Menu');
-      else if (pressed('reset') || J(this.keys.SPACE) || J(this.keys.ENTER)) this.restart();
+      else if (J(this.keys.SPACE) || J(this.keys.ENTER)) this.restart(); // R no longer restarts (it only resets the truck upright mid-run)
       else if (pad.confirm) this.activateGameOverSelection();
     } else {
       if (pressed('reset') || pad.reset) this.recover();
@@ -1268,13 +1301,14 @@ export class GameScene extends Phaser.Scene {
       label(this, layer, x, y, text, kind, size, color, ox);
 
     const title = TITLES[this.run.endReason ?? 'fuel'];
-    put(cx, 56, title, 'display', 34, INK.red);
+    put(cx, 50, title, 'display', 34, INK.red);
     const sm = this.run.summary();
 
-    // Left: the run report. A striped score plate that counts up, then eight stat tiles with icons.
-    const lx = 104;
-    const colW = 190;
-    const scoreText = scorePlate(this, layer, lx, 84, colW * 2 + 10, 56, this.settings.reducedMotion ? String(s.total) : '0', result.newBestScore);
+    // Layout grid: the panel's content box is 764 px wide (28 px in from the rim on both sides), split
+    // into a 380 px left column and a 360 px right column with a 24 px gutter. The coin strip spans
+    // both, and the four buttons divide the same 764 px, so every edge lines up.
+    const L = GAME_OVER_GRID;
+    const scoreText = scorePlate(this, layer, L.left, 80, L.leftW, 54, this.settings.reducedMotion ? String(s.total) : '0', result.newBestScore);
     if (!this.settings.reducedMotion) {
       const counter = { v: 0 };
       this.tweens.add({
@@ -1288,12 +1322,13 @@ export class GameScene extends Phaser.Scene {
     }
     if (result.newBestScore) {
       const g = this.add.graphics();
+      const bx = L.left + L.leftW - 120;
       g.fillStyle(UI.outline, 1);
-      g.fillRoundedRect(lx + colW * 2 + 10 - 118, 70, 112, 24, 6);
+      g.fillRoundedRect(bx, 66, 114, 24, 8);
       g.fillStyle(UI.red, 1);
-      g.fillRoundedRect(lx + colW * 2 + 10 - 116, 72, 108, 20, 5);
+      g.fillRoundedRect(bx + 2, 68, 110, 20, 6);
       layer.add(g);
-      put(lx + colW * 2 + 10 - 62, 82, 'NEW BEST!', 'display', 13, INK.text);
+      put(bx + 57, 78, 'NEW BEST!', 'display', 13, INK.text);
     }
     const tiles: [StatGlyph, string, string, boolean][] = [
       ['distance', `${sm.meters} m`, result.newBestMeters ? 'distance (best!)' : 'distance', result.newBestMeters],
@@ -1306,48 +1341,53 @@ export class GameScene extends Phaser.Scene {
       ['close', String(sm.nearMisses), 'close calls', false],
     ];
     tiles.forEach(([glyph, value, caption, hot], i) => {
-      statTile(this, layer, lx + (i % 2) * (colW + 10), 158 + Math.floor(i / 2) * 50, colW, 44, glyph, value, caption, hot);
+      const tx = L.left + (i % 2) * (L.tileW + L.tileColGap);
+      statTile(this, layer, tx, L.tilesTop + Math.floor(i / 2) * (L.tileH + L.tileRowGap), L.tileW, L.tileH, glyph, value, caption, hot);
     });
-    // The coin strip: what the run earned and the bank (a god-mode run banks nothing).
-    rowPlate(this, layer, lx + colW + 5, 380, colW * 2 + 10, 28, false);
-    coinIcon(this, layer, lx + 20, 380, 9);
-    if (this.run.perks.god) {
-      put(lx + 40, 380, 'GOD MODE RUN: NOTHING BANKED', 'display', 14, INK.good, 0);
-    } else {
-      put(lx + 40, 380, `+${result.coins} COINS`, 'display', 16, INK.title, 0);
-      put(lx + colW * 2 + 10 - 12, 381, `BANK ${this.save.coins}`, 'body', 16, INK.soft, 1);
-    }
 
-    // Right: the high-score table. A trophy per row (gold, silver, bronze, then steel cups), empty slots
-    // dimmed, and this run's row lit up in yellow.
-    const tx = 520;
-    const rowW = 346;
-    trophy(this, layer, tx + 14, 92, 1, 22);
-    put(tx + 36, 92, 'TOP SCORES', 'display', 18, INK.cyan, 0);
-    put(tx + 178, 120, 'SCORE', 'body', 12, INK.dim, 1);
-    put(tx + 256, 120, 'DIST', 'body', 12, INK.dim, 1);
-    put(tx + 330, 120, 'SNACKS', 'body', 12, INK.dim, 1);
+    // Right: the high-score table. A podium icon heads it; each row has its own trophy (gold, silver,
+    // bronze, then steel cups), empty slots are dimmed and this run's row is lit up in yellow.
+    const tx = L.right;
+    const rowW = L.rightW;
+    const edge = tx + rowW - 16; // the right-hand text edge, 16 px inside the rows
+    podiumIcon(this, layer, tx + 18, 96);
+    put(tx + 42, 96, 'TOP SCORES', 'display', 18, INK.cyan, 0);
+    put(edge - 148, 118, 'SCORE', 'body', 12, INK.dim, 1);
+    put(edge - 72, 118, 'DIST', 'body', 12, INK.dim, 1);
+    put(edge, 118, 'SNACKS', 'body', 12, INK.dim, 1);
     for (let i = 0; i < 7; i++) {
-      const y = 146 + i * 34;
+      const y = L.rowsTop + 15 + i * 34;
       const h = this.save.highScores[i];
       const mine = !!h && result.rank === i + 1;
       rowPlate(this, layer, tx + rowW / 2, y, rowW, 30, mine);
-      trophy(this, layer, tx + 24, y + 1, i + 1, 24, !h);
+      trophy(this, layer, tx + 24, y + 1, i + 1, 22, !h);
       if (!h) {
-        put(tx + 178, y, '---', 'display', 15, INK.dim, 1);
+        put(edge - 148, y, '---', 'display', 15, INK.dim, 1);
         continue;
       }
       const color = mine ? INK.title : INK.soft;
-      put(tx + 178, y, String(h.score), 'display', 17, color, 1);
-      put(tx + 256, y, `${h.meters} m`, 'body', 16, color, 1);
-      put(tx + 330, y, String(h.snacks), 'body', 16, color, 1);
+      put(edge - 148, y, String(h.score), 'display', 17, color, 1);
+      put(edge - 72, y, `${h.meters} m`, 'body', 16, color, 1);
+      put(edge, y, String(h.snacks), 'body', 16, color, 1);
     }
-    if (result.achievements.length) {
-      const lines = result.achievements.slice(0, 2).map((a) => `ACHIEVEMENT: ${a.name}  +${a.reward} coins`);
-      if (result.achievements.length > 2) lines.push(`+${result.achievements.length - 2} more`);
-      put(tx + rowW / 2, 392, lines, 'body', 14, INK.title);
+
+    // The coin strip across both columns: what the run earned (left), any achievement (middle) and the bank
+    // (right). A god-mode run banks nothing.
+    const stripY = 380;
+    rowPlate(this, layer, L.left + L.totalW / 2, stripY, L.totalW, 30, false);
+    coinIcon(this, layer, L.left + 22, stripY, 9);
+    if (this.run.perks.god) {
+      put(L.left + 42, stripY, 'GOD MODE RUN: NOTHING BANKED', 'display', 14, INK.good, 0);
+    } else {
+      put(L.left + 42, stripY, `+${result.coins} COINS`, 'display', 16, INK.title, 0);
+      put(L.left + L.totalW - 16, stripY + 1, `BANK ${this.save.coins}`, 'body', 16, INK.soft, 1);
+      if (result.achievements.length) {
+        const first = result.achievements[0];
+        const more = result.achievements.length > 1 ? `  (+${result.achievements.length - 1} more)` : '';
+        put(L.left + L.totalW / 2, stripY + 1, `ACHIEVEMENT: ${first.name}  +${first.reward}${more}`, 'body', 14, INK.title);
+      }
     }
-    put(cx, 479, 'D-PAD / STICK SELECT   A / START CONFIRM   B BACK', 'body', 14, INK.dim);
+    put(cx, 477, 'D-PAD / STICK SELECT   A / START CONFIRM   B BACK', 'body', 14, INK.dim);
     // Five tappable buttons; a tap on one does that button's job.
     const buttons: GameOverOption[] = [
       ['DRIVE AGAIN', 'SPACE', () => this.restart(), UI.yellow],
@@ -1368,14 +1408,16 @@ export class GameScene extends Phaser.Scene {
     layer.removeAll(true);
     const put = (x: number, y: number, text: string, kind: 'display' | 'body', size: number, color: string) =>
       label(this, layer, x, y, text, kind, size, color);
-    const w = 170;
+    // The buttons divide the same 764 px content box as the columns above them.
+    const n = this.gameOverOptions.length;
     const gap = 16;
-    const x0 = VIEW_W / 2 - (this.gameOverOptions.length * w + (this.gameOverOptions.length - 1) * gap) / 2 + w / 2;
+    const w = (GAME_OVER_GRID.totalW - (n - 1) * gap) / n;
+    const x0 = GAME_OVER_GRID.left + w / 2;
     this.gameOverOptions.forEach(([text, hint, go, accent], i) => {
-      put(x0 + i * (w + gap), 456, hint, 'body', 13, INK.dim);
+      put(x0 + i * (w + gap), 454, hint, 'body', 13, INK.dim);
       button(this, layer, {
         x: x0 + i * (w + gap),
-        y: 428,
+        y: 426,
         w,
         h: 40,
         text,

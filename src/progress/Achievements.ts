@@ -1,6 +1,6 @@
 import { SCORING } from '../config';
 import type { RunSummary } from '../game/Run';
-import { UPGRADE_IDS, type SaveData } from './Progress';
+import { UPGRADE_IDS, addCoins, type SaveData } from './Progress';
 
 export interface Achievement {
   id: string;
@@ -122,7 +122,7 @@ export function unlockAchievements(save: SaveData, run: RunSummary | null, day: 
   for (const a of ACHIEVEMENTS) {
     if (save.achievements[a.id] || !a.check(save, run)) continue;
     save.achievements[a.id] = day;
-    save.coins += a.reward;
+    addCoins(save, a.reward);
     fresh.push(a);
   }
   return fresh;

@@ -22,7 +22,7 @@ export const CHEAT_CODES: Record<CheatId, readonly CheatKey[]> = {
 };
 
 /** What "max coins" puts in the bank. */
-export const CHEAT_MAX_COINS = 999_999;
+export const CHEAT_MAX_COINS = PROGRESSION.maxCoins;
 
 const LONGEST = Math.max(...Object.values(CHEAT_CODES).map((c) => c.length));
 

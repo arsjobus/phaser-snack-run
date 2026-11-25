@@ -94,7 +94,7 @@ export function sanitizeSave(raw: unknown): SaveData {
   const out = emptySave();
   if (!isObject(raw)) return out;
 
-  out.coins = Math.floor(num(raw.coins));
+  out.coins = Math.min(PROGRESSION.maxCoins, Math.floor(num(raw.coins)));
   if (isObject(raw.upgrades)) {
     for (const id of UPGRADE_IDS) {
       out.upgrades[id] = Math.min(PROGRESSION.upgrades[id].max, Math.floor(num(raw.upgrades[id])));
@@ -167,6 +167,14 @@ export function resetProgress(store: KeyValueStore): SaveData {
 }
 
 // ---- the garage -------------------------------------------------------------------------------
+
+/** Puts coins in the bank, never past `PROGRESSION.maxCoins`. Returns how many were actually added. */
+export function addCoins(save: SaveData, amount: number): number {
+  const room = Math.max(0, PROGRESSION.maxCoins - save.coins);
+  const added = Math.min(room, Math.max(0, Math.floor(amount)));
+  save.coins += added;
+  return added;
+}
 
 /** Coins for the NEXT level of an upgrade, or null when it is maxed. Level n costs base * growth^n (to the nearest 5). */
 export function upgradeCost(id: UpgradeId, level: number): number | null {
@@ -243,16 +251,16 @@ export function recordRun(save: SaveData, s: RunSummary, day: string): RunResult
   const st = save.stats;
   const newBestScore = s.score > st.bestScore;
   const newBestMeters = s.meters > st.bestMeters;
-  const coins = coinsForRun(s);
+  const earned = coinsForRun(s);
+  const coins = addCoins(save, earned); // what the bank took (less than `earned` when it is full)
 
-  save.coins += coins;
   st.runs++;
   st.meters += s.meters;
   st.snacks += s.snacks;
   st.takedowns += s.takedowns;
   st.nearMisses += s.nearMisses;
   st.laneChanges += s.laneChanges;
-  st.coinsEarned += coins;
+  st.coinsEarned += earned;
   st.bestScore = Math.max(st.bestScore, s.score);
   st.bestMeters = Math.max(st.bestMeters, s.meters);
   st.bestAir = Math.max(st.bestAir, s.bestAir);

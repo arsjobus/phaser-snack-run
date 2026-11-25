@@ -257,6 +257,34 @@ export function logoPlate(scene: Phaser.Scene, layer: Layer, cx: number, cy: num
   label(scene, layer, cx, cy + h * 0.33, small, 'display', Math.round(h * 0.2), '#14224a');
 }
 
+/**
+ * Rounds the corners of a polygon: every corner is replaced by a small quadratic curve that starts and
+ * ends `r` px along its two edges (never more than half an edge). Returns the points to fill and stroke.
+ */
+export function roundPoly(pts: readonly [number, number][], r: number, steps = 5): { x: number; y: number }[] {
+  const out: { x: number; y: number }[] = [];
+  const n = pts.length;
+  for (let i = 0; i < n; i++) {
+    const [px, py] = pts[(i + n - 1) % n];
+    const [cx, cy] = pts[i];
+    const [nx, ny] = pts[(i + 1) % n];
+    const lp = Math.hypot(px - cx, py - cy) || 1;
+    const ln = Math.hypot(nx - cx, ny - cy) || 1;
+    const tp = Math.min(r, lp / 2) / lp;
+    const tn = Math.min(r, ln / 2) / ln;
+    const ax = cx + (px - cx) * tp;
+    const ay = cy + (py - cy) * tp;
+    const bx = cx + (nx - cx) * tn;
+    const by = cy + (ny - cy) * tn;
+    for (let k = 0; k <= steps; k++) {
+      const t = k / steps;
+      const u = 1 - t;
+      out.push({ x: u * u * ax + 2 * u * t * cx + t * t * bx, y: u * u * ay + 2 * u * t * cy + t * t * by });
+    }
+  }
+  return out;
+}
+
 // ---- trophies, the score plate and stat tiles (game over and the garage's high scores) ----------
 
 /** The colours of a trophy for a place: gold, silver and bronze on the podium, plain steel after that. */
@@ -278,11 +306,13 @@ export function trophy(scene: Phaser.Scene, layer: Layer, x: number, y: number, 
   const lite = tone(base, 0.55);
   const g = scene.add.graphics();
   const P = (pts: [number, number][]) => pts.map(([px, py]) => ({ x: x + px * s, y: y + py * s }));
-  const ink = (pts: [number, number][], color: number) => {
+  // Every corner is softened so the cup has no hard right angles.
+  const ink = (pts: [number, number][], color: number, round = 2) => {
+    const soft = roundPoly(pts.map(([px, py]) => [x + px * s, y + py * s] as [number, number]), round * s);
     g.fillStyle(color, 1);
-    g.fillPoints(P(pts), true);
+    g.fillPoints(soft, true);
     g.lineStyle(Math.max(1.5, 2 * s), UI.outline, 1);
-    g.strokePoints(P(pts), true);
+    g.strokePoints(soft, true);
   };
   // Handles first (behind the bowl): two rings out to the sides.
   const hs = podium ? 1 : 0.8;
@@ -296,7 +326,7 @@ export function trophy(scene: Phaser.Scene, layer: Layer, x: number, y: number, 
   ink([[-7, 10], [7, 10], [7, 13], [-7, 13]], dark);
   ink([[-5, 7], [5, 7], [5, 10], [-5, 10]], base);
   ink([[-1.8, 3], [1.8, 3], [2.4, 7], [-2.4, 7]], dark);
-  ink([[-8, -12], [8, -12], [6.5, -1], [3, 3], [-3, 3], [-6.5, -1]], base);
+  ink([[-8, -12], [8, -12], [6.5, -1], [3, 3], [-3, 3], [-6.5, -1]], base, 3.2);
   // Shine down the left of the bowl and a darker shoulder on the right.
   g.fillStyle(lite, dim ? 0.4 : 1);
   g.fillPoints(P([[-6, -10.5], [-3.6, -10.5], [-4.6, -2], [-5.6, -3]]), true);
@@ -355,64 +385,141 @@ export function scorePlate(scene: Phaser.Scene, layer: Layer, x: number, y: numb
 
 export type StatGlyph = 'distance' | 'snack' | 'air' | 'combo' | 'flag' | 'takedown' | 'lanes' | 'close';
 
-/** A little flat icon for a stat tile, centred on (x, y), about 22 px across. */
+/**
+ * A little flat icon for a stat tile, centred on (x, y), about 22 px across. Every shape has rounded
+ * corners (see `roundPoly`) and the same 1.5 px outline. The snack is the real pickup's art (the
+ * `snack` texture) so it matches what the player collects.
+ */
 export function statGlyph(scene: Phaser.Scene, layer: Layer, x: number, y: number, kind: StatGlyph): void {
+  if (kind === 'snack' && scene.textures.exists('snack')) {
+    layer.add(scene.add.image(x, y, 'snack').setDisplaySize(18, 23));
+    return;
+  }
   const g = scene.add.graphics();
-  const poly = (pts: [number, number][], color: number) => {
-    const P = pts.map(([px, py]) => ({ x: x + px, y: y + py }));
+  const poly = (pts: [number, number][], color: number, round = 2.4) => {
+    const P = roundPoly(pts.map(([px, py]) => [x + px, y + py] as [number, number]), round);
     g.fillStyle(color, 1);
     g.fillPoints(P, true);
     g.lineStyle(1.5, UI.outline, 1);
     g.strokePoints(P, true);
   };
+  const dot = (px: number, py: number, r: number, color: number) => {
+    g.fillStyle(UI.outline, 1);
+    g.fillCircle(x + px, y + py, r + 1.4);
+    g.fillStyle(color, 1);
+    g.fillCircle(x + px, y + py, r);
+  };
   switch (kind) {
     case 'distance':
-      poly([[-10, -7], [-2, -7], [3, 0], [-2, 7], [-10, 7], [-5, 0]], UI.cyan);
-      poly([[0, -7], [8, -7], [13, 0], [8, 7], [0, 7], [5, 0]], UI.white);
+      poly([[-10.5, -7], [-3, -7], [2, 0], [-3, 7], [-10.5, 7], [-5.5, 0]], UI.cyan, 2.2);
+      poly([[0, -7], [7.5, -7], [12.5, 0], [7.5, 7], [0, 7], [5, 0]], UI.white, 2.2);
       break;
-    case 'snack':
-      g.fillStyle(UI.outline, 1);
-      g.fillCircle(x, y, 10.5);
-      g.fillStyle(0xd9a05b, 1);
-      g.fillCircle(x, y, 9);
+    case 'snack': {
+      // Fallback only (no texture loaded): a round cracker.
+      dot(0, 0, 8.5, 0xd9a05b);
       g.fillStyle(0x5a3418, 1);
-      for (const [px, py] of [[-3.5, -3], [3.5, -1.5], [-1, 4], [4, 5]]) g.fillCircle(x + px, y + py, 1.9);
+      for (const [px, py] of [[-3.5, -3], [3.5, -1.5], [-1, 4], [4, 5]]) g.fillCircle(x + px, y + py, 1.8);
       break;
-    case 'air':
-      poly([[-11, 6], [-4, -1], [0, 4], [6, -6], [11, 6]], UI.yellowLight);
-      poly([[8, -9], [12, -3], [4, -3]], UI.white);
+    }
+    case 'air': {
+      // A ramp with the jump arc leaving its lip.
+      poly([[-12, 8], [2, 8], [2, -2]], UI.yellowLight, 2.2);
+      dot(6, -8, 1.7, UI.white);
+      dot(10.5, -4.5, 1.7, UI.white);
+      dot(12, 1.5, 1.7, UI.white);
       break;
+    }
     case 'combo':
-      poly([[2, -11], [-7, 2], [-1, 2], [-3, 11], [8, -3], [1, -3]], UI.yellow);
+      poly([[2.5, -11.5], [-7.5, 1.5], [-1.5, 1.5], [-3, 11.5], [8, -2.5], [1.5, -2.5]], UI.yellow, 2);
       break;
     case 'flag':
-      g.lineStyle(3, UI.outline, 1);
-      g.lineBetween(x - 7, y - 10, x - 7, y + 10);
-      g.lineStyle(1.5, UI.white, 1);
-      g.lineBetween(x - 7, y - 10, x - 7, y + 10);
-      poly([[-6, -10], [10, -6], [-6, 0]], UI.green);
+      poly([[-8.5, -11], [-6, -11], [-6, 11], [-8.5, 11]], UI.white, 1.2);
+      poly([[-6, -10], [10.5, -6.5], [-6, -1.5]], UI.green, 2.2);
       break;
-    case 'takedown':
-      poly([[0, -11], [3, -4], [11, -6], [6, 0], [11, 6], [3, 4], [0, 11], [-3, 4], [-11, 6], [-6, 0], [-11, -6], [-3, -4]], 0xff9f45);
+    case 'takedown': {
+      // An explosion starburst: ragged outer flame, hot inner flame, white core.
+      const burst = (outer: number, inner: number, spikes: number, color: number, round: number, phase = 0) => {
+        const pts: [number, number][] = [];
+        for (let i = 0; i < spikes * 2; i++) {
+          const a = phase + (i / (spikes * 2)) * Math.PI * 2 - Math.PI / 2;
+          const tip = i % 2 === 0;
+          const jitter = tip ? [1, 0.84, 0.95, 0.78, 1, 0.9, 0.82][(i / 2) % 7] : 1;
+          const rad = (tip ? outer * jitter : inner) * 1;
+          pts.push([Math.cos(a) * rad, Math.sin(a) * rad]);
+        }
+        poly(pts, color, round);
+      };
+      burst(12.5, 6.2, 9, 0xff7a2e, 1.3);
+      burst(9, 4.4, 9, UI.yellow, 1, Math.PI / 9);
+      g.fillStyle(UI.white, 1);
+      g.fillCircle(x, y, 2.8);
       break;
+    }
     case 'lanes':
-      poly([[-6, -10], [-1, -3], [-4, -3], [-4, 9], [-8, 9], [-8, -3], [-11, -3]], UI.cyan);
-      poly([[6, 10], [11, 3], [8, 3], [8, -9], [4, -9], [4, 3], [1, 3]], UI.white);
+      poly([[-6.5, -11], [-1.5, -4], [-4.5, -4], [-4.5, 10], [-8.5, 10], [-8.5, -4], [-11.5, -4]], UI.cyan, 1.8);
+      poly([[6.5, 11], [11.5, 4], [8.5, 4], [8.5, -10], [4.5, -10], [4.5, 4], [1.5, 4]], UI.white, 1.8);
       break;
-    case 'close':
-      poly([[0, -11], [11, 9], [-11, 9]], UI.yellowLight);
+    case 'close': {
+      // Caution sign: a rounded triangle with the "!" centred on the triangle's centroid, so the mark
+      // sits dead centre horizontally and optically in the middle vertically.
+      const top = -12;
+      const base = 10;
+      const half = 12.5;
+      poly([[0, top], [half, base], [-half, base]], UI.yellowLight, 3.2);
+      const cy = (top + base + base) / 3; // centroid of the triangle
+      const barH = 6.2;
+      const dotR = 1.5;
+      const gap = 1.8;
+      const total = barH + gap + dotR * 2;
+      const y0 = cy - total / 2 + 0.6; // +0.6: the sign is wider at the bottom, so the mark sits a hair low
       g.fillStyle(UI.outline, 1);
-      g.fillRect(x - 1.3, y - 3, 2.6, 7);
-      g.fillCircle(x, y + 6.8, 1.6);
+      g.fillRoundedRect(x - 1.5, y + y0, 3, barH, 1.4);
+      g.fillCircle(x, y + y0 + barH + gap + dotR, dotR + 0.1);
       break;
+    }
   }
   layer.add(g);
 }
 
-/** A stat tile: a flat plate with an icon on the left, the number in the display face, a small caption under it. */
+/**
+ * A stat tile: a flat plate with the icon in a round badge on the left, the number in the display face
+ * and a small caption under it. The badge is centred in a square of the tile's height, so the icon
+ * gutter is the same on the left, top and bottom.
+ */
 export function statTile(scene: Phaser.Scene, layer: Layer, x: number, y: number, w: number, h: number, glyph: StatGlyph, value: string, caption: string, hot = false): void {
   rowPlate(scene, layer, x + w / 2, y + h / 2, w, h, hot);
-  statGlyph(scene, layer, x + 22, y + h / 2, glyph);
-  label(scene, layer, x + 44, y + h / 2 - 6, value, 'display', 16, hot ? INK.title : INK.text, 0);
-  label(scene, layer, x + 44, y + h / 2 + 11, caption, 'body', 12, INK.dim, 0);
+  const bx = x + h / 2;
+  const by = y + h / 2;
+  const g = scene.add.graphics();
+  g.fillStyle(UI.outline, 1);
+  g.fillCircle(bx, by, h / 2 - 5);
+  g.fillStyle(hot ? tone(UI.yellow, -0.55) : UI.navy, 1);
+  g.fillCircle(bx, by, h / 2 - 6.5);
+  layer.add(g);
+  statGlyph(scene, layer, bx, by, glyph);
+  const tx = x + h + 4;
+  label(scene, layer, tx, y + h / 2 - 7, value, 'display', 17, hot ? INK.title : INK.text, 0);
+  label(scene, layer, tx, y + h / 2 + 11, caption, 'body', 12, INK.dim, 0);
+}
+
+/**
+ * A podium: three rounded blocks in gold, silver and bronze, the tallest in the middle. The heading icon
+ * of a leaderboard (the trophy cups belong to the rows). About 28 px wide and 22 tall, centred on (x, y).
+ */
+export function podiumIcon(scene: Phaser.Scene, layer: Layer, x: number, y: number): void {
+  const g = scene.add.graphics();
+  const block = (cx: number, top: number, w: number, color: number) => {
+    const bottom = 11;
+    const left = x + cx - w / 2;
+    g.fillStyle(UI.outline, 1);
+    g.fillRoundedRect(left - 1.5, y + top - 1.5, w + 3, bottom - top + 3, 4);
+    g.fillStyle(color, 1);
+    g.fillRoundedRect(left, y + top, w, bottom - top, 3);
+    g.fillStyle(tone(color, 0.5), 1);
+    g.fillRoundedRect(left + 1.5, y + top + 1.5, w - 3, 3, 1.5);
+  };
+  block(-9, -2, 9, UI.silver);
+  block(9, 2, 9, UI.bronze);
+  block(0, -9, 10, UI.gold);
+  layer.add(g);
 }

@@ -17,6 +17,7 @@ import {
   hash01,
   lensOutline,
   puddleSite,
+  puddleSize,
   ruttedAt,
   rutWobble,
   type Detail,
@@ -393,8 +394,7 @@ export class GroundPainter {
       case 'puddle': {
         // A flat pool lying on the ground: a dark wet rim lens, a water lens and a paler band of
         // reflected sky. All three follow the terrain, so the pool bends with the hill under it.
-        const w = (40 + d.seed * 38) * d.size * laneScale(d.f);
-        const hh = 5 + d.seed * 4;
+        const { w, h: hh } = puddleSize(d);
         // Only on level ground or in a dip of the track (never on a slope, and not on the show stage).
         if (!puddleSite((px) => this.h(px), x - w / 2 - 2, x + w / 2 + 2) || this.onStage(x)) break;
         const water = mixColor(biome.sky[1], c.crustShadow, biome.id === 'swamp' ? 0.55 : biome.id === 'snow' ? 0.05 : 0.32);

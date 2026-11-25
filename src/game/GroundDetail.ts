@@ -214,6 +214,42 @@ function pickKind(biome: BiomeId, r: number, far: boolean): DetailKind {
  * returns none. Details never depend on the viewport, only on the world x of their cell.
  */
 export function groundDetails(biome: BiomeId, xa: number, xb: number, density = 1): Detail[] {
+  // Puddles must not overlap each other, and that has to be decided the same way whichever window is asked
+  // for. So generate a margin wider than any puddle on both sides, drop a puddle only when a higher
+  // priority neighbour overlaps it (a purely local rule), then keep what lies inside the window.
+  const raw = rawGroundDetails(biome, xa - PUDDLE_MARGIN, xb + PUDDLE_MARGIN, density);
+  const puddles = raw.filter((d) => d.kind === 'puddle');
+  return raw.filter((d) => {
+    if (d.x < xa || d.x >= xb) return false;
+    if (d.kind !== 'puddle') return true;
+    return !puddles.some((o) => o !== d && puddleOutranks(o, d) && puddlesOverlap(o, d));
+  });
+}
+
+/** Margin (px) searched either side of a window: more than the widest puddle. */
+const PUDDLE_MARGIN = 220;
+/** Clear space (px) kept between two puddles. */
+const PUDDLE_GAP = 10;
+
+/** Painted size of a puddle (world px wide, px tall): shared by the painter and the overlap rule. */
+export function puddleSize(d: Pick<Detail, 'size' | 'seed' | 'f'>): { w: number; h: number } {
+  return { w: (40 + d.seed * 38) * d.size * (1 - LANES.scaleStep * d.f), h: 5 + d.seed * 4 };
+}
+
+function puddleOutranks(a: Detail, b: Detail): boolean {
+  return a.seed !== b.seed ? a.seed > b.seed : a.x > b.x;
+}
+
+/** Whether two puddles' painted areas (the dark rim included) touch or come within `PUDDLE_GAP`. */
+export function puddlesOverlap(a: Detail, b: Detail): boolean {
+  const sa = puddleSize(a);
+  const sb = puddleSize(b);
+  const dx = Math.abs(a.x - b.x);
+  const dy = Math.abs(a.f - b.f) * LANES.spacing;
+  return dx < (sa.w + sb.w) / 2 + 4 + PUDDLE_GAP && dy < (sa.h + sb.h) / 2 + 3 + PUDDLE_GAP;
+}
+
+function rawGroundDetails(biome: BiomeId, xa: number, xb: number, density = 1): Detail[] {
   const out: Detail[] = [];
   if (density <= 0) return out;
   const p = 0.55 * density;

@@ -237,6 +237,11 @@ export const PICKUPS = {
   arcY: [52, 62, 62, 48, 28],
   /** Truck-centre to pickup-centre distance (px) that collects it. */
   collectRadius: 54,
+  /**
+   * true: a snack the truck touches is collected from ANY depth lane (the default).
+   * false: snacks, like fuel cans and wrenches, can only be collected from the lane they sit in.
+   */
+  snacksFromAnyLane: true,
   /** A pickup this far behind the truck counts as missed (breaks the combo). */
   missMargin: 110,
   /** Spawn this far ahead of the truck (px). */
@@ -587,6 +592,8 @@ export const PROGRESSION = {
   saveKey: 'snack-run:save',
   /** Entries kept in the high-score table. */
   highScores: 10,
+  /** The bank never holds more than this: coins earned on top of a full bank are not added. */
+  maxCoins: 999_999,
   /** Coins (the "snack bank") earned by a run. */
   coins: {
     perSnack: 2,
