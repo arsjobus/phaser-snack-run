@@ -161,7 +161,7 @@ export function button(scene: Phaser.Scene, layer: Layer, b: ButtonSpec): void {
  * keyboard cursor is on it.
  */
 export const BACK_BUTTON = { w: 220, h: 44, size: 18 } as const;
-export function backButton(scene: Phaser.Scene, layer: Layer, x: number, y: number, onClick: () => void, focus = false, text = t('common.back')): void {
+export function backButton(scene: Phaser.Scene, layer: Layer, x: number, y: number, onClick: () => void, focus = false, text = t('garage.backToMenu')): void {
   if (focus) {
     const g = scene.add.graphics();
     g.lineStyle(3, UI.white, 1);

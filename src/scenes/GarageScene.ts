@@ -17,7 +17,7 @@ import { dayKey } from '../progress/Day';
 import { defaultStore, type KeyValueStore } from '../progress/Storage';
 import { PadEdges, firstPad, padButtons } from '../input/Gamepad';
 import { INK, LIST, UI, listRows, paginate, plateInner, rowY, wrapIndex } from '../ui/Theme';
-import { bottomBar, button, coinIcon, flatBackdrop, label, panel, pips, rowPlate, topBar, trophy, type Layer } from '../ui/Ui';
+import { backButton, bottomBar, button, coinIcon, flatBackdrop, label, panel, pips, rowPlate, topBar, trophy, type Layer } from '../ui/Ui';
 import { applyView } from '../ui/Resolution';
 import { t } from '../i18n';
 import { achievementName, achievementText, skinName, upgradeBlurb, upgradeName } from '../i18n/names';
@@ -185,12 +185,7 @@ export class GarageScene extends Phaser.Scene {
     else this.drawAchievements();
 
     this.text(VIEW_W / 2, 441, this.message, 17, INK.title, 0.5);
-    // Two buttons on the column's grid: Back to the menu (the default) and Drive.
-    const bw = 250;
-    const gap = COL_W - bw * 2;
-    const bx = (i: number) => COL_L + bw / 2 + i * (bw + gap);
-    button(this, this.layer, { x: bx(0), y: 482, w: bw, h: 38, text: t('garage.backToMenu'), hint: 'ESC', size: 16, selected: true, onClick: () => this.scene.start('Menu') });
-    button(this, this.layer, { x: bx(1), y: 482, w: bw, h: 38, text: t('garage.drive'), hint: 'SPACE', size: 16, onClick: () => this.scene.start('Game') });
+    backButton(this, this.layer, VIEW_W / 2, 472, () => this.scene.start('Menu'));
     bottomBar(
       this,
       this.layer,
