@@ -354,7 +354,14 @@ export class GameScene extends Phaser.Scene {
 
   private addStartGate(): void {
     const y = this.terrain.heightAt(GATE_X);
-    this.add.image(GATE_X, y, 'start_gate').setOrigin(0.5, 1).setDepth(0.5);
+    // Keep the gate on the far lane, as on the start menu. The foreground ground pass
+    // overlays the bottom of props, so anchoring this at the near-lane ground buries its feet.
+    const lane = 3.5;
+    this.add
+      .image(GATE_X, laneProject(y, y + 4, lane), 'start_gate')
+      .setOrigin(0.5, 1)
+      .setScale(laneScale(lane))
+      .setDepth(0.5);
   }
 
   /** No auto-gas and no air control: the truck only drives while the gas is held (keys, touch or pad). */
