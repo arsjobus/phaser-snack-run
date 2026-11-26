@@ -46,6 +46,8 @@ export class MenuScene extends Phaser.Scene {
   /** Every achievement is unlocked: the special start screen is shown instead of the usual one. */
   private master = false;
   private rays: Phaser.GameObjects.Graphics | null = null;
+  /** Ignore the pointer position inherited from the screen that opened the menu. */
+  private menuHoverReady = false;
 
   constructor() {
     super('Menu');
@@ -61,6 +63,7 @@ export class MenuScene extends Phaser.Scene {
     this.toast = null;
     this.godBadge = null;
     this.rays = null;
+    this.menuHoverReady = false;
     this.master = allAchievementsUnlocked(loadSave(defaultStore()));
     this.buildScenery();
     this.layer = this.add.container(0, 0).setDepth(20).setScrollFactor(0);
@@ -72,6 +75,15 @@ export class MenuScene extends Phaser.Scene {
     const onKey = (e: KeyboardEvent) => this.onKey(e);
     kb.on('keydown', onKey);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => kb.off('keydown', onKey));
+
+    // When Credits returns to this scene on pointerdown, that same held pointer can overlap
+    // a menu button. Wait for a real pointer movement before allowing hover to change selection.
+    const enableMenuHover = () => {
+      this.menuHoverReady = true;
+      this.input.off('pointermove', enableMenuHover);
+    };
+    this.input.on('pointermove', enableMenuHover);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.input.off('pointermove', enableMenuHover));
   }
 
   private buildScenery(): void {
@@ -311,7 +323,7 @@ export class MenuScene extends Phaser.Scene {
         accent: this.master ? MASTER.gold : m.accent,
         size: 20,
         onHover: () => {
-          if (this.index !== i) {
+          if (this.menuHoverReady && this.index !== i) {
             this.index = i;
             this.draw();
           }
