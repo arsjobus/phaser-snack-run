@@ -113,6 +113,12 @@ export class GarageScene extends Phaser.Scene {
     }
     const n = this.rows();
     if (n === 0) return;
+    if (this.tab === 'PAINT') {
+      const column = Math.floor(this.row / 5);
+      this.row = column * 5 + wrapIndex(this.row % 5, d, 5);
+      this.draw();
+      return;
+    }
     this.row = wrapIndex(this.row, d, n);
     this.draw();
   }
@@ -185,7 +191,7 @@ export class GarageScene extends Phaser.Scene {
     else if (this.tab === 'SCORES') this.drawScores();
     else this.drawAchievements();
 
-    this.text(VIEW_W / 2, 441, this.message, 17, INK.title, 0.5);
+    this.text(VIEW_W / 2, this.tab === 'PAINT' ? 410 : 425, this.message, 17, INK.title, 0.5);
     backButton(this, this.layer, VIEW_W / 2, 472, () => this.scene.start('Menu'));
     bottomBar(
       this,
@@ -201,9 +207,9 @@ export class GarageScene extends Phaser.Scene {
   }
 
   /** Clickable row background (`h` tall); a click selects, a second click on the selected row activates. */
-  private rowBox(i: number, y: number, h: number): void {
-    rowPlate(this, this.layer, VIEW_W / 2, y, COL_W, h, i === this.row);
-    const zone = this.add.zone(VIEW_W / 2, y, COL_W, h).setInteractive({ useHandCursor: true });
+  private rowBox(i: number, y: number, h: number, center = VIEW_W / 2, width = COL_W): void {
+    rowPlate(this, this.layer, center, y, width, h, i === this.row);
+    const zone = this.add.zone(center, y, width, h).setInteractive({ useHandCursor: true });
     zone.on('pointerdown', () => {
       if (this.row === i) this.activate();
       else {
@@ -240,15 +246,21 @@ export class GarageScene extends Phaser.Scene {
   }
 
   private drawPaint(): void {
-    const { left, right } = plateInner(VIEW_W / 2, COL_W);
-    const rows = listRows(142, 424, SKINS.length, 58);
+    const columnW = (COL_W - 16) / 2;
+    const columns = [COL_L + columnW / 2, COL_R - columnW / 2];
+    // Leave a dedicated status line below the last paint row so equip feedback clears the buttons.
+    const rows = listRows(142, 390, 5, 58);
     SKINS.forEach((skin, i) => {
-      const y = rows.y(i);
-      this.rowBox(i, y, rows.h);
+      const col = Math.floor(i / 5);
+      const row = i % 5;
+      const center = columns[col];
+      const { left, right } = plateInner(center, columnW);
+      const y = rows.y(row);
+      this.rowBox(i, y, rows.h, center, columnW);
       const owned = this.save.ownedSkins.includes(skin.id);
       const worn = this.save.skin === skin.id;
-      this.layer.add(this.add.image(left + 56, y + 4, playerTruckKey(skin.id)).setScale(0.5));
-      this.text(left + 140, y, skinName(skin), 20, INK.text, 0, true);
+      this.layer.add(this.add.image(left + 38, y + 4, playerTruckKey(skin.id)).setScale(0.38));
+      this.text(left + 76, y, skinName(skin), 17, INK.text, 0, true);
       if (worn) this.text(right, y, t('garage.equippedTag'), 18, INK.cyan, 1, true);
       else if (owned) this.text(right, y, t('garage.owned'), 18, INK.soft, 1, true);
       else this.price(right, y, skin.cost, this.save.coins >= skin.cost ? INK.good : INK.bad);
