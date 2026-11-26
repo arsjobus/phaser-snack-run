@@ -74,6 +74,10 @@
         width: 100%;
         height: 100%;
         object-fit: contain;
+        visibility: hidden;
+      }
+      #loading-logo.is-loaded {
+        visibility: visible;
       }
       #loading-logo-frame {
         box-sizing: border-box;
@@ -135,6 +139,12 @@
         <div id="loading-progress"></div>
       </div>
     </div>
+    <script>
+      const loadingLogo = document.getElementById("loading-logo");
+      const showLoadingLogo = () => loadingLogo?.classList.add("is-loaded");
+      loadingLogo?.addEventListener("load", showLoadingLogo, { once: true });
+      if (loadingLogo?.complete && loadingLogo.naturalWidth > 0) showLoadingLogo();
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
