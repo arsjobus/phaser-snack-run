@@ -226,6 +226,10 @@ export const SCORING = {
 };
 
 export const PICKUPS = {
+  /** Draw ground shadows under lane-placed snack pickups. */
+  snackShadows: false,
+  /** Draw snacks above every lane-based vehicle, hazard and pickup. */
+  snacksAboveAll: true,
   /** Distance above the ground (px) at which pickups float, about truck-centre height. */
   hover: 46,
   spacing: 56,

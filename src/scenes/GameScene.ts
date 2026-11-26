@@ -11,6 +11,7 @@ import {
   PHYSICS,
   OBSTACLES,
   OBSTACLE_KINDS,
+  PICKUPS,
   PX_PER_METER,
   SCROLL_Y0,
   STUNT,
@@ -265,7 +266,13 @@ export class GameScene extends Phaser.Scene {
     this.touchView = new TouchView(this);
     // Pause button for touch screens (top left, clear of the controls at the bottom).
     this.touchPause = this.add.container(0, 0).setScrollFactor(0).setDepth(9);
-    button(this, this.touchPause, { x: 46, y: 36, w: 72, h: 40, text: '||', size: 18, onClick: () => { if (!this.run.over && !this.paused) this.showPause(); } });
+    const pauseX = 46;
+    button(this, this.touchPause, { x: pauseX, y: 36, w: 72, h: 40, text: '', onClick: () => { if (!this.run.over && !this.paused) this.showPause(); } });
+    const pauseIcon = this.add.graphics();
+    pauseIcon.fillStyle(0xffffff, 1);
+    pauseIcon.fillRoundedRect(pauseX - 8, 27, 5, 18, 2);
+    pauseIcon.fillRoundedRect(pauseX + 3, 27, 5, 18, 2);
+    this.touchPause.add(pauseIcon);
     this.input.addPointer(3);
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       if (p.wasTouch) this.touchedOnce = true;
@@ -420,13 +427,13 @@ export class GameScene extends Phaser.Scene {
     const fingers = this.input.manager.pointers.filter((p) => p.isDown).map((p) => ({ x: toLogical(p.x), y: toLogical(p.y) }));
     const showTouch = touchVisible(this.settings.touch, this.sys.game.device.input.touch, this.touchedOnce) && !this.run.over;
     this.touchView.setVisible(showTouch);
-    this.touchPause.setVisible(touchVisible(this.settings.touch, this.sys.game.device.input.touch, this.touchedOnce) && !this.paused && !this.run.over);
+    this.touchPause.setVisible(touchVisible(this.settings.touch, this.sys.game.device.input.touch, this.touchedOnce) && !this.run.over);
     this.held = mergeHeld(
       heldFromKeys(this.tracker, this.settings.bindings),
       padHeld(pad),
-      showTouch ? touchHeld(fingers) : { gas: 0, brake: 0, far: false, near: false },
+      showTouch && !this.paused ? touchHeld(fingers) : { gas: 0, brake: 0, far: false, near: false },
     );
-    this.touchView.draw(this.held);
+    this.touchView.draw(this.paused ? { gas: 0, brake: 0, far: false, near: false } : this.held);
     return this.padEdges.update(padButtons(pad));
   }
 
@@ -611,6 +618,7 @@ export class GameScene extends Phaser.Scene {
     };
     for (const p of this.run.pickups.items) {
       if (p.taken || p.x < left || p.x > right) continue;
+      if (p.kind === 'snack' && !PICKUPS.snackShadows) continue;
       const height = this.terrain.heightAt(p.x) - p.y;
       const near = Math.max(0, Math.min(1, 1 - height / 110)); // 1 on the ground, fading as it floats higher
       const w = (p.kind === 'wrench' ? 34 : 26) * (0.65 + 0.35 * near);
@@ -686,7 +694,7 @@ export class GameScene extends Phaser.Scene {
           .setPosition(p.x, sy)
           .setScale(laneScale(p.lane))
           .setTint(Phaser.Display.Color.GetColor(shadeV, shadeV, shadeV))
-          .setDepth(laneDepth(p.lane, 0.04));
+          .setDepth(p.kind === 'snack' && PICKUPS.snacksAboveAll ? 3.5 : laneDepth(p.lane, 0.04));
       } else if (!p.taken) {
         this.imagePool.release(sprite);
         this.sprites.delete(p.id);
@@ -1208,6 +1216,9 @@ export class GameScene extends Phaser.Scene {
     this.audio.setPaused(true);
     const layer = this.add.container(0, 0).setScrollFactor(0).setDepth(30);
     layer.add(this.add.rectangle(VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, 0x07121b, 0.72));
+    // Catch pointer input across the whole screen so underlying HUD/menu zones cannot activate.
+    const blocker = this.add.zone(VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H).setScrollFactor(0).setInteractive();
+    layer.add(blocker);
     layer.add(
       this.add
         .text(VIEW_W / 2, VIEW_H / 2 - 18, tr('game.paused'), {
@@ -1615,5 +1626,6 @@ export class GameScene extends Phaser.Scene {
       );
     }
     this.hud.setText(lines);
+    this.hud.setX(lines.length && !this.debug ? VIEW_W / 2 : 12).setOrigin(lines.length && !this.debug ? 0.5 : 0, 0);
   }
 }
