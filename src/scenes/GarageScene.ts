@@ -148,7 +148,8 @@ export class GarageScene extends Phaser.Scene {
   }
 
   private text(x: number, y: number, str: string | string[], size: number, color: string, ox = 0, display = false): Phaser.GameObjects.Text {
-    return label(this, this.layer, x, y, str, display ? 'display' : 'body', size, color, ox);
+    const maxWidth = ox === 1 ? 190 : ox === 0 ? 520 : 820;
+    return label(this, this.layer, x, y, str, display ? 'display' : 'body', size, color, ox, 0, maxWidth);
   }
 
   private draw(): void {

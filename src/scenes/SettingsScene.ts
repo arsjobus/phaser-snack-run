@@ -210,7 +210,8 @@ export class SettingsScene extends Phaser.Scene {
 
   /** Rows 0 to `LEFT_ROWS - 1` are the left column (sound and screen), the rest the right column (keys). */
   private text(x: number, y: number, str: string, size: number, color: string, ox = 0, display = false): Phaser.GameObjects.Text {
-    return label(this, this.layer, x, y, str, display ? 'display' : 'body', size, color, ox);
+    const maxWidth = ox === 1 ? 150 : ox === 0 ? (x < 500 ? 184 : 190) : 500;
+    return label(this, this.layer, x, y, str, display ? 'display' : 'body', size, color, ox, 0, maxWidth);
   }
 
   private draw(): void {
@@ -224,7 +225,7 @@ export class SettingsScene extends Phaser.Scene {
       const cx = left ? 250 : 712;
       const w = 430;
       // Rows are `LIST.rowGap` apart (the same standard as the garage and the achievements).
-      const rowH = left ? 34 : 28;
+      const rowH = LIST.rowHeight;
       const step = rowH + LIST.rowGap;
       const y = 124 + j * step;
       const on = i === this.row;
@@ -233,7 +234,7 @@ export class SettingsScene extends Phaser.Scene {
       const vx = r.kind === 'slider' ? cx + 8 : cx + 30; // where the value starts (a slider's track starts earlier so its percentage fits)
       if (r.kind === 'back') {
         // Keep the shared Back button on the same bottom line as Garage and Credits.
-        backButton(this, this.layer, cx, 439, () => this.back(), on);
+        backButton(this, this.layer, VIEW_W / 2, 472, () => this.back(), on);
         return;
       }
       rowPlate(this, this.layer, cx, y, w, rowH, on);

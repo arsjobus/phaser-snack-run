@@ -122,7 +122,7 @@ export class MenuScene extends Phaser.Scene {
     // Best score, from the save.
     const best = loadSave(defaultStore()).highScores[0];
     const l = this.add.container(0, 0).setDepth(20).setScrollFactor(0);
-    label(this, l, VIEW_W - 22, 24, best ? t('menu.best', { score: best.score }) : t('menu.noRuns'), 'display', 18, INK.title, 1, 4);
+    label(this, l, VIEW_W - 22, 24, best ? t('menu.best', { score: best.score }) : t('menu.noRuns'), 'display', 18, INK.title, 1, 4, 330);
     if (this.master) this.buildMasterScenery(gy);
   }
 

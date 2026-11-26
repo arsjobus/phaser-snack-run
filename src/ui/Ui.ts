@@ -32,10 +32,20 @@ export function label(
   color: string = INK.text,
   ox = 0.5,
   outline = 0,
+  maxWidth?: number,
 ): Phaser.GameObjects.Text {
   const t = scene.add.text(x, y, str, { ...textStyle(kind, size, color, outline), lineSpacing: 4 }).setOrigin(ox, 0.5);
+  if (maxWidth !== undefined) fitText(t, maxWidth);
   layer.add(t);
   return t;
+}
+
+/** Reduce a translated label only as much as needed to keep it inside its layout cell. */
+export function fitText(text: Phaser.GameObjects.Text, maxWidth: number, minSize = 11): Phaser.GameObjects.Text {
+  while (text.width > maxWidth && Number.parseFloat(text.style.fontSize as string) > minSize) {
+    text.setFontSize(Number.parseFloat(text.style.fontSize as string) - 1);
+  }
+  return text;
 }
 
 /** The backdrop of every menu that has no scenery: dark navy with big, faint diagonal bands. */
@@ -59,7 +69,7 @@ export function topBar(scene: Phaser.Scene, layer: Layer, title: string): void {
   for (const poly of hazardStripes(0, 58, VIEW_W, 9, 9)) g.fillPoints(poly, true);
   g.fillRect(0, 67, VIEW_W, 3);
   layer.add(g);
-  label(scene, layer, 28, 30, title, 'display', 28, INK.title, 0);
+  label(scene, layer, 28, 30, title, 'display', 28, INK.title, 0, 0, VIEW_W - 56);
 }
 
 /** Bottom strip: a checkered flag edge, with `hint` (the keys) above it. */
@@ -71,7 +81,7 @@ export function bottomBar(scene: Phaser.Scene, layer: Layer, hint: string): void
   g.fillStyle(UI.outline, 1);
   for (const [sx, sy, s] of checkerSquares(0, y, VIEW_W, 10, 10)) g.fillRect(sx, sy, s, s);
   layer.add(g);
-  label(scene, layer, VIEW_W / 2, VIEW_H - 25, hint, 'body', 15, INK.dim);
+  label(scene, layer, VIEW_W / 2, VIEW_H - 25, hint, 'body', 15, INK.dim, 0.5, 0, VIEW_W - 40);
 }
 
 function rivets(g: Phaser.GameObjects.Graphics, x: number, y: number, w: number, h: number): void {
@@ -123,6 +133,8 @@ export interface ButtonSpec {
   size?: number;
   onClick?: () => void;
   onHover?: () => void;
+  /** Draw the shared keyboard/gamepad focus ring without changing the selected face. */
+  focused?: boolean;
 }
 
 /**
@@ -143,7 +155,13 @@ export function button(scene: Phaser.Scene, layer: Layer, b: ButtonSpec): void {
   g.fillStyle(tone(face, b.selected ? 0.28 : 0.08), 1);
   g.fillRoundedRect(x + 3, y + 3, b.w - 6, (b.h - 6) * 0.38, { tl: 7, tr: 7, bl: 0, br: 0 });
   layer.add(g);
-  label(scene, layer, b.x, b.y + 1, b.text, 'display', b.size ?? 18, b.selected ? INK.dark : INK.soft);
+  if (b.focused ?? b.selected) {
+    const ring = scene.add.graphics();
+    ring.lineStyle(2, UI.white, 1);
+    ring.strokeRoundedRect(x - 6, y - 6, b.w + 12, b.h + 12, 12);
+    layer.add(ring);
+  }
+  label(scene, layer, b.x, b.y + 1, b.text, 'display', b.size ?? 18, b.selected ? INK.dark : INK.soft, 0.5, 0, b.w - 24);
   if (b.onClick || b.onHover) {
     const zone = scene.add.zone(b.x, b.y, b.w, b.h).setScrollFactor(0).setInteractive({ useHandCursor: true });
     if (b.onClick) zone.on('pointerdown', b.onClick);
@@ -159,13 +177,7 @@ export function button(scene: Phaser.Scene, layer: Layer, b: ButtonSpec): void {
  */
 export const BACK_BUTTON = { w: 220, h: 44, size: 18 } as const;
 export function backButton(scene: Phaser.Scene, layer: Layer, x: number, y: number, onClick: () => void, focus = false, text = t('garage.backToMenu')): void {
-  if (focus) {
-    const g = scene.add.graphics();
-    g.lineStyle(3, UI.white, 1);
-    g.strokeRoundedRect(x - BACK_BUTTON.w / 2 - 7, y - BACK_BUTTON.h / 2 - 7, BACK_BUTTON.w + 14, BACK_BUTTON.h + 14, 14);
-    layer.add(g);
-  }
-  button(scene, layer, { x, y, w: BACK_BUTTON.w, h: BACK_BUTTON.h, text, selected: true, size: BACK_BUTTON.size, onClick });
+  button(scene, layer, { x, y, w: BACK_BUTTON.w, h: BACK_BUTTON.h, text, selected: false, focused: focus, size: BACK_BUTTON.size, onClick });
 }
 
 /**

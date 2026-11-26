@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { CHECKPOINT, FUEL, VIEW_H, VIEW_W } from '../config';
 import { t } from '../i18n';
-import { FONT_BODY, FONT_DISPLAY } from '../ui/Fonts';
+import { INK, UI, textStyle } from '../ui/Theme';
 import { NeedleSpring, blinkLit, formatClock, formatDistance, needleAngle } from './HudModel';
 
 export const HUD_H = 72;
@@ -28,12 +28,12 @@ export interface HudState {
   dt: number;
 }
 
-const NAVY = 0x14224a;
-const PANEL = 0x0b1230;
-const RIM = 0x8fa4d6;
-const GREEN = 0x4cd964;
-const YELLOW = 0xffcc33;
-const RED = 0xff4d3d;
+const NAVY = UI.navy;
+const PANEL = UI.panel;
+const RIM = UI.rim;
+const GREEN = UI.green;
+const YELLOW = UI.yellow;
+const RED = UI.red;
 
 const DIAL_R = 32;
 /** Panel layout: [left x, width]. Dials, clock, distance, score, combo. */
@@ -68,12 +68,12 @@ export class Hud {
     st.fillRect(0, this.top - 2, VIEW_W, 2);
 
     // Logo plate (original brand)
-    st.fillStyle(0xf2c200, 1);
+    st.fillStyle(UI.yellow, 1);
     st.fillRoundedRect(10, this.top + 8, 150, 56, 8);
-    st.lineStyle(3, 0x111111, 1);
+    st.lineStyle(3, UI.outline, 1);
     st.strokeRoundedRect(10, this.top + 8, 150, 56, 8);
     this.label(85, this.top + 24, 'CRUNCH', '#b83a1a', 22, true);
-    this.label(85, this.top + 47, '4x4', '#14224a', 24, true);
+    this.label(85, this.top + 47, '4x4', '#000000', 24, true);
 
     for (const [x, w] of Object.values(PANELS)) {
       st.fillStyle(PANEL, 1);
@@ -97,20 +97,20 @@ export class Hud {
     const cx0 = PANELS.clock[0];
     st.lineStyle(1, RIM, 0.35);
     st.lineBetween(cx0 + 84, this.top + 14, cx0 + 84, this.top + 44);
-    this.label(cx0 + 42, this.top + 15, t('hud.cp'), '#9fb4e8', 13, true);
-    this.label(cx0 + 127, this.top + 15, t('hud.time'), '#9fb4e8', 13, true);
+    this.label(cx0 + 42, this.top + 15, t('hud.cp'), INK.hudLabel, 13, true);
+    this.label(cx0 + 127, this.top + 15, t('hud.time'), INK.hudLabel, 13, true);
 
-    this.label(PANELS.distance[0] + 70, this.top + 15, t('hud.distance'), '#9fb4e8', 13, true);
-    this.label(PANELS.score[0] + 65, this.top + 15, t('hud.score'), '#9fb4e8', 13, true);
-    this.label(PANELS.combo[0] + 45, this.top + 15, t('hud.combo'), '#9fb4e8', 13, true);
+    this.label(PANELS.distance[0] + 70, this.top + 15, t('hud.distance'), INK.hudLabel, 13, true);
+    this.label(PANELS.score[0] + 65, this.top + 15, t('hud.score'), INK.hudLabel, 13, true);
+    this.label(PANELS.combo[0] + 45, this.top + 15, t('hud.combo'), INK.hudLabel, 13, true);
 
     this.dyn = scene.add.graphics().setScrollFactor(0).setDepth(21);
     this.texts.cp = this.value(cx0 + 42, this.top + 38, 26);
     this.texts.clock = this.value(cx0 + 127, this.top + 38, 26);
     this.texts.dist = this.value(PANELS.distance[0] + 70, this.top + 36, 24);
-    this.texts.speed = this.label(PANELS.distance[0] + 70, this.top + 55, '', '#9fb4e8', 13, true);
+    this.texts.speed = this.label(PANELS.distance[0] + 70, this.top + 55, '', INK.hudLabel, 13, true);
     this.texts.score = this.value(PANELS.score[0] + 65, this.top + 33, 24);
-    this.texts.bonus = this.label(PANELS.score[0] + 65, this.top + 54, '', '#ffe066', 13, true);
+    this.texts.bonus = this.label(PANELS.score[0] + 65, this.top + 54, '', INK.title, 13, true);
     this.texts.combo = this.value(PANELS.combo[0] + 45, this.top + 42, 28);
   }
 
@@ -121,13 +121,7 @@ export class Hud {
 
   private label(x: number, y: number, text: string, color: string, size: number, bold = false) {
     return this.scene.add
-      .text(x, y, text, {
-        // Big readouts are the display face, small labels the body face.
-        fontFamily: size >= 20 ? FONT_DISPLAY : FONT_BODY,
-        fontSize: `${size}px`,
-        fontStyle: size >= 20 ? 'normal' : bold ? 'bold' : 'normal',
-        color,
-      })
+      .text(x, y, text, { ...textStyle(size >= 20 ? 'display' : 'body', size, color), fontStyle: size >= 20 ? 'normal' : bold ? 'bold' : 'normal' })
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setResolution(2)

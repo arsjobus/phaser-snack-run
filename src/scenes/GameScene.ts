@@ -154,6 +154,7 @@ export class GameScene extends Phaser.Scene {
   private hintFading = false;
   private paused = false;
   private pauseLayer: Phaser.GameObjects.Container | null = null;
+  private pauseFocus = 0;
   private gameOverButtonLayer: Layer | null = null;
   private gameOverOptions: GameOverOption[] = [];
   private gameOverSelection = 0;
@@ -349,7 +350,7 @@ export class GameScene extends Phaser.Scene {
       kb.off('keydown');
       kb.off('keyup');
     });
-    this.keys = kb.addKeys('G,O,SPACE,ENTER,ESC,X') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = kb.addKeys('G,O,SPACE,ENTER,ESC,X,LEFT,RIGHT') as Record<string, Phaser.Input.Keyboard.Key>;
     this.applyQuality();
 
     this.terrain.ensure(this.startX + VIEW_W + 1500);
@@ -447,8 +448,14 @@ export class GameScene extends Phaser.Scene {
     const b = this.settings.bindings;
     const pressed = (a: Parameters<typeof actionPressed>[2]) => actionPressed(this.tracker, b, a);
     if (this.paused) {
-      if (J(this.keys.ESC) || pad.start) this.resumeFromPause();
+      const moved = J(this.keys.LEFT) || J(this.keys.RIGHT) || pad.left || pad.right;
+      if (moved) this.pauseFocus = 1 - this.pauseFocus;
+      if (J(this.keys.ENTER) || J(this.keys.SPACE) || pad.confirm) {
+        if (this.pauseFocus === 0) this.resumeFromPause();
+        else this.quitFromPause();
+      } else if (J(this.keys.ESC) || pad.start) this.resumeFromPause();
       else if (J(this.keys.X) || pad.back) this.quitFromPause();
+      if (moved) this.updatePauseFocus();
       this.tracker.endFrame();
       return;
     }
@@ -1211,17 +1218,19 @@ export class GameScene extends Phaser.Scene {
     this.scene.restart();
   }
 
-  private showPause(): void {
+  private showPause(resetFocus = true): void {
     this.paused = true;
+    if (resetFocus) this.pauseFocus = 0;
     this.audio.setPaused(true);
     const layer = this.add.container(0, 0).setScrollFactor(0).setDepth(30);
     layer.add(this.add.rectangle(VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, 0x07121b, 0.72));
     // Catch pointer input across the whole screen so underlying HUD/menu zones cannot activate.
     const blocker = this.add.zone(VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H).setScrollFactor(0).setInteractive();
     layer.add(blocker);
+    // Keep the title, prompt, and choices as one vertically centered group.
     layer.add(
       this.add
-        .text(VIEW_W / 2, VIEW_H / 2 - 18, tr('game.paused'), {
+        .text(VIEW_W / 2, VIEW_H / 2 - 50, tr('game.paused'), {
           fontFamily: FONT_DISPLAY,
           fontSize: '42px',
           color: INK.title,
@@ -1232,7 +1241,7 @@ export class GameScene extends Phaser.Scene {
     );
     layer.add(
       this.add
-        .text(VIEW_W / 2, VIEW_H / 2 + 34, tr('game.resume'), {
+        .text(VIEW_W / 2, VIEW_H / 2 + 2, tr('game.resume'), {
           fontFamily: FONT_BODY,
           fontSize: '18px',
           color: '#ffffff',
@@ -1242,8 +1251,8 @@ export class GameScene extends Phaser.Scene {
         .setOrigin(0.5),
     );
     // Two choices: carry on, or forfeit the run and go straight to the start screen (no game-over screen, nothing banked).
-    button(this, layer, { x: VIEW_W / 2 - 110, y: VIEW_H / 2 + 92, w: 200, h: 44, text: tr('game.btn.resume'), hint: 'ESC', size: 16, selected: true, onClick: () => this.resumeFromPause() });
-    button(this, layer, { x: VIEW_W / 2 + 110, y: VIEW_H / 2 + 92, w: 200, h: 44, text: tr('game.btn.quit'), hint: 'X', size: 16, accent: UI.red, onClick: () => this.quitFromPause() });
+    button(this, layer, { x: VIEW_W / 2 - 110, y: VIEW_H / 2 + 58, w: 200, h: 44, text: tr('game.btn.resume'), hint: 'ESC', size: 16, selected: true, focused: this.pauseFocus === 0, onClick: () => this.resumeFromPause() });
+    button(this, layer, { x: VIEW_W / 2 + 110, y: VIEW_H / 2 + 58, w: 200, h: 44, text: tr('game.btn.quit'), hint: 'X', size: 16, accent: UI.red, focused: this.pauseFocus === 1, onClick: () => this.quitFromPause() });
     this.pauseLayer = layer;
   }
 
@@ -1252,6 +1261,14 @@ export class GameScene extends Phaser.Scene {
     this.audio.setPaused(false);
     this.pauseLayer?.destroy();
     this.pauseLayer = null;
+  }
+
+  private updatePauseFocus(): void {
+    // The pause menu is rebuilt only when opened; redraw its focus ring when arrow keys move focus.
+    if (!this.pauseLayer) return;
+    this.pauseLayer.destroy();
+    this.pauseLayer = null;
+    this.showPause(false);
   }
 
   /** Forfeit the run: leave for the start screen. Nothing is banked, so no coins or scores. */
@@ -1307,7 +1324,7 @@ export class GameScene extends Phaser.Scene {
     const cx = VIEW_W / 2;
     panel(this, layer, 70, 22, 820, 446);
     const put = (x: number, y: number, text: string | string[], kind: 'display' | 'body', size: number, color: string, ox = 0.5) =>
-      label(this, layer, x, y, text, kind, size, color, ox);
+      label(this, layer, x, y, text, kind, size, color, ox, 0, ox === 0 ? 360 : ox === 1 ? 145 : 740);
 
     const title = tr(TITLE_KEYS[this.run.endReason ?? 'fuel']);
     put(cx, 50, title, 'display', 34, INK.red);

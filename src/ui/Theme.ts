@@ -36,7 +36,9 @@ export const INK = {
   bad: '#ff6a5a',
   cyan: '#9be0ff',
   dark: '#0a0a10',
+  navy: '#14224a',
   red: '#ff5a4a',
+  hudLabel: '#9fb4e8',
 } as const;
 
 export type TextKind = 'display' | 'body';
@@ -145,7 +147,7 @@ export const rowY = (top: number, step: number, i: number): number => top + i * 
  * The spacing every list in the menus follows (garage rows, achievements, settings): rows are
  * separated by at least `rowGap` px, and text starts `padX` px inside its plate.
  */
-export const LIST = { rowGap: 8, padX: 24 } as const;
+export const LIST = { rowGap: 8, padX: 24, rowHeight: 30 } as const;
 
 /** Rows of a list laid out between `top` and `bottom`: each is at most `maxH` tall, `LIST.rowGap` apart. */
 export function listRows(top: number, bottom: number, n: number, maxH: number): { h: number; step: number; y: (i: number) => number } {
