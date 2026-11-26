@@ -66,7 +66,7 @@ Every one-shot effect is an mp3 in `public/audio/` (`snack.mp3`, `fuel.mp3`, `bo
 - **Landing dust** comes from the ground under each wheel that touched down, in the player's own lane.
 - **Lane changes** need gas or reverse (`LANES.minDriveToSteer`), and are refused when the truck is rolled over with no wheel on the ground.
 - **Crisp text:** the canvas is rendered at 2x (`src/ui/Resolution.ts`, chosen from the window size) and text is rasterised at the same factor, so it is no longer stretched by the browser.
-- **SVG art:** vehicle parts, pickups, road hazards and props live in `public/art/` as SVG and are loaded at start-up (`npm run art:export` regenerates them; see `public/art/README.md`).
+- **SVG art:** vehicle parts, pickups, road hazards and props live in `src/art/assets/` as SVG and are loaded directly at start-up.
 
 ## What's new (balance, achievements, languages)
 

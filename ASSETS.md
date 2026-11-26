@@ -22,7 +22,7 @@ Every asset in the game must be listed here with its source and licence.
 | Music (adaptive theme: pad, drums, bass, lead stems) | Audio | Composed for this project (`src/audio/Composition.ts`), synthesized at runtime | Project licence | Original composition (A minor, 132 bpm, Am-F-G-E). Not derived from the original game's music; no samples |
 | Russo One (display font) | Font | `public/fonts/russo-one-latin-400-normal.woff2` (Fontsource build of Google Fonts' Russo One, Jovanny Lemonad) | SIL OFL 1.1 | `public/fonts/OFL-RussoOne.txt` |
 | Rajdhani 600/700 (text font) | Font | `public/fonts/rajdhani-latin-*-normal.woff2` (Fontsource build, Indian Type Foundry) | SIL OFL 1.1 | `public/fonts/OFL-Rajdhani.txt` |
-| Vehicle parts (player truck in 5 paints, 6 rival bodies, tire, 12 show-jump cars), pickups (snack, fuel can, wrench), road hazards (rocks, boulders, logs, tire stacks, 3 variants each) and props (start, checkpoint and biome gates, pyro stand, boost arch) | Texture | `public/art/{vehicles,pickups,hazards,props}/*.svg`, exported from the drawing code by `npm run art:export` | Project licence | Original art. Edit the SVGs freely (keep each file's width, height and viewBox); the boot scene loads them under the keys in `src/art/manifest.ts`, and draws a sprite from code if its file is missing. Details in `public/art/README.md` |
+| Vehicle parts, pickups, road hazards and props | Texture | `src/art/assets/**/*.svg` | Project licence | Original art. These SVGs are the source of truth and are loaded directly by Vite. |
 | Menu kit: panels, buttons, hazard strip, checker strip, medals, logo plate | UI | Drawn in code (`src/ui/`) | Project licence | Plan in `docs/ui-art-plan.md` |
 
 ## Rules

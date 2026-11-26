@@ -1,6 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { artAssets, artPath } from '../src/art/manifest';
-import { SvgGraphics } from '../src/art/SvgGraphics';
 import { BIOMES, GAMEPLAY, LANES, VIEW_H, VIEW_W } from '../src/config';
 import { biomeAtX, biomeSegments, groundPaletteAt, mixColor } from '../src/game/Biomes';
 import { landingPoints } from '../src/game/Effects';
@@ -10,8 +8,6 @@ import { ScreenShake } from '../src/game/Shake';
 import { MAX_RENDER_SCALE, chooseRenderScale } from '../src/ui/RenderScale';
 
 const START = GAMEPLAY.startX;
-/** Every file under public/art, as raw text, keyed by its path relative to public/. */
-const files = import.meta.glob('../public/art/**/*.svg', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 
 describe('Screen shake', () => {
   it('only ever offsets by whole pixels and dies away', () => {
@@ -149,46 +145,3 @@ describe('Render scale', () => {
   });
 });
 
-describe('SVG art', () => {
-  it('SvgGraphics writes the shapes in draw order', () => {
-    const g = new SvgGraphics();
-    g.fillStyle(0xff0000, 1).fillRect(1, 2, 3, 4);
-    g.fillStyle(0x00ff00, 0.5).fillCircle(5, 5, 2);
-    g.lineStyle(2, 0x0000ff, 1).lineBetween(0, 0, 9, 9);
-    const svg = g.toSvg(10, 10);
-    expect(svg).toContain('width="10" height="10" viewBox="0 0 10 10"');
-    expect(svg.indexOf('<rect')).toBeLessThan(svg.indexOf('<circle'));
-    expect(svg.indexOf('<circle')).toBeLessThan(svg.indexOf('<line'));
-    expect(svg).toContain('fill="#ff0000"');
-    expect(svg).toContain('fill-opacity="0.5"');
-    expect(svg).toContain('stroke="#0000ff" stroke-width="2"');
-  });
-  it('a pie slice is a closed path with the right arc direction', () => {
-    const g = new SvgGraphics();
-    g.fillStyle(0, 1).slice(10, 10, 5, Math.PI, Math.PI * 2, false).fillPath();
-    const svg = g.toSvg(20, 20);
-    expect(svg).toMatch(/<path d="M10 10 L5 10 A5 5 0 0 1 15 10 Z"/);
-  });
-  const assets = artAssets();
-  it('every sprite has a unique key and file', () => {
-    expect(new Set(assets.map((a) => a.key)).size).toBe(assets.length);
-    expect(new Set(assets.map(artPath)).size).toBe(assets.length);
-  });
-  it('covers the vehicle parts, pickups and road hazards', () => {
-    const groups = new Set(assets.map((a) => a.group));
-    for (const g of ['vehicles', 'pickups', 'hazards']) expect(groups.has(g as never)).toBe(true);
-    expect(assets.filter((a) => a.group === 'hazards').length).toBe(12);
-    expect(assets.filter((a) => a.group === 'pickups').map((a) => a.key).sort()).toEqual(['fuel_can', 'snack', 'wrench']);
-    expect(assets.some((a) => a.key === 'wheel')).toBe(true);
-  });
-  it('the exported files exist in public/art and keep their sprite size', () => {
-    for (const a of assets) {
-      const text = files[`../public/${artPath(a)}`];
-      expect(text, `${artPath(a)} is missing: run npm run art:export`).toBeTypeOf('string');
-      const head = text.slice(0, 400);
-      expect(head).toContain(`width="${a.w}"`);
-      expect(head).toContain(`height="${a.h}"`);
-      expect(head).toContain(`viewBox="0 0 ${a.w} ${a.h}"`);
-    }
-  });
-});
