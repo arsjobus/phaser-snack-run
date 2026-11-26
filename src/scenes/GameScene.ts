@@ -1251,8 +1251,8 @@ export class GameScene extends Phaser.Scene {
         .setOrigin(0.5),
     );
     // Two choices: carry on, or forfeit the run and go straight to the start screen (no game-over screen, nothing banked).
-    button(this, layer, { x: VIEW_W / 2 - 110, y: VIEW_H / 2 + 58, w: 200, h: 44, text: tr('game.btn.resume'), hint: 'ESC', size: 16, selected: true, focused: this.pauseFocus === 0, onClick: () => this.resumeFromPause() });
-    button(this, layer, { x: VIEW_W / 2 + 110, y: VIEW_H / 2 + 58, w: 200, h: 44, text: tr('game.btn.quit'), hint: 'X', size: 16, accent: UI.red, focused: this.pauseFocus === 1, onClick: () => this.quitFromPause() });
+    button(this, layer, { x: VIEW_W / 2 - 110, y: VIEW_H / 2 + 58, w: 200, h: 44, text: tr('game.btn.resume'), size: 16, selected: true, focused: this.pauseFocus === 0, onClick: () => this.resumeFromPause() });
+    button(this, layer, { x: VIEW_W / 2 + 110, y: VIEW_H / 2 + 58, w: 200, h: 44, text: tr('game.btn.quit'), size: 16, accent: UI.red, focused: this.pauseFocus === 1, onClick: () => this.quitFromPause() });
     this.pauseLayer = layer;
   }
 
@@ -1432,14 +1432,12 @@ export class GameScene extends Phaser.Scene {
     const layer = this.gameOverButtonLayer;
     if (!layer) return;
     layer.removeAll(true);
-    const put = (x: number, y: number, text: string, kind: 'display' | 'body', size: number, color: string) =>
-      label(this, layer, x, y, text, kind, size, color);
     // The buttons divide the same 764 px content box as the columns above them.
     const n = this.gameOverOptions.length;
     const gap = 16;
     const w = (GAME_OVER_GRID.totalW - (n - 1) * gap) / n;
     const x0 = GAME_OVER_GRID.left + w / 2;
-    this.gameOverOptions.forEach(([text, hint, go, accent], i) => {
+    this.gameOverOptions.forEach(([text, , go, accent], i) => {
       button(this, layer, {
         x: x0 + i * (w + gap),
         y: 426,

@@ -291,7 +291,6 @@ export class MenuScene extends Phaser.Scene {
         w,
         h: 54,
         text: t(m.key),
-        hint: m.hint,
         selected: i === this.index,
         accent: this.master ? MASTER.gold : m.accent,
         size: 20,

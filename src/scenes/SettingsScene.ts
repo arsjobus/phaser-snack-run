@@ -328,7 +328,7 @@ export class SettingsScene extends Phaser.Scene {
     const body = this.text(cx, cy - 4, t('garage.confirmBody'), 16, INK.soft, 0.5);
     body.setAlign('center').setWordWrapWidth(inner.right - inner.left);
     const bw = 220;
-    button(this, this.layer, { x: cx - bw / 2 - 10, y: cy + 64, w: bw, h: 40, text: t('garage.keepIt'), hint: 'N', size: 16, selected: this.eraseFocus === 0, onClick: () => this.closeErase() });
-    button(this, this.layer, { x: cx + bw / 2 + 10, y: cy + 64, w: bw, h: 40, text: t('garage.eraseAll'), hint: 'Y', size: 16, selected: this.eraseFocus === 1, accent: UI.red, onClick: () => this.eraseProgress() });
+    button(this, this.layer, { x: cx - bw / 2 - 10, y: cy + 64, w: bw, h: 40, text: t('garage.keepIt'), size: 16, selected: this.eraseFocus === 0, onClick: () => this.closeErase() });
+    button(this, this.layer, { x: cx + bw / 2 + 10, y: cy + 64, w: bw, h: 40, text: t('garage.eraseAll'), size: 16, selected: this.eraseFocus === 1, accent: UI.red, onClick: () => this.eraseProgress() });
   }
 }
