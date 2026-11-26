@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { SCROLL_Y0, TRUCK, VIEW_W } from '../config';
+import { SCROLL_Y0, TRUCK, VIEW_H, VIEW_W } from '../config';
 import { playerTruckKey, rivalTruckKey } from '../art/trucks';
 import { BIOME_LIST } from '../game/Biomes';
 import { GroundPainter } from '../game/GroundPainter';
@@ -231,7 +231,7 @@ export class MenuScene extends Phaser.Scene {
   private showToast(text: string): void {
     this.toast?.destroy();
     const l = this.add.container(0, 0).setDepth(25).setScrollFactor(0);
-    label(this, l, VIEW_W / 2, 176, text, 'display', 30, INK.title, 0.5, 5);
+    label(this, l, VIEW_W / 2, VIEW_H / 2, text, 'display', 30, INK.title, 0.5, 5);
     this.toast = l;
     this.tweens.add({ targets: l, alpha: 0, delay: 1600, duration: 500, onComplete: () => l.destroy() });
   }

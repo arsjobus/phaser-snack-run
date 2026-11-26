@@ -31,6 +31,17 @@ There is no air control and no lean: the arrow keys steer through the field inst
 
 Add `?seed=anything` to the URL for a repeatable course.
 
+## Start menu cheat codes
+
+Enter these directional sequences on the start menu with the arrow keys, gamepad D-pad or left stick. The game displays a confirmation message when a code is accepted.
+
+| Sequence | Effect |
+| --- | --- |
+| ↑ ↑ ↓ ↓ ← → ← → | Toggle God Mode for the current page session. It prevents damage and fuel use, stops the timer from ending a run, and rights the truck after a rollover. Reloading turns it off. |
+| ← ← → → ↑ ↓ ↑ ↓ | Unlock every upgrade at its maximum level and every truck skin. |
+| ↓ ↓ ↑ ↑ → ← → ← | Set your coin balance to 999,999. |
+| ↑ ↓ ← → ↑ ↓ ← → | Unlock every achievement, including the hidden ones. Any unclaimed achievement coin rewards are added to your bank. |
+
 ## What's in Phase 9 (the monster-truck show)
 
 Before every second checkpoint (the biome borders: 2nd, 4th, 6th...) the last tenth of the segment is a stage:

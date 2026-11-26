@@ -1,7 +1,9 @@
 import { PROGRESSION } from '../config';
+import { ACHIEVEMENTS } from './Achievements';
+import { dayKey } from './Day';
 import { SKINS } from './Skins';
 import { isGodMode, setGodMode } from './Session';
-import { UPGRADE_IDS, type SaveData } from './Progress';
+import { addCoins, UPGRADE_IDS, type SaveData } from './Progress';
 
 /**
  * Invisible, classic-style cheat codes (pure TypeScript, no Phaser): on the start screen the player
@@ -10,7 +12,7 @@ import { UPGRADE_IDS, type SaveData } from './Progress';
  * no code ends with another, so two can never fire at once.
  */
 export type CheatKey = 'U' | 'D' | 'L' | 'R';
-export type CheatId = 'god' | 'unlock' | 'coins';
+export type CheatId = 'god' | 'unlock' | 'coins' | 'achievements';
 
 export const CHEAT_CODES: Record<CheatId, readonly CheatKey[]> = {
   /** Up Up Down Down Left Right Left Right (a nod to the classic). Toggles. */
@@ -19,6 +21,8 @@ export const CHEAT_CODES: Record<CheatId, readonly CheatKey[]> = {
   unlock: ['L', 'L', 'R', 'R', 'U', 'D', 'U', 'D'],
   /** Down Down Up Up Right Left Right Left. */
   coins: ['D', 'D', 'U', 'U', 'R', 'L', 'R', 'L'],
+  /** Up Down Left Right Up Down Left Right. */
+  achievements: ['U', 'D', 'L', 'R', 'U', 'D', 'L', 'R'],
 };
 
 /** What "max coins" puts in the bank. */
@@ -72,5 +76,14 @@ export function applyCheat(save: SaveData, id: CheatId): CheatResult {
     case 'coins':
       save.coins = Math.max(save.coins, CHEAT_MAX_COINS);
       return { id, message: 'MAX COINS', messageKey: 'cheat.coins' };
+    case 'achievements': {
+      const today = dayKey();
+      for (const achievement of ACHIEVEMENTS) {
+        if (save.achievements[achievement.id]) continue;
+        save.achievements[achievement.id] = today;
+        addCoins(save, achievement.reward);
+      }
+      return { id, message: 'ALL ACHIEVEMENTS UNLOCKED', messageKey: 'cheat.achievements' };
+    }
   }
 }
