@@ -242,6 +242,9 @@ export const PICKUPS = {
    * false: snacks, like fuel cans and wrenches, can only be collected from the lane they sit in.
    */
   snacksFromAnyLane: true,
+  /** Keep every snack pickup in lane 1 (the second lane from the camera). */
+  snacksFixedLane: true,
+  snackLane: 1,
   /** A pickup this far behind the truck counts as missed (breaks the combo). */
   missMargin: 110,
   /** Spawn this far ahead of the truck (px). */

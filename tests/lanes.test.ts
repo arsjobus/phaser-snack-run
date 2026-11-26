@@ -334,7 +334,7 @@ describe('Run with lanes', () => {
     }
   });
 
-  it('fuel cans stay in the middle lanes and snack trails wander one lane at a time', () => {
+  it('fuel cans stay in the middle lanes and snacks use the configured fixed lane', () => {
     const t = new Terrain(2);
     const f = new PickupField(2, t, START);
     f.ensure(START + 6000 * PX_PER_METER);
@@ -343,7 +343,7 @@ describe('Run with lanes', () => {
       expect(p.lane).toBeLessThanOrEqual(LANES.count - 2);
     }
     const lanes = new Set(f.items.filter((p) => p.kind === 'snack').map((p) => p.lane));
-    expect(lanes.size).toBeGreaterThanOrEqual(3);
+    expect([...lanes]).toEqual([1]);
   });
 
   it('counts lane changes and near misses, and pays the BONUS', () => {

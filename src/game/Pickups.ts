@@ -75,7 +75,7 @@ export class PickupField {
     // Starter line on the opening flat so the first thing the player learns is "grab these".
     for (let i = 0; i < 6; i++) {
       const x = startX + 380 + i * PICKUPS.spacing;
-      this.add('snack', x, terrain.heightAt(x) - PICKUPS.hover, LANES.startLane);
+      this.add('snack', x, terrain.heightAt(x) - PICKUPS.hover, this.snackSpawnLane(LANES.startLane));
     }
     this.nextFuelX = this.planFuel(startX);
     this.nextWrenchX = startX + WRENCH.firstMeters * PX_PER_METER;
@@ -224,7 +224,7 @@ export class PickupField {
   private stuntSnacks(p: TerrainPiece): void {
     const t = this.terrain;
     const stage = stuntLayout(p.stage ?? 0, this.startX);
-    const lane = 1;
+    const lane = this.snackSpawnLane(1);
     const first = stage.pads[0].x0;
     const last = stage.rampX0;
     for (let x = first + 40; x < last; x += PICKUPS.spacing * 2) this.add('snack', x, t.heightAt(x) - PICKUPS.hover, lane);
@@ -239,7 +239,7 @@ export class PickupField {
     if (this.rng.next() > SNACK_CHANCE[p.kind]) return;
     const t = this.terrain;
     const hover = PICKUPS.hover;
-    const lane = (this.snackLane = clampLane(this.snackLane + this.laneRng.int(-1, 1)));
+    const lane = this.snackSpawnLane((this.snackLane = clampLane(this.snackLane + this.laneRng.int(-1, 1))));
     if (p.kind === 'ramp' || p.kind === 'table') {
       // Two on the climb, then an arc over the gap: the arc teaches "hit the ramp".
       for (const f of [0.45, 0.8]) {
@@ -259,5 +259,9 @@ export class PickupField {
       if (this.wrecks?.near(x, 80, lane) || this.obstacles?.near(x, 80, lane)) continue; // something lies there
       this.add('snack', x, t.heightAt(x) - hover, lane);
     }
+  }
+
+  private snackSpawnLane(lane: number): number {
+    return PICKUPS.snacksFixedLane ? clampLane(PICKUPS.snackLane) : lane;
   }
 }
