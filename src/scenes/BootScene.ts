@@ -27,12 +27,12 @@ export class BootScene extends Phaser.Scene {
 
     for (const a of artAssets()) this.load.svg(a.key, a.url);
     // The wordmark is an existing SVG outside the generated art manifest.
-    this.load.svg("crunch_logo", "art/crunch-logo.svg");
+    this.load.svg("crunch_logo", "assets/art/crunch-logo.svg");
     this.load.on("loaderror", (file: Phaser.Loader.File) => {
       if (file.type === "svg") console.warn(`Art file ${file.url} did not load for ${file.key}.`);
     });
 
-    this.load.audio("bgm", "audio/bgm.mp3");
+    this.load.audio("bgm", "assets/audio/bgm.mp3");
     for (const key of SFX_KEYS) this.load.audio(sfxCacheKey(key), sfxUrl(key));
   }
 

@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { PIXEL_FONT, pixelTextWidth } from '../src/art/pixelFont';
 import { SFX, SFX_KEYS, sfxCacheKey, sfxUrl } from '../src/audio/sfx';
 
-/** File names of every mp3 in public/audio (only the keys are used; nothing is imported). */
-const FILES = Object.keys(import.meta.glob('../public/audio/*.mp3')).map((p) => p.split('/').pop() as string);
+/** File names of every mp3 in public/assets/audio (only the keys are used; nothing is imported). */
+const FILES = Object.keys(import.meta.glob('../public/assets/audio/*.mp3')).map((p) => p.split('/').pop() as string);
 
 describe('pixel font', () => {
   it('has a glyph for every letter of BOOST (the sign used to read OOST)', () => {
@@ -22,11 +22,11 @@ describe('pixel font', () => {
 });
 
 describe('sound effect files', () => {
-  it('every effect points at an mp3 that exists in public/audio', () => {
+  it('every effect points at an mp3 that exists in public/assets/audio', () => {
     for (const key of SFX_KEYS) {
       const file = SFX[key].file;
       expect(file, key).toMatch(/\.mp3$/);
-      expect(FILES, `${file} is missing from public/audio`).toContain(file);
+      expect(FILES, `${file} is missing from public/assets/audio`).toContain(file);
     }
   });
 

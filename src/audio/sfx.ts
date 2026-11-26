@@ -1,5 +1,5 @@
 /**
- * The one-shot sound effects. Each one is an mp3 in `public/audio/`, so you can edit or replace
+ * The one-shot sound effects. Each one is an mp3 in `public/assets/audio/`, so you can edit or replace
  * any of them: drop your own file in with the same name (or change `file` here) and reload.
  *
  * `volume` is the playback gain (0..1+, before the player's SFX volume setting). The mp3s that
@@ -51,5 +51,5 @@ export function sfxCacheKey(key: SfxKey): string {
 
 /** URL (relative to the page, so it works on itch.io and GitHub Pages) of a sound effect. */
 export function sfxUrl(key: SfxKey): string {
-  return `audio/${SFX[key].file}`;
+  return `assets/audio/${SFX[key].file}`;
 }

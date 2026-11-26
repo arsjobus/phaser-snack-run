@@ -1,6 +1,6 @@
 /**
  * The game's two typefaces, both free under the SIL Open Font License (see ASSETS.md and
- * `public/fonts/`), both bundled so nothing is fetched from a third party:
+ * `public/assets/fonts/`), both bundled so nothing is fetched from a third party:
  *  - primary (display): Russo One: chunky, sporty capitals for titles, buttons and big numbers,
  *  - secondary (text): Rajdhani (semi-bold and bold): a squarish, condensed face for labels,
  *    descriptions and tables (its digits line up in columns).
@@ -16,9 +16,9 @@ interface Face {
 }
 
 const FACES: readonly Face[] = [
-  { family: 'Russo One', file: 'fonts/russo-one-latin-400-normal.woff2', weight: '400' },
-  { family: 'Rajdhani', file: 'fonts/rajdhani-latin-600-normal.woff2', weight: '600' },
-  { family: 'Rajdhani', file: 'fonts/rajdhani-latin-700-normal.woff2', weight: '700' },
+  { family: 'Russo One', file: 'assets/fonts/russo-one-latin-400-normal.woff2', weight: '400' },
+  { family: 'Rajdhani', file: 'assets/fonts/rajdhani-latin-600-normal.woff2', weight: '600' },
+  { family: 'Rajdhani', file: 'assets/fonts/rajdhani-latin-700-normal.woff2', weight: '700' },
 ];
 
 /**

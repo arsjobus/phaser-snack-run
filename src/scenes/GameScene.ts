@@ -1481,23 +1481,41 @@ export class GameScene extends Phaser.Scene {
     const t = this.truck;
     const cos = Math.cos(t.angle);
     const sin = Math.sin(t.angle);
+    // Vehicle views are depth projected (raised and scaled) while physics stays in
+    // world coordinates. Project debug geometry the same way as the sprites.
+    const project = (x: number, y: number, lane: number) => ({
+      x,
+      y: laneProject(this.terrain.heightAt(x), y, lane),
+      scale: laneScale(lane),
+    });
     t.wheelContacts.forEach((c) => {
+      const p = project(c.x, c.y, this.lane.f);
       g.lineStyle(2, c.inContact ? 0xff3030 : 0x30ff30, 1);
-      g.strokeCircle(c.x, c.y, PHYSICS.wheelRadius);
+      g.strokeCircle(p.x, p.y, PHYSICS.wheelRadius * p.scale);
     });
     g.fillStyle(0xff00ff, 1);
     for (const b of TRUCK.body) {
-      g.fillCircle(t.x + b.x * cos - b.y * sin, t.y + b.x * sin + b.y * cos, 4);
+      const x = t.x + b.x * cos - b.y * sin;
+      const y = t.y + b.x * sin + b.y * cos;
+      const p = project(x, y, this.lane.f);
+      g.fillCircle(p.x, p.y, 4 * p.scale);
     }
     g.lineStyle(1, 0xffffff, 0.6);
     g.lineBetween(this.cameras.main.scrollX, BASE_Y, this.cameras.main.scrollX + VIEW_W, BASE_Y);
     g.lineStyle(1, 0xffe066, 0.7); // pickup collect radius
-    g.strokeCircle(t.x, t.y, 54);
+    const playerCenter = project(t.x, t.y, this.lane.f);
+    g.strokeCircle(playerCenter.x, playerCenter.y, 54 * playerCenter.scale);
     g.lineStyle(1, 0x30c0ff, 0.9); // collision circles: player, rivals, wrecks
-    for (const c of truckCircles(t)) g.strokeCircle(c.x, c.y, c.r);
+    for (const c of truckCircles(t)) {
+      const p = project(c.x, c.y, this.lane.f);
+      g.strokeCircle(p.x, p.y, c.r * p.scale);
+    }
     for (const r of this.race.rivals) {
       g.lineStyle(1, r.inLane(this.lane.f) ? 0xff5a4a : 0x886666, 0.9);
-      for (const c of truckCircles(r.truck)) g.strokeCircle(c.x, c.y, c.r);
+      for (const c of truckCircles(r.truck)) {
+        const p = project(c.x, c.y, r.laneF);
+        g.strokeCircle(p.x, p.y, c.r * p.scale);
+      }
     }
     g.lineStyle(1, 0xff9f45, 0.9);
     for (const w of this.run.wrecks.items) {

@@ -22,7 +22,7 @@ export interface AudioState {
 
 /**
  * Music comes from the bgm.mp3 audio asset and every one-shot sound effect from its own mp3 in
- * public/audio (see `sfx.ts`), so they can be edited or swapped. Only the engine and the mud-roll
+ * public/assets/audio (see `sfx.ts`), so they can be edited or swapped. Only the engine and the mud-roll
  * hiss are still synthesized at runtime, because they are continuous and follow speed.
  * Everything feeds Phaser's master mute node, so M mutes it all. The context stays suspended until
  * the first key press or tap; until then every call here is a no-op.

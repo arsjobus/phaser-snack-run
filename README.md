@@ -57,7 +57,7 @@ Before every second checkpoint (the biome borders: 2nd, 4th, 6th...) the last te
 
 ## Sound effects
 
-Every one-shot effect is an mp3 in `public/audio/` (`snack.mp3`, `fuel.mp3`, `boost.mp3`, `thud-hard.mp3`, ...). To change one, drop your own mp3 over it with the same name (or edit its `file` in `src/audio/sfx.ts`); `volume` in that file is its playback level. The game pitches some of them on the fly: `snack` climbs the scale with the combo, `boost` rises with each pad and `rocket` varies a little. Check the licence of anything you add and list it in `ASSETS.md`. `npm test` fails if a listed file is missing.
+Every one-shot effect is an mp3 in `public/assets/audio/` (`snack.mp3`, `fuel.mp3`, `boost.mp3`, `thud-hard.mp3`, ...). To change one, drop your own mp3 over it with the same name (or edit its `file` in `src/audio/sfx.ts`); `volume` in that file is its playback level. The game pitches some of them on the fly: `snack` climbs the scale with the combo, `boost` rises with each pad and `rocket` varies a little. Check the licence of anything you add and list it in `ASSETS.md`. `npm test` fails if a listed file is missing.
 
 ## What's in Phase 9.6 (fixes)
 
@@ -124,7 +124,7 @@ Every one-shot effect is an mp3 in `public/audio/` (`snack.mp3`, `fuel.mp3`, `bo
 
 ## What's in Phase 6
 
-Music is `public/audio/bgm.mp3`, and every one-shot sound effect is its own mp3 in `public/audio/` (the list, with a playback volume for each, is `src/audio/sfx.ts`), so you can edit or swap any of them: replace the file, keep the name, reload. Only the engine hum and mud-roll hiss are still synthesized at runtime (Web Audio), since they follow your speed. `scripts/make-sfx.py` regenerates the original effects. Browsers keep audio locked until the first key press or tap, so the music starts then. `M` mutes everything, `N` just the music.
+Music is `public/assets/audio/bgm.mp3`, and every one-shot sound effect is its own mp3 in `public/assets/audio/` (the list, with a playback volume for each, is `src/audio/sfx.ts`), so you can edit or swap any of them: replace the file, keep the name, reload. Only the engine hum and mud-roll hiss are still synthesized at runtime (Web Audio), since they follow your speed. `scripts/make-sfx.py` regenerates the original effects. Browsers keep audio locked until the first key press or tap, so the music starts then. `M` mutes everything, `N` just the music.
 
 - **Score:** an original theme (`src/audio/Composition.ts`): a funky big-beat groove in A minor at 132 bpm over Am-F-G-E, four stems (pad, drums, bass, lead). It is **not** a remix of the original game's music (see roadmap §3, path 1: recompose).
 - **Adaptive mix** (`src/audio/Mix.ts`, tuned in `AUDIO` in `src/config.ts`): the pad is always on; drums fade in with speed, then bass; the lead joins at high speed or from combo x2 (full at x5). Stems swell over about half a second rather than switching. A checkpoint plays a bright stinger in the current key; each biome transposes the theme (0, +2, -2, +3 semitones) at the next 4-bar loop start so chords never clash.

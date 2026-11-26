@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Renders the game's one-shot sound effects to public/audio/*.mp3.
+Renders the game's one-shot sound effects to public/assets/audio/*.mp3.
 
-These files are the *starting point*: the game just plays whatever mp3 is in public/audio under
+These files are the *starting point*: the game just plays whatever mp3 is in public/assets/audio under
 the names listed in src/audio/sfx.ts. Swap any file for your own sound (keep the file name, or
 change it in sfx.ts) and nothing else needs to change. This script is only here so the originals
 can be regenerated; you never need to run it.
 
 Needs: python3, numpy, scipy and ffmpeg (with libmp3lame).
-    python3 scripts/make-sfx.py            # writes public/audio/*.mp3
+    python3 scripts/make-sfx.py            # writes public/assets/audio/*.mp3
     python3 scripts/make-sfx.py --peaks    # also prints each file's original peak level
 """
 import subprocess

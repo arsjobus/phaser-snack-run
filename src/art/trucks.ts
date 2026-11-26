@@ -446,7 +446,7 @@ export function drawTruck(
 export function makeTruckTextures(scene: Phaser.Scene): string[] {
   const keys: string[] = [];
   const build = (key: string, kind: BodyKind, paint: Paint, number: number | null, wheel: number, seed: number) => {
-    // A truck loaded from its SVG file (public/art/vehicles) is used as it is; the drawing code is the fallback.
+    // A truck loaded from its SVG file (public/assets/art/vehicles) is used as it is; the drawing code is the fallback.
     if (!scene.textures.exists(key)) {
       const g = scene.make.graphics({ x: 0, y: 0 }, false);
       drawTruck(g, kind, paint, number, wheel, seed);
