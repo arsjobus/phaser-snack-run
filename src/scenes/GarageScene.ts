@@ -113,12 +113,6 @@ export class GarageScene extends Phaser.Scene {
     }
     const n = this.rows();
     if (n === 0) return;
-    if (this.tab === 'PAINT') {
-      const column = Math.floor(this.row / 5);
-      this.row = column * 5 + wrapIndex(this.row % 5, d, 5);
-      this.draw();
-      return;
-    }
     this.row = wrapIndex(this.row, d, n);
     this.draw();
   }
