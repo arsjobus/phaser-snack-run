@@ -263,7 +263,11 @@ export function logoPlate(scene: Phaser.Scene, layer: Layer, cx: number, cy: num
   g.fillStyle(UI.outline, 1);
   g.fillRect(cx - w / 2 + 14, cy + h * 0.18, w - 28, 3);
   layer.add(g);
-  label(scene, layer, cx, cy - h * 0.14, 'CRUNCH 4x4', 'display', Math.round(h * 0.42), '#b83a1a');
+  if (scene.textures.exists('crunch_logo') && scene.textures.get('crunch_logo').has('wordmark')) {
+    layer.add(scene.add.image(cx, cy - h * 0.14, 'crunch_logo', 'wordmark').setDisplaySize(w * 0.85, h * 0.46));
+  } else {
+    label(scene, layer, cx, cy - h * 0.14, 'CRUNCH 4x4', 'display', Math.round(h * 0.42), '#b83a1a');
+  }
   label(scene, layer, cx, cy + h * 0.33, small, 'display', Math.round(h * 0.2), '#000000');
 }
 

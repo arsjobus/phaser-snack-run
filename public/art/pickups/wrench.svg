@@ -1,11 +1,109 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="52" height="44" viewBox="0 0 52 44">
-  <rect x="4" y="17" width="40" height="10" rx="4" fill="#111111"/>
-  <circle cx="8" cy="22" r="10" fill="#111111"/>
-  <circle cx="42" cy="22" r="9" fill="#111111"/>
-  <rect x="6" y="19" width="36" height="6" rx="3" fill="#c9ced6"/>
-  <circle cx="8" cy="22" r="8" fill="#c9ced6"/>
-  <circle cx="42" cy="22" r="7" fill="#c9ced6"/>
-  <rect x="12" y="19" width="24" height="2" fill="#ffffff" fill-opacity="0.7"/>
-  <rect x="0" y="19" width="8" height="6" fill="#111111"/>
-  <rect x="41" y="18" width="9" height="4" fill="#111111"/>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="52"
+   height="44"
+   viewBox="0 0 52 44"
+   version="1.1"
+   id="svg6"
+   sodipodi:docname="wrench.svg"
+   inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs6" />
+  <sodipodi:namedview
+     id="namedview6"
+     pagecolor="#505050"
+     bordercolor="#eeeeee"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#505050"
+     inkscape:zoom="9.4545454"
+     inkscape:cx="27.129808"
+     inkscape:cy="30.091346"
+     inkscape:window-width="1920"
+     inkscape:window-height="1050"
+     inkscape:window-x="0"
+     inkscape:window-y="38"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg6" />
+  <rect
+     x="6.3109579"
+     y="17"
+     width="38.483307"
+     height="10"
+     rx="3.848331"
+     fill="#111111"
+     id="rect1"
+     style="stroke-width:0.980858" />
+  <ellipse
+     cx="10.159288"
+     cy="22"
+     fill="#111111"
+     id="circle1"
+     rx="9.6208267"
+     ry="10"
+     style="stroke-width:0.980858" />
+  <ellipse
+     cx="42.870102"
+     cy="22"
+     fill="#111111"
+     id="circle2"
+     rx="8.6587439"
+     ry="9"
+     style="stroke-width:0.980858" />
+  <rect
+     x="8.2351227"
+     y="19"
+     width="34.634975"
+     height="6"
+     rx="2.8862481"
+     fill="#c9ced6"
+     id="rect2"
+     style="stroke-width:0.980858" />
+  <ellipse
+     cx="10.159288"
+     cy="22"
+     fill="#c9ced6"
+     id="circle3"
+     rx="7.6966619"
+     ry="8"
+     style="stroke-width:0.980858" />
+  <ellipse
+     cx="42.870102"
+     cy="22"
+     fill="#c9ced6"
+     id="circle4"
+     rx="6.7345791"
+     ry="7"
+     style="stroke-width:0.980858" />
+  <rect
+     x="14.00762"
+     y="19"
+     width="23.089985"
+     height="2"
+     fill="#ffffff"
+     fill-opacity="0.7"
+     id="rect4"
+     style="stroke-width:0.980858" />
+  <rect
+     x="2.4626269"
+     y="19"
+     width="7.6966619"
+     height="6"
+     fill="#111111"
+     id="rect5"
+     style="stroke-width:0.980858" />
+  <rect
+     x="41.90802"
+     y="18"
+     width="8.6587439"
+     height="4"
+     fill="#111111"
+     id="rect6"
+     style="stroke-width:0.980858" />
 </svg>

@@ -51,6 +51,8 @@ export class BootScene extends Phaser.Scene {
     // Vehicle parts, pickups, hazards and props are SVG files in public/art (see ASSETS.md). A file
     // that is missing or fails to load is drawn from code instead (see `bake`), so the game still runs.
     for (const a of artAssets()) this.load.svg(a.key, artPath(a));
+    // The wordmark is an existing SVG outside the generated art manifest.
+    this.load.svg("crunch_logo", "art/crunch-logo.svg");
     this.load.on("loaderror", (file: Phaser.Loader.File) => {
       if (file.type === "svg") console.warn(`Art file ${file.url} did not load; drawing ${file.key} from code.`);
     });
@@ -60,6 +62,8 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
+    const logo = this.textures.get("crunch_logo");
+    if (logo && !logo.has("wordmark")) logo.add("wordmark", 0, 0, 0, 520, 100);
     makeBackdrops(this);
     if (ART.rotationFrames > 0) {
       for (const key of makeTruckTextures(this)) makeRotationAtlas(this, key);

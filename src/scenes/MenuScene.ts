@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { SCROLL_Y0, TRUCK, VIEW_H, VIEW_W } from '../config';
 import { playerTruckKey, rivalTruckKey } from '../art/trucks';
+import { obstacleKey } from '../art/props';
 import { BIOME_LIST } from '../game/Biomes';
 import { GroundPainter } from '../game/GroundPainter';
 import { laneDepth, laneLift, laneProject, laneScale } from '../game/Lanes';
@@ -92,13 +93,30 @@ export class MenuScene extends Phaser.Scene {
       .setScale(laneScale(MENU_GATE.lane))
       .setDepth(0.5);
 
-    // The lineup: the player's truck up front (in the paint job chosen in the garage), three rivals behind it.
+    // A roadside boulder fills the open space on the left of the start screen.
+    const boulderX = 230;
+    const boulderLane = 3;
+    const boulderGround = terrain.heightAt(boulderX);
+    const boulderY = laneProject(boulderGround, boulderGround - 33, boulderLane);
+    this.add
+      .image(boulderX, boulderY, obstacleKey('boulder', 0))
+      .setScale(laneScale(boulderLane))
+      .setDepth(laneDepth(boulderLane, 0.02));
+    const tiresX = boulderX + 51;
+    const tiresGround = terrain.heightAt(tiresX);
+    const tiresY = laneProject(tiresGround, tiresGround - 23, boulderLane);
+    this.add
+      .image(tiresX, tiresY, obstacleKey('tires', 0))
+      .setScale(laneScale(boulderLane))
+      .setDepth(laneDepth(boulderLane, 0.02));
+
+    // Keep the original stagger and spacing, shifting the full lineup right to center its bounds.
     const playerKey = playerTruckKey(loadSave(defaultStore()).skin);
     const lineup = [
-      { key: rivalTruckKey(2), tire: RIVAL_STYLES[2].wheel, x: 330, lane: 2 },
-      { key: rivalTruckKey(0), tire: RIVAL_STYLES[0].wheel, x: 650, lane: 2 },
-      { key: rivalTruckKey(1), tire: RIVAL_STYLES[1].wheel, x: 820, lane: 1 },
-      { key: playerKey, tire: PLAYER_WHEEL, x: 480, lane: 0 },
+      { key: rivalTruckKey(2), tire: RIVAL_STYLES[2].wheel, x: 385, lane: 2 },
+      { key: rivalTruckKey(0), tire: RIVAL_STYLES[0].wheel, x: 705, lane: 2 },
+      { key: rivalTruckKey(1), tire: RIVAL_STYLES[1].wheel, x: 875, lane: 1 },
+      { key: playerKey, tire: PLAYER_WHEEL, x: 535, lane: 0 },
     ];
     const [ox, oy] = bodyOrigin();
     lineup.forEach((t, i) => {
@@ -142,8 +160,8 @@ export class MenuScene extends Phaser.Scene {
       this.tweens.add({ targets: star, alpha: 1, scale: 1.3, duration: 900, yoyo: true, repeat: -1, delay: s.delay, ease: 'Sine.easeInOut' });
     }
     // A warm pool of light on the road under the player's truck.
-    this.add.ellipse(480, groundY + 6, 230, 34, MASTER.gold, 0.28).setDepth(0.6);
-    this.add.ellipse(480, groundY + 6, 140, 20, MASTER.goldLight, 0.3).setDepth(0.61);
+    this.add.ellipse(535, groundY + 6, 230, 34, MASTER.gold, 0.28).setDepth(0.6);
+    this.add.ellipse(535, groundY + 6, 140, 20, MASTER.goldLight, 0.3).setDepth(0.61);
   }
 
   private drawRays(): void {
