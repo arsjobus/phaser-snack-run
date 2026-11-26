@@ -1,4 +1,4 @@
-import { CHECKPOINT, FUEL, LANES, PICKUPS, PX_PER_METER, SCORING, WRENCH } from '../config';
+import { CHECKPOINT, FUEL, LANES, PICKUPS, PX_PER_METER, SCORING, TRUCK, WRENCH } from '../config';
 import { CheckpointTrack } from './Checkpoint';
 import { DamageMeter } from './Damage';
 import { FuelTank } from './Fuel';
@@ -26,6 +26,7 @@ export type EndReason = 'fuel' | 'time' | 'wreck';
 export interface TruckSample {
   x: number;
   y: number;
+  angle?: number;
   /** Forward speed, px/s. */
   speed: number;
   /** The truck's depth (informational: pickups are grabbed from any depth). */
@@ -162,7 +163,10 @@ export class RunModel {
 
     this.pickups.ensure(truck.x + PICKUPS.spawnAhead);
 
-    for (const p of this.pickups.collect(truck.x, truck.y, truck.lane ?? LANES.startLane)) {
+    const angle = truck.angle ?? 0;
+    const collectX = truck.x + TRUCK.lift * Math.sin(angle);
+    const collectY = truck.y - TRUCK.lift * Math.cos(angle);
+    for (const p of this.pickups.collect(collectX, collectY, truck.lane ?? LANES.startLane)) {
       if (p.kind === 'snack') {
         const multiplier = this.score.multiplier;
         events.push({ type: 'snack', pickup: p, points: this.score.collectSnack(), multiplier });

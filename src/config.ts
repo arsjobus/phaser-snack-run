@@ -240,7 +240,7 @@ export const PICKUPS = {
   arcX: [70, 125, 180, 235, 290],
   arcY: [52, 62, 62, 48, 28],
   /** Truck-centre to pickup-centre distance (px) that collects it. */
-  collectRadius: 54,
+  collectRadius: 64,
   /**
    * true: a snack the truck touches is collected from ANY depth lane (the default).
    * false: snacks, like fuel cans and wrenches, can only be collected from the lane they sit in.

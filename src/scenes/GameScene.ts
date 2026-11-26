@@ -47,7 +47,7 @@ import { RunModel, type RunEvent } from '../game/Run';
 import { GroundPainter } from '../game/GroundPainter';
 import { Terrain } from '../game/Terrain';
 import { TruckPhysics } from '../game/TruckPhysics';
-import { axleY } from '../game/Tires';
+import { axleY, tireRadius, tireRise } from '../game/Tires';
 import { TruckView } from '../game/TruckView';
 import { wreckCircles, type Wreck } from '../game/Wrecks';
 import { playerInput, type InputState } from '../game/Input';
@@ -461,12 +461,13 @@ export class GameScene extends Phaser.Scene {
     }
     if (this.settings.effects === 'auto' && this.governor.update(realDt)) this.applyQuality();
     if (this.run.over) {
-      if (pad.left || pad.up) this.moveGameOverSelection(-1);
-      else if (pad.right || pad.down) this.moveGameOverSelection(1);
+      if (J(this.keys.LEFT) || pad.left || pad.up) this.moveGameOverSelection(-1);
+      else if (J(this.keys.RIGHT) || pad.right || pad.down) this.moveGameOverSelection(1);
       else if (J(this.keys.G) || pad.garage) this.scene.start('Garage');
       else if (J(this.keys.O) || pad.settings) this.scene.start('Settings', { from: 'Game' });
       else if (J(this.keys.ESC) || (pad.back && this.time.now - this.overAt > 400)) this.scene.start('Menu');
-      else if (J(this.keys.SPACE) || J(this.keys.ENTER)) this.restart(); // R does nothing: the manual reset-upright feature was removed
+      else if (J(this.keys.ENTER)) this.activateGameOverSelection();
+      else if (J(this.keys.SPACE)) this.restart(); // R does nothing: the manual reset-upright feature was removed
       else if (pad.confirm) this.activateGameOverSelection();
     } else {
       if (J(this.keys.ESC) || pad.start) {
@@ -508,7 +509,7 @@ export class GameScene extends Phaser.Scene {
     this.terrain.prune(this.truck.x - 1800);
     for (const e of this.stunt.drain()) this.onShowEvent(e);
 
-    for (const e of this.run.update(dt, { x: this.truck.x, y: this.truck.y, speed: this.truck.speed, lane: this.lane.f }, { gas: this.held.gas > 0, brake: this.held.brake > 0 })) {
+    for (const e of this.run.update(dt, { x: this.truck.x, y: this.truck.y, angle: this.truck.angle, speed: this.truck.speed, lane: this.lane.f }, { gas: this.held.gas > 0, brake: this.held.brake > 0 })) {
       this.onRunEvent(e);
     }
     for (const e of this.race.update(dt, this.truck, this.run.bestMeters, !this.run.over, this.lane.f, this.lane.target, this.run.over)) {
@@ -1483,37 +1484,60 @@ export class GameScene extends Phaser.Scene {
     const sin = Math.sin(t.angle);
     // Vehicle views are depth projected (raised and scaled) while physics stays in
     // world coordinates. Project debug geometry the same way as the sprites.
-    const project = (x: number, y: number, lane: number) => ({
-      x,
-      y: laneProject(this.terrain.heightAt(x), y, lane),
-      scale: laneScale(lane),
-    });
+    const projectVehiclePoint = (vehicle: TruckPhysics, x: number, y: number, lane: number) => {
+      const scale = laneScale(lane);
+      const centerY = laneProject(this.terrain.heightAt(vehicle.x), vehicle.y, lane);
+      return {
+        x: vehicle.x + (x - vehicle.x) * scale,
+        y: centerY + (y - vehicle.y) * scale,
+        scale,
+      };
+    };
     t.wheelContacts.forEach((c) => {
-      const p = project(c.x, c.y, this.lane.f);
+      const scale = laneScale(this.lane.f);
+      const gy = this.terrain.heightAt(t.x);
+      const groundY = this.terrain.heightAt(c.x) - PHYSICS.wheelRadius;
+      const x = c.x;
+      const y = laneProject(gy, Math.min(c.y, groundY) - tireRise(), this.lane.f);
       g.lineStyle(2, c.inContact ? 0xff3030 : 0x30ff30, 1);
-      g.strokeCircle(p.x, p.y, PHYSICS.wheelRadius * p.scale);
+      g.strokeCircle(x, y, tireRadius() * scale);
+      // Physics contact point, distinct from the larger drawn tire.
+      const contact = projectVehiclePoint(t, c.x, c.y, this.lane.f);
+      g.fillStyle(c.inContact ? 0xff3030 : 0x30ff30, 1);
+      g.fillCircle(contact.x, contact.y, 2.5);
     });
     g.fillStyle(0xff00ff, 1);
     for (const b of TRUCK.body) {
       const x = t.x + b.x * cos - b.y * sin;
       const y = t.y + b.x * sin + b.y * cos;
-      const p = project(x, y, this.lane.f);
+      const p = projectVehiclePoint(t, x, y, this.lane.f);
       g.fillCircle(p.x, p.y, 4 * p.scale);
     }
     g.lineStyle(1, 0xffffff, 0.6);
     g.lineBetween(this.cameras.main.scrollX, BASE_Y, this.cameras.main.scrollX + VIEW_W, BASE_Y);
     g.lineStyle(1, 0xffe066, 0.7); // pickup collect radius
-    const playerCenter = project(t.x, t.y, this.lane.f);
-    g.strokeCircle(playerCenter.x, playerCenter.y, 54 * playerCenter.scale);
+    // The body artwork is lifted inside its frame, so show the radius around the
+    // visible chassis centre (the local point 32 px above the physics anchor).
+    const chassisX = t.x + TRUCK.lift * sin;
+    const chassisY = t.y - TRUCK.lift * cos;
+    const chassisCenter = projectVehiclePoint(t, chassisX, chassisY, this.lane.f);
+    g.strokeCircle(chassisCenter.x, chassisCenter.y, PICKUPS.collectRadius * chassisCenter.scale);
     g.lineStyle(1, 0x30c0ff, 0.9); // collision circles: player, rivals, wrecks
     for (const c of truckCircles(t)) {
-      const p = project(c.x, c.y, this.lane.f);
+      const p = projectVehiclePoint(t, c.x, c.y, this.lane.f);
       g.strokeCircle(p.x, p.y, c.r * p.scale);
     }
     for (const r of this.race.rivals) {
       g.lineStyle(1, r.inLane(this.lane.f) ? 0xff5a4a : 0x886666, 0.9);
+      const rivalWheel = RIVAL_STYLES[r.style % RIVAL_STYLES.length].wheel;
+      const gy = this.terrain.heightAt(r.truck.x);
+      for (const contact of r.truck.wheelContacts) {
+        const groundY = this.terrain.heightAt(contact.x) - PHYSICS.wheelRadius;
+        const y = laneProject(gy, Math.min(contact.y, groundY) - tireRise(rivalWheel), r.laneF);
+        g.strokeCircle(contact.x, y, tireRadius(rivalWheel) * laneScale(r.laneF));
+      }
       for (const c of truckCircles(r.truck)) {
-        const p = project(c.x, c.y, r.laneF);
+        const p = projectVehiclePoint(r.truck, c.x, c.y, r.laneF);
         g.strokeCircle(p.x, p.y, c.r * p.scale);
       }
     }
