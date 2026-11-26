@@ -35,9 +35,18 @@
         color: #c9d3ee;
         font: 700 20px "Rajdhani", "Arial Narrow", Arial, sans-serif;
         text-align: center;
+        opacity: 1;
+        transition: opacity 360ms ease-out;
+      }
+      #loading-screen.is-fading {
+        opacity: 0;
+        pointer-events: none;
       }
       #loading-screen[hidden] {
         display: none;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #loading-screen { transition-duration: 0ms; }
       }
       /* hard-edged hazard stripes along the top, like the menus' title bar */
       #loading-screen::before {

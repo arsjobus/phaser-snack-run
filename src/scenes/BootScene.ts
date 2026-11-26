@@ -106,7 +106,15 @@ export class BootScene extends Phaser.Scene {
             : "Menu",
     );
     const loadingScreen = document.getElementById("loading-screen");
-    if (loadingScreen) loadingScreen.hidden = true;
+    if (loadingScreen) {
+      // Keep the completed loading screen visible briefly so the transition feels intentional.
+      window.setTimeout(() => {
+        loadingScreen.classList.add("is-fading");
+        window.setTimeout(() => {
+          loadingScreen.hidden = true;
+        }, 360);
+      }, 1000);
+    }
   }
 
   private bake(
