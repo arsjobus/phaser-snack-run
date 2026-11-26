@@ -158,6 +158,8 @@ export const FUEL = {
   distanceRampMeters: 3000,
   /** Tank fraction restored by one can. */
   canRestore: 0.3,
+  /** Height of the fuel can centre above the ground. */
+  pickupHeight: 16,
   /** Below this the gauge blinks. */
   low: 0.25,
   /** Speed (px/s) assumed when guaranteeing that the next can is reachable (a slowish pace). */

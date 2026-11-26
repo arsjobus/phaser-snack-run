@@ -323,7 +323,7 @@ export class GameScene extends Phaser.Scene {
       .setDepth(10)
       .setAlpha(0);
     this.cpToast = this.add
-      .text(VIEW_W / 2, 128, '', { ...text(26, '#9be0ff'), align: 'center' })
+      .text(VIEW_W / 2, VIEW_H / 2, '', { ...text(26, '#9be0ff'), align: 'center' })
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(10)
@@ -695,7 +695,7 @@ export class GameScene extends Phaser.Scene {
       if (visible) {
         // Placed in the pickup's lane: higher, smaller and darker further away.
         const gy = this.terrain.heightAt(p.x);
-        const bob = p.kind !== 'wrench' && !this.settings.reducedMotion ? Math.sin(seconds * 4 + p.id) * 3 : 0;
+        const bob = p.kind === 'snack' && !this.settings.reducedMotion ? Math.sin(seconds * 4 + p.id) * 3 : 0;
         const shadeV = laneShade(p.lane);
         const sy = laneProject(gy, p.y + bob, p.lane);
         sprite

@@ -93,7 +93,7 @@ export class PickupField {
       const x = this.safeFuelX(wanted);
       this.items = this.items.filter((p) => !(p.kind === 'snack' && Math.abs(p.x - x) < 70));
       const lane = this.laneRng.int(1, Math.max(1, LANES.count - 2));
-      this.add('fuel', x, this.terrain.heightAt(x) - PICKUPS.hover, lane);
+      this.add('fuel', x, this.terrain.heightAt(x) - FUEL.pickupHeight, lane);
       this.fuelXs.push(x);
       this.lastFuelX = x;
       // A can that had to slide back before a stage (up to a few thousand px) does not make the

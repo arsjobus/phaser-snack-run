@@ -27,6 +27,8 @@ export interface TruckSample {
   x: number;
   y: number;
   angle?: number;
+  /** Wheel contact positions used to collect ground pickups. */
+  wheelContacts?: readonly { x: number; y: number }[];
   /** Forward speed, px/s. */
   speed: number;
   /** The truck's depth (informational: pickups are grabbed from any depth). */
@@ -166,7 +168,15 @@ export class RunModel {
     const angle = truck.angle ?? 0;
     const collectX = truck.x + TRUCK.lift * Math.sin(angle);
     const collectY = truck.y - TRUCK.lift * Math.cos(angle);
-    for (const p of this.pickups.collect(collectX, collectY, truck.lane ?? LANES.startLane)) {
+    const collectLane = truck.lane ?? LANES.startLane;
+    const collected = new Set<Pickup>();
+    for (const p of this.pickups.collect(collectX, collectY, collectLane)) collected.add(p);
+    // Let either tire collect a ground pickup as it rolls through it, including when
+    // the raised chassis centre is outside the pickup radius.
+    for (const wheel of truck.wheelContacts ?? []) {
+      for (const p of this.pickups.collect(wheel.x, wheel.y, collectLane)) collected.add(p);
+    }
+    for (const p of collected) {
       if (p.kind === 'snack') {
         const multiplier = this.score.multiplier;
         events.push({ type: 'snack', pickup: p, points: this.score.collectSnack(), multiplier });
