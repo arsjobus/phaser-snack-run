@@ -39,11 +39,12 @@ export function chevronOutline(x: number, cw: number, t: number): LanePoint[] {
   ];
 }
 
-/** Left edges of the chevrons across a pad `w` px long: three, evenly spread, 10 px in from the pad's start. */
-export function chevronStarts(w: number, count = 3): number[] {
-  const out: number[] = [];
-  for (let k = 0; k < count; k++) out.push(10 + k * (w / (count + 0.2)));
-  return out;
+/** Left edges of chevrons across a pad, keeping their full outline inside both ends. */
+export function chevronStarts(w: number, count = 3, width = 26, thickness = 13, margin = 10): number[] {
+  if (count <= 0) return [];
+  const extent = width + thickness;
+  const span = Math.max(0, w - 2 * margin - extent);
+  return Array.from({ length: count }, (_, k) => margin + (count === 1 ? span / 2 : (k * span) / (count - 1)));
 }
 
 /** The chevron wave: whether chevron `k` is lit at `seconds` (a ripple towards the ramp). */
