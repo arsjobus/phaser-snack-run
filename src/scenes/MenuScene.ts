@@ -20,7 +20,7 @@ import { MENU_GATE, MENU_ITEMS, type MenuId } from '../ui/MenuModel';
 import { INK, wrapIndex } from '../ui/Theme';
 import { button, label, logoPlate, type Layer } from '../ui/Ui';
 import { applyView } from '../ui/Resolution';
-import { ACHIEVEMENTS, allAchievementsUnlocked } from '../progress/Achievements';
+import { allAchievementsUnlocked } from '../progress/Achievements';
 import { MASTER, starField, sunRays } from '../ui/MasterMenu';
 import { t } from '../i18n';
 
@@ -268,13 +268,11 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  /** The title of the special screen: the usual logo plate, untouched, with the achievement tally under it. */
+  /** The title of the special screen: the usual logo plate with its gold subtitle. */
   private drawMasterHeader(): void {
     const cx = VIEW_W / 2;
     logoPlate(this, this.layer, cx, 92, 460, 92, t('menu.subtitle'));
     label(this, this.layer, cx, 172, t('master.subtitle'), 'display', 18, MASTER.goldInk, 0.5, 4);
-    const total = ACHIEVEMENTS.filter((a) => !a.hidden).length;
-    label(this, this.layer, cx, 198, t('master.stats', { done: total, total }), 'body', 16, INK.soft, 0.5, 3);
   }
 
   private draw(): void {
