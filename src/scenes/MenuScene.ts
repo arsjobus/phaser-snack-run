@@ -3,7 +3,7 @@ import { SCROLL_Y0, TRUCK, VIEW_W } from '../config';
 import { playerTruckKey, rivalTruckKey } from '../art/trucks';
 import { BIOME_LIST } from '../game/Biomes';
 import { GroundPainter } from '../game/GroundPainter';
-import { laneDepth, laneProject, laneScale } from '../game/Lanes';
+import { laneDepth, laneLift, laneProject, laneScale } from '../game/Lanes';
 import { Parallax } from '../game/Parallax';
 import { PLAYER_WHEEL, RIVAL_STYLES } from '../game/Rival';
 import { Terrain } from '../game/Terrain';
@@ -105,6 +105,10 @@ export class MenuScene extends Phaser.Scene {
       const sc = laneScale(t.lane);
       const cy = gy - 42;
       const baseY = laneProject(gy, cy, t.lane);
+      // Match the soft ground blobs used for vehicles during a race.
+      const shadow = this.add.graphics().setDepth(laneDepth(t.lane, 0.05));
+      shadow.fillStyle(0x000000, 0.3);
+      shadow.fillEllipse(t.x, gy - laneLift(t.lane) + 2 * sc, 116 * sc, 13 * sc);
       const img = this.add.image(t.x, baseY, t.key).setOrigin(ox, oy).setScale(sc).setDepth(laneDepth(t.lane, 0.1));
       if (this.master && t.key === playerKey) img.setTint(MASTER.goldLight); // the champion's truck shines
       this.bodies.push({ img, baseY, phase: i * 1.7 });
