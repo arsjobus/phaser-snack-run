@@ -113,7 +113,7 @@ export class BootScene extends Phaser.Scene {
         window.setTimeout(() => {
           loadingScreen.hidden = true;
         }, 360);
-      }, 1000);
+      }, 500);
     }
   }
 
