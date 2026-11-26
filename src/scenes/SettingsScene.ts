@@ -81,9 +81,9 @@ export class SettingsScene extends Phaser.Scene {
       { kind: 'choice', label: 'settings.touch', options: ['auto', 'on', 'off'], get: () => s.touch, set: (v) => (s.touch = v as Settings['touch']), show: (v) => t(`common.${v}`) },
       // Only languages that have a locale file in src/i18n/locales are listed.
       { kind: 'choice', label: 'settings.language', options: availableLocales(), get: () => s.language, set: (v) => (s.language = v), show: (v) => localeName(v) },
+      { kind: 'erase' },
       ...ACTIONS.map((action): Row => ({ kind: 'bind', action })),
       { kind: 'reset' },
-      { kind: 'erase' },
       { kind: 'back' },
     ];
     const kb = this.input.keyboard!;
@@ -232,8 +232,8 @@ export class SettingsScene extends Phaser.Scene {
       const inner = plateInner(cx, w);
       const vx = r.kind === 'slider' ? cx + 8 : cx + 30; // where the value starts (a slider's track starts earlier so its percentage fits)
       if (r.kind === 'back') {
-        // The Back button looks exactly like the Credits one: wide, yellow, with its key hint.
-        backButton(this, this.layer, cx, y + 14, () => this.back(), on);
+        // Keep the shared Back button on the same bottom line as Garage and Credits.
+        backButton(this, this.layer, cx, 439, () => this.back(), on);
         return;
       }
       rowPlate(this, this.layer, cx, y, w, rowH, on);

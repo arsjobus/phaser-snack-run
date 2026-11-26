@@ -117,8 +117,6 @@ export interface ButtonSpec {
   w: number;
   h: number;
   text: string;
-  /** Small key hint on the right ("ENTER", "G"). */
-  hint?: string;
   selected?: boolean;
   /** Face colour of the selected state (default: logo yellow). */
   accent?: number;
@@ -146,7 +144,6 @@ export function button(scene: Phaser.Scene, layer: Layer, b: ButtonSpec): void {
   g.fillRoundedRect(x + 3, y + 3, b.w - 6, (b.h - 6) * 0.38, { tl: 7, tr: 7, bl: 0, br: 0 });
   layer.add(g);
   label(scene, layer, b.x, b.y + 1, b.text, 'display', b.size ?? 18, b.selected ? INK.dark : INK.soft);
-  if (b.hint) label(scene, layer, x + b.w - 12, b.y + 1, b.hint, 'body', 13, b.selected ? '#3a2f00' : INK.dim, 1);
   if (b.onClick || b.onHover) {
     const zone = scene.add.zone(b.x, b.y, b.w, b.h).setScrollFactor(0).setInteractive({ useHandCursor: true });
     if (b.onClick) zone.on('pointerdown', b.onClick);
@@ -156,8 +153,8 @@ export function button(scene: Phaser.Scene, layer: Layer, b: ButtonSpec): void {
 }
 
 /**
- * The Back button of the sub-menus (settings and credits): the same wide, bright yellow button with
- * the key hint, so it is the one thing on those screens that stands out. `focus` rings it when the
+ * The Back button of the sub-menus (settings and credits): the same wide, bright yellow button.
+ * `focus` rings it when the
  * keyboard cursor is on it.
  */
 export const BACK_BUTTON = { w: 220, h: 44, size: 18 } as const;
@@ -168,7 +165,7 @@ export function backButton(scene: Phaser.Scene, layer: Layer, x: number, y: numb
     g.strokeRoundedRect(x - BACK_BUTTON.w / 2 - 7, y - BACK_BUTTON.h / 2 - 7, BACK_BUTTON.w + 14, BACK_BUTTON.h + 14, 14);
     layer.add(g);
   }
-  button(scene, layer, { x, y, w: BACK_BUTTON.w, h: BACK_BUTTON.h, text, hint: 'ESC', selected: true, size: BACK_BUTTON.size, onClick });
+  button(scene, layer, { x, y, w: BACK_BUTTON.w, h: BACK_BUTTON.h, text, selected: true, size: BACK_BUTTON.size, onClick });
 }
 
 /**
@@ -255,7 +252,7 @@ export function logoPlate(scene: Phaser.Scene, layer: Layer, cx: number, cy: num
   g.fillRect(cx - w / 2 + 14, cy + h * 0.18, w - 28, 3);
   layer.add(g);
   label(scene, layer, cx, cy - h * 0.14, 'CRUNCH 4x4', 'display', Math.round(h * 0.42), '#b83a1a');
-  label(scene, layer, cx, cy + h * 0.33, small, 'display', Math.round(h * 0.2), '#14224a');
+  label(scene, layer, cx, cy + h * 0.33, small, 'display', Math.round(h * 0.2), '#000000');
 }
 
 /**

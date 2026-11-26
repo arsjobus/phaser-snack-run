@@ -1423,7 +1423,6 @@ export class GameScene extends Phaser.Scene {
     const w = (GAME_OVER_GRID.totalW - (n - 1) * gap) / n;
     const x0 = GAME_OVER_GRID.left + w / 2;
     this.gameOverOptions.forEach(([text, hint, go, accent], i) => {
-      put(x0 + i * (w + gap), 454, hint, 'body', 13, INK.dim);
       button(this, layer, {
         x: x0 + i * (w + gap),
         y: 426,
