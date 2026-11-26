@@ -147,6 +147,7 @@ export class GameScene extends Phaser.Scene {
   private tracker = new KeyTracker();
   private padEdges = new PadEdges();
   private touchView!: TouchView;
+  private touchPause!: Phaser.GameObjects.Container;
   private touchedOnce = false;
   /** Set once the first gas or brake input has started the how-to-play text fading. */
   private hintFading = false;
@@ -264,6 +265,9 @@ export class GameScene extends Phaser.Scene {
     this.laneHud = this.add.graphics().setScrollFactor(0).setDepth(10);
     this.marks = this.add.graphics().setDepth(1.6);
     this.touchView = new TouchView(this);
+    // Pause button for touch screens (top left, clear of the controls at the bottom).
+    this.touchPause = this.add.container(0, 0).setScrollFactor(0).setDepth(9);
+    button(this, this.touchPause, { x: 46, y: 36, w: 72, h: 40, text: '||', size: 18, onClick: () => { if (!this.run.over && !this.paused) this.showPause(); } });
     this.input.addPointer(3);
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       if (p.wasTouch) this.touchedOnce = true;
@@ -340,7 +344,7 @@ export class GameScene extends Phaser.Scene {
       kb.off('keydown');
       kb.off('keyup');
     });
-    this.keys = kb.addKeys('G,O,SPACE,ENTER,ESC') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = kb.addKeys('G,O,SPACE,ENTER,ESC,X') as Record<string, Phaser.Input.Keyboard.Key>;
     this.applyQuality();
 
     this.terrain.ensure(this.startX + VIEW_W + 1500);
@@ -351,7 +355,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private addStartGate(): void {
-    const y = this.terrain.heightAt(GATE_X) + 4;
+    const y = this.terrain.heightAt(GATE_X);
     this.add.image(GATE_X, y, 'start_gate').setOrigin(0.5, 1).setDepth(0.5);
   }
 
@@ -411,6 +415,7 @@ export class GameScene extends Phaser.Scene {
     const fingers = this.input.manager.pointers.filter((p) => p.isDown).map((p) => ({ x: toLogical(p.x), y: toLogical(p.y) }));
     const showTouch = touchVisible(this.settings.touch, this.sys.game.device.input.touch, this.touchedOnce) && !this.run.over;
     this.touchView.setVisible(showTouch);
+    this.touchPause.setVisible(touchVisible(this.settings.touch, this.sys.game.device.input.touch, this.touchedOnce) && !this.paused && !this.run.over);
     this.held = mergeHeld(
       heldFromKeys(this.tracker, this.settings.bindings),
       padHeld(pad),
@@ -430,12 +435,8 @@ export class GameScene extends Phaser.Scene {
     const b = this.settings.bindings;
     const pressed = (a: Parameters<typeof actionPressed>[2]) => actionPressed(this.tracker, b, a);
     if (this.paused) {
-      if (J(this.keys.ESC) || pad.start) {
-        this.paused = false;
-        this.audio.setPaused(false);
-        this.pauseLayer?.destroy();
-        this.pauseLayer = null;
-      }
+      if (J(this.keys.ESC) || pad.start) this.resumeFromPause();
+      else if (J(this.keys.X) || pad.back) this.quitFromPause();
       this.tracker.endFrame();
       return;
     }
@@ -491,7 +492,7 @@ export class GameScene extends Phaser.Scene {
     for (const e of this.run.update(dt, { x: this.truck.x, y: this.truck.y, speed: this.truck.speed, lane: this.lane.f }, { gas: this.held.gas > 0, brake: this.held.brake > 0 })) {
       this.onRunEvent(e);
     }
-    for (const e of this.race.update(dt, this.truck, this.run.bestMeters, !this.run.over, this.lane.f, this.lane.target)) {
+    for (const e of this.race.update(dt, this.truck, this.run.bestMeters, !this.run.over, this.lane.f, this.lane.target, this.run.over)) {
       this.onRaceEvent(e);
     }
     this.checkAchievements(dt);
@@ -1249,7 +1250,23 @@ export class GameScene extends Phaser.Scene {
         })
         .setOrigin(0.5),
     );
+    // Two choices: carry on, or forfeit the run and go straight to the start screen (no game-over screen, nothing banked).
+    button(this, layer, { x: VIEW_W / 2 - 110, y: VIEW_H / 2 + 92, w: 200, h: 44, text: tr('game.btn.resume'), hint: 'ESC', size: 16, selected: true, onClick: () => this.resumeFromPause() });
+    button(this, layer, { x: VIEW_W / 2 + 110, y: VIEW_H / 2 + 92, w: 200, h: 44, text: tr('game.btn.quit'), hint: 'X', size: 16, accent: UI.red, onClick: () => this.quitFromPause() });
     this.pauseLayer = layer;
+  }
+
+  private resumeFromPause(): void {
+    this.paused = false;
+    this.audio.setPaused(false);
+    this.pauseLayer?.destroy();
+    this.pauseLayer = null;
+  }
+
+  /** Forfeit the run: leave for the start screen. Nothing is banked, so no coins or scores. */
+  private quitFromPause(): void {
+    this.resumeFromPause();
+    this.scene.start('Menu');
   }
 
   /** Banks the finished run once: coins, lifetime stats, the score table and any achievements. */

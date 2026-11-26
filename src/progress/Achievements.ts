@@ -124,10 +124,10 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   {
     id: 'reverse500',
     name: 'Backing Out',
-    description: 'Reverse 500 m behind the starting line (-500 m)',
+    description: 'Reverse 50 m behind the starting line (-50 m)',
     reward: 250,
     hidden: true,
-    check: (_s, r) => !!r && r.lowestMeters <= -500,
+    check: (_s, r) => !!r && r.lowestMeters <= -50,
   },
 ];
 

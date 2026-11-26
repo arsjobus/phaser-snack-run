@@ -188,17 +188,22 @@ export class Race {
     playerAlive = true,
     playerLane = 0,
     playerTarget = playerLane,
+    frozen = false,
   ): RaceEvent[] {
     const events: RaceEvent[] = [];
     this.time += dt;
     this.playerLane = playerLane;
     this.playerTarget = playerTarget;
-    this.spawn(dt, player, meters);
-
-    this.chooseLanes(dt, player);
-    for (const r of this.rivals) {
-      r.think(player.x, this.terrain);
-      r.watch(dt);
+    if (frozen) {
+      // Game over: the field stops. No new rivals, no lane changes, no throttle.
+      for (const r of this.rivals) r.input = { throttle: 0, brake: 0, lean: 0 };
+    } else {
+      this.spawn(dt, player, meters);
+      this.chooseLanes(dt, player);
+      for (const r of this.rivals) {
+        r.think(player.x, this.terrain);
+        r.watch(dt);
+      }
     }
 
     // Player vs rivals, wrecks and obstacles (only in the same lane).

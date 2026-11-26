@@ -1,8 +1,10 @@
 import Phaser from 'phaser';
 import { PadEdges, firstPad, padButtons } from '../input/Gamepad';
 import { INK, LIST, UI, plateInner, wrapIndex } from '../ui/Theme';
-import { backButton, bottomBar, flatBackdrop, label, rowPlate, topBar, type Layer } from '../ui/Ui';
+import { backButton, bottomBar, button, flatBackdrop, label, panel, rowPlate, topBar, type Layer } from '../ui/Ui';
 import { defaultStore, type KeyValueStore } from '../progress/Storage';
+import { resetProgress } from '../progress/Progress';
+import { VIEW_W } from '../config';
 import {
   ACTIONS,
   DEFAULT_BINDINGS,
@@ -26,6 +28,7 @@ type Row =
   | { kind: 'choice'; label: string; options: string[]; get: () => string; set: (v: string) => void; show?: (v: string) => string }
   | { kind: 'bind'; action: Action }
   | { kind: 'reset' }
+  | { kind: 'erase' }
   | { kind: 'back' };
 
 /**
@@ -44,6 +47,9 @@ export class SettingsScene extends Phaser.Scene {
   private rebinding: Action | null = null;
   private layer!: Layer;
   private rows: Row[] = [];
+  /** The erase box is open; `eraseFocus` is the button the keyboard is on (0 keep, 1 erase). */
+  private erasing = false;
+  private eraseFocus = 0;
   private edges = new PadEdges();
 
   constructor() {
@@ -59,6 +65,8 @@ export class SettingsScene extends Phaser.Scene {
     this.settings = loadSettings(this.store);
     this.row = 0;
     this.rebinding = null;
+    this.erasing = false;
+    this.eraseFocus = 0;
     this.edges = new PadEdges();
     flatBackdrop(this);
     this.layer = this.add.container(0, 0);
@@ -76,6 +84,7 @@ export class SettingsScene extends Phaser.Scene {
       { kind: 'choice', label: 'settings.language', options: availableLocales(), get: () => s.language, set: (v) => (s.language = v), show: (v) => localeName(v) },
       ...ACTIONS.map((action): Row => ({ kind: 'bind', action })),
       { kind: 'reset' },
+      { kind: 'erase' },
       { kind: 'back' },
     ];
     const kb = this.input.keyboard!;
@@ -87,6 +96,17 @@ export class SettingsScene extends Phaser.Scene {
   update(): void {
     const e = this.edges.update(padButtons(firstPad()));
     if (this.rebinding) return;
+    if (this.erasing) {
+      if (e.back) this.closeErase();
+      else if (e.left || e.right) {
+        this.eraseFocus = 1 - this.eraseFocus;
+        this.draw();
+      } else if (e.confirm) {
+        if (this.eraseFocus === 1) this.eraseProgress();
+        else this.closeErase();
+      }
+      return;
+    }
     if (e.up) this.move(-1);
     if (e.down) this.move(1);
     if (e.left) this.change(-1);
@@ -96,6 +116,10 @@ export class SettingsScene extends Phaser.Scene {
   }
 
   private onKey(e: KeyboardEvent): void {
+    if (this.erasing) {
+      this.onEraseKey(e.code);
+      return;
+    }
     if (this.rebinding) {
       if (e.code === 'Escape') this.rebinding = null;
       else if (e.code !== 'Enter' && e.code !== 'NumpadEnter') {
@@ -160,6 +184,10 @@ export class SettingsScene extends Phaser.Scene {
     } else if (r.kind === 'reset') {
       this.settings.bindings = cloneBindings(DEFAULT_BINDINGS);
       this.commit();
+    } else if (r.kind === 'erase') {
+      this.erasing = true;
+      this.eraseFocus = 0; // Keep is the safe default
+      this.draw();
     } else if (r.kind === 'back') this.back();
     else if (r.kind === 'slider') {
       const v = r.get();
@@ -252,8 +280,55 @@ export class SettingsScene extends Phaser.Scene {
         case 'reset':
           this.text(lx, y, t('settings.resetKeys'), 16, col);
           break;
+        case 'erase':
+          this.text(lx, y, t('settings.eraseProgress'), 16, col);
+          break;
       }
     });
     bottomBar(this, this.layer, this.rebinding ? t('settings.hintRebind') : t('settings.hint'));
+    if (this.erasing) this.drawEraseConfirm();
+  }
+
+  /** Wipe the save (coins, upgrades, paint, scores, stats, achievements). Settings and key bindings stay. */
+  private eraseProgress(): void {
+    resetProgress(this.store);
+    this.erasing = false;
+    this.draw();
+  }
+
+  private closeErase(): void {
+    this.erasing = false;
+    this.draw();
+  }
+
+  /** The erase box takes the keys: Y erases, N or Esc keeps, arrows pick a button, Enter presses it. */
+  private onEraseKey(code: string): void {
+    if (code === 'KeyY') this.eraseProgress();
+    else if (code === 'KeyN' || code === 'Escape') this.closeErase();
+    else if (code === 'ArrowLeft' || code === 'ArrowRight' || code === 'KeyA' || code === 'KeyD') {
+      this.eraseFocus = 1 - this.eraseFocus;
+      this.draw();
+    } else if (code === 'Enter' || code === 'NumpadEnter' || code === 'Space') {
+      if (this.eraseFocus === 1) this.eraseProgress();
+      else this.closeErase();
+    }
+  }
+
+  /** The erase box: dims the screen, swallows clicks, and defaults to keeping the save. */
+  private drawEraseConfirm(): void {
+    const dim = this.add.rectangle(VIEW_W / 2, 270, VIEW_W, 540, 0x000000, 0.74).setInteractive();
+    this.layer.add(dim);
+    const w = 540;
+    const h = 214;
+    const cx = VIEW_W / 2;
+    const cy = 270;
+    panel(this, this.layer, cx - w / 2, cy - h / 2, w, h, t('garage.confirmTitle'));
+    const inner = plateInner(cx, w);
+    this.text(cx, cy - 46, 'Erase everything?', 26, INK.title, 0.5, true);
+    const body = this.text(cx, cy - 4, t('garage.confirmBody'), 16, INK.soft, 0.5);
+    body.setAlign('center').setWordWrapWidth(inner.right - inner.left);
+    const bw = 220;
+    button(this, this.layer, { x: cx - bw / 2 - 10, y: cy + 64, w: bw, h: 40, text: t('garage.keepIt'), hint: 'N', size: 16, selected: this.eraseFocus === 0, onClick: () => this.closeErase() });
+    button(this, this.layer, { x: cx + bw / 2 + 10, y: cy + 64, w: bw, h: 40, text: t('garage.eraseAll'), hint: 'Y', size: 16, selected: this.eraseFocus === 1, accent: UI.red, onClick: () => this.eraseProgress() });
   }
 }

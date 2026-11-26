@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { SCROLL_Y0, TRUCK, VIEW_W } from '../config';
-import { PLAYER_TRUCK_KEY, rivalTruckKey } from '../art/trucks';
+import { playerTruckKey, rivalTruckKey } from '../art/trucks';
 import { BIOME_LIST } from '../game/Biomes';
 import { GroundPainter } from '../game/GroundPainter';
 import { laneDepth, laneProject, laneScale } from '../game/Lanes';
@@ -92,12 +92,13 @@ export class MenuScene extends Phaser.Scene {
       .setScale(laneScale(MENU_GATE.lane))
       .setDepth(0.5);
 
-    // The lineup: the player's truck up front, three rivals behind it on the far lanes.
+    // The lineup: the player's truck up front (in the paint job chosen in the garage), three rivals behind it.
+    const playerKey = playerTruckKey(loadSave(defaultStore()).skin);
     const lineup = [
       { key: rivalTruckKey(2), tire: RIVAL_STYLES[2].wheel, x: 330, lane: 2 },
       { key: rivalTruckKey(0), tire: RIVAL_STYLES[0].wheel, x: 650, lane: 2 },
       { key: rivalTruckKey(1), tire: RIVAL_STYLES[1].wheel, x: 820, lane: 1 },
-      { key: PLAYER_TRUCK_KEY, tire: PLAYER_WHEEL, x: 480, lane: 0 },
+      { key: playerKey, tire: PLAYER_WHEEL, x: 480, lane: 0 },
     ];
     const [ox, oy] = bodyOrigin();
     lineup.forEach((t, i) => {
@@ -105,7 +106,7 @@ export class MenuScene extends Phaser.Scene {
       const cy = gy - 42;
       const baseY = laneProject(gy, cy, t.lane);
       const img = this.add.image(t.x, baseY, t.key).setOrigin(ox, oy).setScale(sc).setDepth(laneDepth(t.lane, 0.1));
-      if (this.master && t.key === PLAYER_TRUCK_KEY) img.setTint(MASTER.goldLight); // the champion's truck shines
+      if (this.master && t.key === playerKey) img.setTint(MASTER.goldLight); // the champion's truck shines
       this.bodies.push({ img, baseY, phase: i * 1.7 });
       for (const w of TRUCK.wheels) {
         this.add

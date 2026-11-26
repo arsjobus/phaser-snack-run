@@ -12,8 +12,8 @@ export type Action = (typeof ACTIONS)[number];
 export const ACTION_LABELS: Record<Action, string> = {
   gas: 'Gas',
   brake: 'Brake / reverse',
-  far: 'Drift away from camera',
-  near: 'Drift towards camera',
+  far: 'Drift lanes (change upper)',
+  near: 'Drift lanes (change lower)',
   mute: 'Mute all',
   music: 'Music on/off',
   debug: 'Debug overlay',

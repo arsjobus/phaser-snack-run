@@ -8,7 +8,6 @@ import {
   buyUpgrade,
   equipSkin,
   loadSave,
-  resetProgress,
   upgradeCost,
   writeSave,
   type SaveData,
@@ -49,9 +48,6 @@ export class GarageScene extends Phaser.Scene {
   private edges = new PadEdges();
   private message = '';
   private achPage = 0;
-  /** The "erase everything?" box is open; `confirmFocus` is the button the keyboard is on (0 cancel, 1 erase). */
-  private confirming = false;
-  private confirmFocus = 0;
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
 
@@ -66,14 +62,12 @@ export class GarageScene extends Phaser.Scene {
     this.row = 0;
     this.message = '';
     this.achPage = 0;
-    this.confirming = false;
-    this.confirmFocus = 0;
     this.edges = new PadEdges();
     flatBackdrop(this);
     this.layer = this.add.container(0, 0);
     const kb = this.input.keyboard!;
     this.cursors = kb.createCursorKeys();
-    this.keys = kb.addKeys('SPACE,ENTER,ESC,G,A,W,S,O,R,Y,N') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = kb.addKeys('SPACE,ENTER,ESC,G,A,W,S,O') as Record<string, Phaser.Input.Keyboard.Key>;
     kb.addCapture('UP,DOWN,LEFT,RIGHT,SPACE');
     this.draw();
   }
@@ -81,20 +75,6 @@ export class GarageScene extends Phaser.Scene {
   update(): void {
     const J = Phaser.Input.Keyboard.JustDown;
     const c = this.cursors;
-    if (this.confirming) {
-      const e = this.edges.update(padButtons(firstPad()));
-      if (J(this.keys.Y)) this.eraseProgress();
-      else if (J(this.keys.N) || J(this.keys.ESC) || e.back) this.closeConfirm();
-      else if (J(c.left) || J(c.right) || J(this.keys.A) || e.left || e.right) {
-        this.confirmFocus = 1 - this.confirmFocus;
-        this.draw();
-      } else if (J(this.keys.ENTER) || e.confirm) {
-        if (this.confirmFocus === 1) this.eraseProgress();
-        else this.closeConfirm();
-      }
-      return;
-    }
-    if (J(this.keys.R)) this.openConfirm();
     if (J(c.right)) this.setTab(1);
     if (J(c.left)) this.setTab(-1);
     if (J(c.down) || J(this.keys.S)) this.move(1);
@@ -117,28 +97,6 @@ export class GarageScene extends Phaser.Scene {
     this.tab = TABS[(TABS.indexOf(this.tab) + d + TABS.length) % TABS.length];
     this.row = 0;
     this.message = '';
-    this.draw();
-  }
-
-  private openConfirm(): void {
-    this.confirming = true;
-    this.confirmFocus = 0; // Cancel is the safe default
-    this.draw();
-  }
-
-  private closeConfirm(): void {
-    this.confirming = false;
-    this.draw();
-  }
-
-  /** Wipe the save (coins, upgrades, paint, scores, stats, achievements). Settings and key bindings stay. */
-  private eraseProgress(): void {
-    this.save = resetProgress(this.store);
-    this.confirming = false;
-    this.tab = 'UPGRADES';
-    this.row = 0;
-    this.achPage = 0;
-    this.message = t('garage.progressReset');
     this.draw();
   }
 
@@ -227,37 +185,17 @@ export class GarageScene extends Phaser.Scene {
     else this.drawAchievements();
 
     this.text(VIEW_W / 2, 441, this.message, 17, INK.title, 0.5);
-    // Three buttons on the column's grid: Drive, Back, and the (red) reset.
+    // Two buttons on the column's grid: Back to the menu (the default) and Drive.
     const bw = 250;
-    const gap = (COL_W - bw * 3) / 2;
+    const gap = COL_W - bw * 2;
     const bx = (i: number) => COL_L + bw / 2 + i * (bw + gap);
-    button(this, this.layer, { x: bx(0), y: 482, w: bw, h: 38, text: t('garage.drive'), hint: 'SPACE', size: 16, selected: true, onClick: () => this.scene.start('Game') });
-    button(this, this.layer, { x: bx(1), y: 482, w: bw, h: 38, text: t('garage.backToMenu'), hint: 'ESC', size: 16, onClick: () => this.scene.start('Menu') });
-    button(this, this.layer, { x: bx(2), y: 482, w: bw, h: 38, text: t('garage.resetProgress'), hint: 'R', size: 15, accent: UI.red, onClick: () => this.openConfirm() });
+    button(this, this.layer, { x: bx(0), y: 482, w: bw, h: 38, text: t('garage.backToMenu'), hint: 'ESC', size: 16, selected: true, onClick: () => this.scene.start('Menu') });
+    button(this, this.layer, { x: bx(1), y: 482, w: bw, h: 38, text: t('garage.drive'), hint: 'SPACE', size: 16, onClick: () => this.scene.start('Game') });
     bottomBar(
       this,
       this.layer,
-      this.confirming ? t('garage.hintConfirm') : this.tab === 'ACHIEVEMENTS' ? t('garage.hintPage') : t('garage.hintPick'),
+      this.tab === 'ACHIEVEMENTS' ? t('garage.hintPage') : t('garage.hintPick'),
     );
-    if (this.confirming) this.drawConfirm();
-  }
-
-  /** The "erase everything?" box: dims the garage, swallows clicks, and defaults to Cancel. */
-  private drawConfirm(): void {
-    const dim = this.add.rectangle(VIEW_W / 2, 270, VIEW_W, 540, 0x000000, 0.74).setInteractive();
-    this.layer.add(dim);
-    const w = 540;
-    const h = 214;
-    const cx = VIEW_W / 2;
-    const cy = 270;
-    panel(this, this.layer, cx - w / 2, cy - h / 2, w, h, t('garage.confirmTitle'));
-    const inner = plateInner(cx, w);
-    this.text(cx, cy - 46, 'Erase everything?', 26, INK.title, 0.5, true);
-    const body = this.text(cx, cy - 4, t('garage.confirmBody'), 16, INK.soft, 0.5);
-    body.setAlign('center').setWordWrapWidth(inner.right - inner.left);
-    const bw = 220;
-    button(this, this.layer, { x: cx - bw / 2 - 10, y: cy + 64, w: bw, h: 40, text: t('garage.keepIt'), hint: 'N', size: 16, selected: this.confirmFocus === 0, onClick: () => this.closeConfirm() });
-    button(this, this.layer, { x: cx + bw / 2 + 10, y: cy + 64, w: bw, h: 40, text: t('garage.eraseAll'), hint: 'Y', size: 16, selected: this.confirmFocus === 1, accent: UI.red, onClick: () => this.eraseProgress() });
   }
 
   /** A price: the number with the snack-coin icon after it, right-aligned at `x`. */

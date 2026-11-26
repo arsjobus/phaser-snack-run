@@ -81,11 +81,11 @@ describe('hidden achievements', () => {
     expect(run.bestCoast).toBe(0);
   });
 
-  it('Backing Out needs -500 m, not -499', () => {
+  it('Backing Out needs -50 m, not -49', () => {
     const save = emptySave();
     const base = new RunModel(1, new Terrain(1), START).summary();
-    expect(unlockAchievements(save, { ...base, lowestMeters: -499 }, '2026-01-01').map((a) => a.id)).not.toContain('reverse500');
-    expect(unlockAchievements(save, { ...base, lowestMeters: -500 }, '2026-01-01').map((a) => a.id)).toContain('reverse500');
+    expect(unlockAchievements(save, { ...base, lowestMeters: -49 }, '2026-01-01').map((a) => a.id)).not.toContain('reverse500');
+    expect(unlockAchievements(save, { ...base, lowestMeters: -50 }, '2026-01-01').map((a) => a.id)).toContain('reverse500');
   });
 
   it('both are flagged hidden and have text in every language', () => {
