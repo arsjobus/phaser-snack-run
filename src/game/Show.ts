@@ -137,6 +137,11 @@ export class StuntShow {
       s.launched = true;
       s.air = true;
       s.lastAngle = truck.angle;
+      // The spring can leave a small downward velocity as the wheels lose the last
+      // ramp sample. Carry the ramp's tangent through the lip so the truck does not
+      // visibly dip before crossing the gap. The curve's derivative at its end is
+      // rampHeight * rampCurve / rampLength (upward in world coordinates).
+      truck.vy = -truck.vx * (STUNT.rampHeight * STUNT.rampCurve) / STUNT.rampLength;
       truck.angVel += launchKick(this.seed, layout.index);
       this.events.push({ type: 'launch', layout });
     }
