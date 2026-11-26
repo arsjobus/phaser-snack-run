@@ -25,12 +25,22 @@ export class CreditsScene extends Phaser.Scene {
     const layer: Layer = this.add.container(0, 0);
     topBar(this, layer, t('credits.title'));
     logoPlate(this, layer, VIEW_W / 2, 124, 380, 70, t('menu.subtitle'));
-    panel(this, layer, 130, 178, 700, 262);
-    const step = 40;
+    // Keep the credits panel above the fixed Back button, with enough room for every role/name pair.
+    const panelY = 170;
+    const panelHeight = 260;
+    panel(this, layer, 130, panelY, 700, panelHeight);
+    const sectionStep = 43;
+    // Center the full block, including the rendered text height, inside the panel's inner face.
+    const nameOffset = 16;
+    const textHeight = 18;
+    const contentHeight = ALL_CREDITS.length === 0
+      ? 0
+      : (ALL_CREDITS.length - 1) * sectionStep + nameOffset + textHeight;
+    const firstY = panelY + (panelHeight - contentHeight) / 2 + textHeight / 2;
     ALL_CREDITS.forEach((c, i) => {
-      const y = 204 + i * step;
+      const y = firstY + i * sectionStep;
       label(this, layer, VIEW_W / 2, y, c.roleKey ? t(c.roleKey) : c.role, 'body', 15, INK.cyan);
-      label(this, layer, VIEW_W / 2, y + 19, (c.namesKey ? t(c.namesKey) : c.names.join('  ')), 'display', 17, INK.text);
+      label(this, layer, VIEW_W / 2, y + nameOffset, (c.namesKey ? t(c.namesKey) : c.names.join('  ')), 'display', 17, INK.text);
     });
     backButton(this, layer, VIEW_W / 2, 472, () => this.back());
     bottomBar(this, layer, `${GAME_TITLE}   ·   ${t('credits.hint')}`);
