@@ -112,12 +112,14 @@ describe('hidden achievements', () => {
 });
 
 describe('every achievement unlocked', () => {
-  it('is detected only when all of them, hidden ones included, are in the save', () => {
+  it('is detected when every normal achievement is in the save; the hidden ones are optional', () => {
     const save = emptySave();
     expect(allAchievementsUnlocked(save)).toBe(false);
-    for (const a of ACHIEVEMENTS) save.achievements[a.id] = '2026-01-01';
+    for (const a of ACHIEVEMENTS) if (!a.hidden) save.achievements[a.id] = '2026-01-01';
     expect(allAchievementsUnlocked(save)).toBe(true);
-    delete save.achievements.reverse500;
+    for (const a of ACHIEVEMENTS) if (a.hidden) save.achievements[a.id] = '2026-01-01';
+    expect(allAchievementsUnlocked(save)).toBe(true);
+    delete save.achievements.combo10;
     expect(allAchievementsUnlocked(save)).toBe(false);
   });
 

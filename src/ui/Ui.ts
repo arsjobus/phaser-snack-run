@@ -295,7 +295,7 @@ export function trophyColor(rank: number): number {
 
 /**
  * A trophy cup with the place on it. `h` is its height in px. The podium (1 to 3) gets the full cup with
- * handles, a shine and the place in dark ink on the bowl (gold also gets sparkles); every later place
+ * handles, a shine and the place in dark ink on the bowl; every later place
  * gets a smaller steel cup so each row of a table still has its own little prize. `dim` greys it out
  * for an empty slot.
  */
@@ -336,29 +336,6 @@ export function trophy(scene: Phaser.Scene, layer: Layer, x: number, y: number, 
   layer.add(g);
   if (podium && !dim) {
     label(scene, layer, x, y - 6 * s, String(rank), 'display', Math.max(9, Math.round(11 * s)), INK.dark);
-    if (rank === 1) {
-      const sp = scene.add.graphics();
-      sp.fillStyle(UI.white, 1);
-      for (const [px, py, r] of [[-13, -13, 2.6], [12, -15, 3.2], [14, -4, 1.8]]) {
-        const cx = x + px * s;
-        const cy = y + py * s;
-        const rr = r * s;
-        sp.fillPoints(
-          [
-            { x: cx, y: cy - rr * 1.7 },
-            { x: cx + rr * 0.5, y: cy - rr * 0.5 },
-            { x: cx + rr * 1.7, y: cy },
-            { x: cx + rr * 0.5, y: cy + rr * 0.5 },
-            { x: cx, y: cy + rr * 1.7 },
-            { x: cx - rr * 0.5, y: cy + rr * 0.5 },
-            { x: cx - rr * 1.7, y: cy },
-            { x: cx - rr * 0.5, y: cy - rr * 0.5 },
-          ],
-          true,
-        );
-      }
-      layer.add(sp);
-    }
   }
 }
 

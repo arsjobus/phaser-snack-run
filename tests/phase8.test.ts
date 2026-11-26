@@ -24,7 +24,6 @@ import {
   loadSettings,
   musicLevel,
   particleScale,
-  pickupMark,
   sanitizeSettings,
   saveSettings,
   setBinding,
@@ -60,20 +59,18 @@ describe('Phase 8: settings', () => {
     const store = new MemoryStore();
     const s = defaultSettings();
     s.music = 0.3;
-    s.colorblind = true;
     s.effects = 'reduced';
     saveSettings(store, s);
     expect(loadSettings(store)).toEqual(s);
     store.setItem(SETTINGS_KEY, '{nope');
     expect(loadSettings(store)).toEqual(defaultSettings());
     expect(sanitizeSettings(null)).toEqual(defaultSettings());
-    const bad = sanitizeSettings({ master: 7, music: 'loud', shake: -2, effects: 'ultra', touch: 3, colorblind: 'yes' });
+    const bad = sanitizeSettings({ master: 7, music: 'loud', shake: -2, effects: 'ultra', touch: 3 });
     expect(bad.master).toBe(1);
     expect(bad.music).toBe(1);
     expect(bad.shake).toBe(0);
     expect(bad.effects).toBe('auto');
     expect(bad.touch).toBe('auto');
-    expect(bad.colorblind).toBe(false);
   });
 
   it('repairs bindings: no clashes, no reserved keys, nothing left without a key', () => {
@@ -128,12 +125,6 @@ describe('Phase 8: settings', () => {
     expect(particleScale(s, 1)).toBeLessThan(0.5);
     s.reducedMotion = false;
     expect(particleScale(s, 0.3)).toBe(0.3);
-  });
-
-  it('colour-blind markers differ in shape AND colour for every pickup kind', () => {
-    const marks = (['snack', 'fuel', 'wrench'] as const).map(pickupMark);
-    expect(new Set(marks.map((m) => m.shape)).size).toBe(3);
-    expect(new Set(marks.map((m) => m.fill)).size).toBe(3);
   });
 });
 

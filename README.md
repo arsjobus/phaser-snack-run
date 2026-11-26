@@ -23,7 +23,7 @@ npm run dev        # http://localhost:5173
 
 ## Controls
 
-→/D gas (**hold it: there is no auto-gas**; let go and engine braking slows you down) · ←/A brake/reverse · **↑/W and ↓/S: hold to drift away from / towards the camera through the depth field** (Q/E also work) · M mute all · N music on/off · H debug overlay · SPACE/ENTER/tap restart after game over · **G** garage and **D** daily challenge / free run (game-over screen)
+→/D gas (**hold it: there is no auto-gas**; let go and engine braking slows you down) · ←/A brake/reverse · **↑/W and ↓/S: hold to drift away from / towards the camera through the depth field** · M mute all · N music on/off · H debug overlay · SPACE/ENTER/tap restart after game over · **G** garage and **D** daily challenge / free run (game-over screen)
 
 **Gamepad:** RT/A/stick right gas (triggers are analog) · LT/B/X/stick left brake · stick or D-pad up/down drift · Start/A restart · Y garage · Back settings · RB music. **Touch:** GAS, BRAKE and ▲/▼ buttons appear on touch devices. **O** opens the settings (also from the garage) where every driving key can be rebound.
 
@@ -62,7 +62,7 @@ Every one-shot effect is an mp3 in `public/audio/` (`snack.mp3`, `fuel.mp3`, `bo
 - **Garage prices** are set for a long haul: the whole shop (every upgrade level plus all paint) costs about 146,000 coins, which is 3 to 4 hours at the reference pace of 2000 coins per 3 minutes (`PROGRESSION.pacing` in `src/config.ts`; a test fails if a price change leaves that window).
 - **Distance can go negative.** Reversing takes metres off the readout, and behind the start line it shows a minus sign. Checkpoints, race spawns and distance points follow the furthest point reached, so reversing never costs score or un-reaches a gate. A run that ends behind the line banks 0.
 - **Two hidden achievements** (shown as ??? in the garage until earned): *Hands Off* (100 m without pressing gas or brake) and *Backing Out* (-500 m behind the starting line; it takes about 1.4 tanks of fuel, so it needs a couple of tank upgrades).
-- **Legend of the Mud:** once every achievement (hidden ones included; `HIDDEN_COUNT_FOR_COMPLETION` in `src/progress/Achievements.ts`) is unlocked, the start screen changes: golden hour over the desert, a turning sunburst, stars, trophies, a gold-trimmed logo and a glowing champion truck.
+- **Legend of the Mud:** once every normal achievement (the hidden ones are optional; `HIDDEN_COUNT_FOR_COMPLETION` in `src/progress/Achievements.ts`) is unlocked, the start screen changes: golden hour over the desert, a turning sunburst, stars and a glowing champion truck under the usual CRUNCH 4x4 | OFF-ROAD RACING logo.
 - **Languages:** every `src/i18n/locales/<code>.json` is a language (English, Spanish, French and German ship). The file must have `"meta.name"`; any key it lacks falls back to English. Pick the language in Settings. To add one, copy `en.json`, rename it and translate the values. The bundled fonts cover Latin-1 only, so languages with other scripts also need a font in `src/ui/Fonts.ts`.
 - **Removed:** the R reset-upright key and the pad's LB reset. (A crew still rights the truck automatically during the show jump, and god mode never wrecks on a rollover.)
 
@@ -76,7 +76,7 @@ Every one-shot effect is an mp3 in `public/audio/` (`snack.mp3`, `fuel.mp3`, `bo
 ## What's in Phase 8 (platform and polish) and the art pass
 
 - **Controls everywhere:** keyboard (rebindable), gamepad and touch all feed one control state (`src/input/`); they can be mixed. Touch buttons are multi-touch and forgiving (a finger counts a little beyond a button's edge, sliding between buttons works). Nothing held means no throttle on every device.
-- **Settings** (`src/scenes/SettingsScene.ts`, saved automatically): volumes, screen shake, reduced motion, colour-blind pickups, effects quality, touch controls, key bindings. Dev shortcuts: `/?settings`, `/?art=forest|desert|snow|swamp` (a review page with the whole truck set and pickups on one road).
+- **Settings** (`src/scenes/SettingsScene.ts`, saved automatically): volumes, screen shake, reduced motion, effects quality, touch controls, key bindings. Dev shortcuts: `/?settings`, `/?art=forest|desert|snow|swamp` (a review page with the whole truck set and pickups on one road).
 - **Performance:** pooled sprites and popups, one height lookup per ground column per frame, in-place particle culling, and an adaptive effects governor (below 45 fps for 2.5 s lowers ground detail and particles one step; set Effects quality to Full or Reduced to override it).
 - **Road:** a detailed foreground slab, a hazy far field, meandering paired tire ruts with tread, and per-biome pebbles, grit, stones, clods, cracks, puddles, sand ripples and snow glints.
 - **Monster trucks:** every vehicle has big tires and a body hoisted on visible axles, shocks and a driveshaft. Driving and flipping feel the same as before.

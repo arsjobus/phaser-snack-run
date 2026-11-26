@@ -56,7 +56,7 @@ import { KeyTracker, actionPressed, heldFromKeys, laneDirOf, mergeHeld, type Hel
 import { PadEdges, firstPad, padButtons, padHeld } from '../input/Gamepad';
 import { touchHeld, touchVisible } from '../input/Touch';
 import { TouchView } from '../input/TouchView';
-import { keyLabel, loadSettings, particleScale, pickupMark, shakeScale, type Action, type Settings } from '../settings/Settings';
+import { keyLabel, loadSettings, particleScale, shakeScale, type Action, type Settings } from '../settings/Settings';
 import { unlockAchievements, type Achievement } from '../progress/Achievements';
 import { dayKey } from '../progress/Day';
 import { loadSave, perksFor, recordRun, writeSave, type RunResult, type SaveData } from '../progress/Progress';
@@ -162,7 +162,6 @@ export class GameScene extends Phaser.Scene {
   private quality = 1;
   private imagePool!: Pool<Phaser.GameObjects.Image>;
   private textPool!: Pool<Phaser.GameObjects.Text>;
-  private marks!: Phaser.GameObjects.Graphics;
 
   private acc = 0;
   private shake = new ScreenShake();
@@ -263,7 +262,6 @@ export class GameScene extends Phaser.Scene {
     this.debugGfx = this.add.graphics().setDepth(5);
     this.hudBar = new Hud(this);
     this.laneHud = this.add.graphics().setScrollFactor(0).setDepth(10);
-    this.marks = this.add.graphics().setDepth(1.6);
     this.touchView = new TouchView(this);
     // Pause button for touch screens (top left, clear of the controls at the bottom).
     this.touchPause = this.add.container(0, 0).setScrollFactor(0).setDepth(9);
@@ -661,8 +659,6 @@ export class GameScene extends Phaser.Scene {
     const cam = this.cameras.main;
     const left = cam.scrollX - 60;
     const right = cam.scrollX + VIEW_W + 60;
-    const marks = this.marks;
-    marks.clear();
     for (const p of this.run.pickups.items) {
       const visible = !p.taken && p.x > left && p.x < right;
       let sprite = this.sprites.get(p.id);
@@ -684,33 +680,10 @@ export class GameScene extends Phaser.Scene {
           .setScale(laneScale(p.lane))
           .setTint(Phaser.Display.Color.GetColor(shadeV, shadeV, shadeV))
           .setDepth(laneDepth(p.lane, 0.04));
-        if (this.settings.colorblind) this.drawPickupMark(marks, p.kind, p.x, sy, laneScale(p.lane));
       } else if (!p.taken) {
         this.imagePool.release(sprite);
         this.sprites.delete(p.id);
       }
-    }
-  }
-
-  /**
-   * Colour-blind mode: a badge behind each pickup with its own shape (circle snack, diamond can,
-   * square wrench) in colour-blind-safe colours, so the kind never depends on colour alone.
-   */
-  private drawPickupMark(g: Phaser.GameObjects.Graphics, kind: 'snack' | 'fuel' | 'wrench', x: number, y: number, sc: number): void {
-    const m = pickupMark(kind);
-    const r = 25 * sc;
-    g.fillStyle(m.fill, 0.9);
-    g.lineStyle(3, m.ring, 1);
-    if (m.shape === 'circle') {
-      g.fillCircle(x, y, r);
-      g.strokeCircle(x, y, r);
-    } else if (m.shape === 'diamond') {
-      const pts = [new Phaser.Geom.Point(x, y - r * 1.2), new Phaser.Geom.Point(x + r * 1.2, y), new Phaser.Geom.Point(x, y + r * 1.2), new Phaser.Geom.Point(x - r * 1.2, y)];
-      g.fillPoints(pts, true);
-      g.strokePoints(pts, true);
-    } else {
-      g.fillRect(x - r, y - r, r * 2, r * 2);
-      g.strokeRect(x - r, y - r, r * 2, r * 2);
     }
   }
 

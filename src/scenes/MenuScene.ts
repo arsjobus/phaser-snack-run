@@ -17,8 +17,8 @@ import { SFX, sfxCacheKey } from '../audio/sfx';
 import { loadSettings } from '../settings/Settings';
 import { defaultStore } from '../progress/Storage';
 import { MENU_GATE, MENU_ITEMS, type MenuId } from '../ui/MenuModel';
-import { INK, UI, wrapIndex } from '../ui/Theme';
-import { button, label, logoPlate, trophy, type Layer } from '../ui/Ui';
+import { INK, wrapIndex } from '../ui/Theme';
+import { button, label, logoPlate, type Layer } from '../ui/Ui';
 import { applyView } from '../ui/Resolution';
 import { ACHIEVEMENTS, allAchievementsUnlocked } from '../progress/Achievements';
 import { MASTER, starField, sunRays } from '../ui/MasterMenu';
@@ -264,23 +264,13 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  /** Gold-trimmed logo with a trophy on each side, the title of the special screen and the achievement tally. */
+  /** The title of the special screen: the usual logo plate, untouched, with the achievement tally under it. */
   private drawMasterHeader(): void {
     const cx = VIEW_W / 2;
-    const g = this.add.graphics();
-    // A gold frame around the usual plate, so it reads as a champion's badge.
-    g.fillStyle(UI.outline, 1);
-    g.fillRoundedRect(cx - 250, 38, 500, 108, 20);
-    g.fillStyle(MASTER.gold, 1);
-    g.fillRoundedRect(cx - 246, 42, 492, 100, 17);
-    g.fillStyle(MASTER.goldLight, 1);
-    g.fillRoundedRect(cx - 240, 46, 480, 10, 5);
-    this.layer.add(g);
-    logoPlate(this, this.layer, cx, 92, 460, 92, t('master.title'));
-    trophy(this, this.layer, cx - 292, 92, 1, 78);
-    trophy(this, this.layer, cx + 292, 92, 1, 78);
+    logoPlate(this, this.layer, cx, 92, 460, 92, t('menu.subtitle'));
     label(this, this.layer, cx, 172, t('master.subtitle'), 'display', 18, MASTER.goldInk, 0.5, 4);
-    label(this, this.layer, cx, 198, t('master.stats', { done: ACHIEVEMENTS.length, total: ACHIEVEMENTS.length }), 'body', 16, INK.soft, 0.5, 3);
+    const total = ACHIEVEMENTS.filter((a) => !a.hidden).length;
+    label(this, this.layer, cx, 198, t('master.stats', { done: total, total }), 'body', 16, INK.soft, 0.5, 3);
   }
 
   private draw(): void {

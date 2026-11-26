@@ -32,7 +32,7 @@ type Row =
   | { kind: 'back' };
 
 /**
- * Settings (Phase 8): volumes, screen shake, reduced motion, colour-blind pickups, effects quality,
+ * Settings (Phase 8): volumes, screen shake, reduced motion, effects quality,
  * touch controls and remappable keys. Reached with O from the game-over screen or the garage (or
  * the pad's Back button). Keyboard: Up/Down pick, Left/Right change, Enter changes or rebinds,
  * Esc goes back to where you came from (the start screen, the garage or the game-over screen).
@@ -77,7 +77,6 @@ export class SettingsScene extends Phaser.Scene {
       { kind: 'slider', label: 'settings.sfx', get: () => s.sfx, set: (v) => (s.sfx = v) },
       { kind: 'slider', label: 'settings.shake', get: () => s.shake, set: (v) => (s.shake = v) },
       { kind: 'toggle', label: 'settings.reducedMotion', get: () => s.reducedMotion, set: (v) => (s.reducedMotion = v) },
-      { kind: 'toggle', label: 'settings.colorblind', get: () => s.colorblind, set: (v) => (s.colorblind = v) },
       { kind: 'choice', label: 'settings.effects', options: ['auto', 'full', 'reduced'], get: () => s.effects, set: (v) => (s.effects = v as Settings['effects']), show: (v) => t(`common.${v}`) },
       { kind: 'choice', label: 'settings.touch', options: ['auto', 'on', 'off'], get: () => s.touch, set: (v) => (s.touch = v as Settings['touch']), show: (v) => t(`common.${v}`) },
       // Only languages that have a locale file in src/i18n/locales are listed.

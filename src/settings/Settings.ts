@@ -25,8 +25,8 @@ export type Bindings = Record<Action, string[]>;
 export const DEFAULT_BINDINGS: Readonly<Bindings> = {
   gas: ['ArrowRight', 'KeyD'],
   brake: ['ArrowLeft', 'KeyA'],
-  far: ['ArrowUp', 'KeyW', 'KeyQ'],
-  near: ['ArrowDown', 'KeyS', 'KeyE'],
+  far: ['ArrowUp', 'KeyW'],
+  near: ['ArrowDown', 'KeyS'],
   mute: ['KeyM'],
   music: ['KeyN'],
   debug: ['KeyH'],
@@ -47,8 +47,6 @@ export interface Settings {
   shake: number;
   /** Calms everything that moves for its own sake: no shake, no bobbing, no drifting clouds, fewer particles. */
   reducedMotion: boolean;
-  /** Pickups get a distinct shape and colour-blind-safe colours behind them. */
-  colorblind: boolean;
   effects: EffectsLevel;
   touch: TouchMode;
   /** Code of a language that has a locale file (`src/i18n/locales`). */
@@ -62,7 +60,6 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   sfx: 1,
   shake: 1,
   reducedMotion: false,
-  colorblind: false,
   effects: 'auto',
   touch: 'auto',
   language: DEFAULT_LOCALE,
@@ -93,7 +90,6 @@ export function sanitizeSettings(raw: unknown): Settings {
   s.sfx = unit(r.sfx, s.sfx);
   s.shake = unit(r.shake, s.shake);
   s.reducedMotion = flag(r.reducedMotion, s.reducedMotion);
-  s.colorblind = flag(r.colorblind, s.colorblind);
   s.effects = pick(r.effects, ['auto', 'full', 'reduced'] as const, s.effects);
   s.touch = pick(r.touch, ['auto', 'on', 'off'] as const, s.touch);
   s.language = isLocaleAvailable(r.language) ? r.language : s.language;
@@ -179,16 +175,3 @@ export const shakeScale = (s: Settings): number => (s.reducedMotion ? 0 : s.shak
 
 /** Particle count multiplier. */
 export const particleScale = (s: Settings, quality: number): number => Math.min(quality, s.reducedMotion ? 0.35 : 1);
-
-/** Colour-blind-safe (Okabe-Ito) pickup markers: a shape plus a colour per kind, so colour alone never tells them apart. */
-export type PickupMarkShape = 'circle' | 'diamond' | 'square';
-export function pickupMark(kind: 'snack' | 'fuel' | 'wrench'): { shape: PickupMarkShape; fill: number; ring: number } {
-  switch (kind) {
-    case 'snack':
-      return { shape: 'circle', fill: 0x0072b2, ring: 0xffffff };
-    case 'fuel':
-      return { shape: 'diamond', fill: 0xe69f00, ring: 0x000000 };
-    case 'wrench':
-      return { shape: 'square', fill: 0xf0e442, ring: 0x000000 };
-  }
-}

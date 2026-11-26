@@ -131,8 +131,8 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   },
 ];
 
-/** Hidden extras count toward "every achievement unlocked" (the special start screen). Flip to false to make them optional. */
-export const HIDDEN_COUNT_FOR_COMPLETION = true;
+/** Hidden extras do not count toward "every achievement unlocked" (the special start screen). Flip to true to require them too. */
+export const HIDDEN_COUNT_FOR_COMPLETION = false;
 
 /** True once every achievement that counts has been unlocked. */
 export function allAchievementsUnlocked(save: SaveData): boolean {

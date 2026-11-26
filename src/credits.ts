@@ -11,7 +11,7 @@ export interface CreditLine {
   namesKey?: string;
 }
 
-export const GAME_TITLE = 'CRUNCH 4x4 SNACK RUN';
+export const GAME_TITLE = 'CRUNCH 4x4 | OFF-ROAD RACING';
 
 /** The people who made the game. */
 export const TEAM: readonly CreditLine[] = [

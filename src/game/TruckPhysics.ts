@@ -238,11 +238,14 @@ export class TruckPhysics {
     this.y += this.vy * dt;
     this.angle += this.angVel * dt;
 
-    // Airtime bookkeeping with a short grace period so tiny bumps don't count as jumps
+    // Airtime bookkeeping with a short grace period so tiny bumps don't count as jumps. Any ground
+    // contact stops the clock: a truck lying on its roof or side has no wheels down but it is not in
+    // the air (`airborne` above still means "no wheels down" for the lean and drag physics).
+    const inAir = airborne && !bodyDown;
     const events: StepEvents = { landedAirTime: null };
     // The surge clock only runs on the ground, so a jump never uses it up.
     if (surging && !airborne) this.surge = Math.max(0, this.surge - dt);
-    if (airborne) {
+    if (inAir) {
       this.airGrace += dt;
       if (this.airGrace > 0.08) this.airTime += dt;
     } else {

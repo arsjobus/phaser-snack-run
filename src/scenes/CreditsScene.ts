@@ -24,7 +24,7 @@ export class CreditsScene extends Phaser.Scene {
     flatBackdrop(this);
     const layer: Layer = this.add.container(0, 0);
     topBar(this, layer, t('credits.title'));
-    logoPlate(this, layer, VIEW_W / 2, 124, 380, 70, 'SNACK RUN');
+    logoPlate(this, layer, VIEW_W / 2, 124, 380, 70, t('menu.subtitle'));
     panel(this, layer, 130, 178, 700, 262);
     const step = 40;
     ALL_CREDITS.forEach((c, i) => {

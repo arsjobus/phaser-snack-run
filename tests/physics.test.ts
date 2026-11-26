@@ -99,3 +99,20 @@ describe('TruckPhysics', () => {
     expect(survived).toBeGreaterThanOrEqual(6);
   });
 });
+
+describe('air timer', () => {
+  it('stops counting once a rolled-over truck is lying on its roof', () => {
+    const terrain = new Terrain(11);
+    terrain.ensure(4000);
+    const truck = new TruckPhysics(400, BASE_Y - 45);
+    truck.angle = Math.PI; // upside down, dropped from a little height
+    let lateAir = 0;
+    for (let t = 0; t < 4; t += DT) {
+      truck.step(DT, NEUTRAL_INPUT, terrain);
+      if (t > 2.5) lateAir = Math.max(lateAir, truck.airTime);
+    }
+    expect(truck.bodyContact).toBe(true);
+    expect(truck.grounded).toBe(false); // no wheels down...
+    expect(lateAir).toBe(0); // ...but it is not "in the air"
+  });
+});
