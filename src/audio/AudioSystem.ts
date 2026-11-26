@@ -145,7 +145,7 @@ export class AudioSystem {
     e.oscs[1].frequency.setTargetAtTime(f * 0.5, now, 0.06);
     e.filter.frequency.setTargetAtTime(380 + 900 * n, now, 0.1);
     const on = s.engineOn && !s.over;
-    e.gain.gain.setTargetAtTime(on ? 0.05 + 0.05 * n : 0, now, on ? 0.1 : 0.15);
+    e.gain.gain.setTargetAtTime(on ? 0.025 + 0.025 * n : 0, now, on ? 0.1 : 0.15);
     const r = this.roll!;
     r.filter.frequency.setTargetAtTime(350 + 700 * n, now, 0.1);
     r.gain.gain.setTargetAtTime(s.grounded && !s.over ? 0.18 * n : 0, now, 0.1);

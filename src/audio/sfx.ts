@@ -28,7 +28,7 @@ export const SFX = {
   lowFuel: { file: 'low-fuel.mp3', volume: 0.14 },
   empty: { file: 'empty.mp3', volume: 0.36 },
   /** Mid-stage whoosh; the game shifts its pitch up for each pad of the stage. */
-  boost: { file: 'boost.mp3', volume: 0.3 },
+  boost: { file: 'boost.mp3', volume: 0.45 },
   pyro: { file: 'pyro.mp3', volume: 1.0 },
   /** The game varies its pitch a little each time. */
   rocket: { file: 'rocket.mp3', volume: 0.09 },
