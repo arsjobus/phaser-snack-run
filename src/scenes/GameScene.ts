@@ -509,7 +509,14 @@ export class GameScene extends Phaser.Scene {
     this.terrain.prune(this.truck.x - 1800);
     for (const e of this.stunt.drain()) this.onShowEvent(e);
 
-    for (const e of this.run.update(dt, { x: this.truck.x, y: this.truck.y, angle: this.truck.angle, speed: this.truck.speed, lane: this.lane.f }, { gas: this.held.gas > 0, brake: this.held.brake > 0 })) {
+    for (const e of this.run.update(dt, {
+      x: this.truck.x,
+      y: this.truck.y,
+      angle: this.truck.angle,
+      speed: this.truck.speed,
+      lane: this.lane.f,
+      wheelContacts: this.truck.wheelContacts,
+    }, { gas: this.held.gas > 0, brake: this.held.brake > 0 })) {
       this.onRunEvent(e);
     }
     for (const e of this.race.update(dt, this.truck, this.run.bestMeters, !this.run.over, this.lane.f, this.lane.target, this.run.over)) {
