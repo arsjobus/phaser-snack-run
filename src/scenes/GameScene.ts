@@ -1321,7 +1321,7 @@ export class GameScene extends Phaser.Scene {
    * The game-over screen, drawn with the shared UI kit (`src/ui/`): a rimmed panel with the run's
    * numbers on the left, the high-score table (medals for the podium, this run highlighted) on the
    * right, and five buttons along the bottom. Keyboard shortcuts and gamepad menu navigation work
-   * alongside pointer input; a tap anywhere else drives again.
+   * alongside pointer input; only the Play Again button starts another run by pointer.
    */
   private showGameOver(result: RunResult & { achievements: Achievement[] }): void {
     const s = this.run.score;
@@ -1433,7 +1433,6 @@ export class GameScene extends Phaser.Scene {
     this.gameOverOptions = buttons;
     this.gameOverButtonLayer = this.add.container(0, -14).setScrollFactor(0).setDepth(31);
     this.drawGameOverButtons();
-    this.input.on('pointerdown', this.tapRestart, this);
   }
 
   private drawGameOverButtons(): void {
@@ -1472,14 +1471,6 @@ export class GameScene extends Phaser.Scene {
   private activateGameOverSelection(): void {
     if (this.time.now - this.overAt <= 400) return;
     this.gameOverOptions[this.gameOverSelection]?.[2]();
-  }
-
-  private tapRestart(_pointer?: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[] = []): void {
-    if (over.length > 0) return; // a tap on one of the buttons does that button's job
-    if (this.run.over && this.time.now - this.overAt > 400) {
-      this.input.off('pointerdown', this.tapRestart, this);
-      this.restart();
-    }
   }
 
   private drawDebug(): void {

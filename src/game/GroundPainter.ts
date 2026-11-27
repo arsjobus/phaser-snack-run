@@ -388,7 +388,8 @@ export class GroundPainter {
         break;
       }
       case 'crack': {
-        this.crack(biome, d, sc);
+        // Cracks read as an unrelated overlay on the terrain, so keep their generated
+        // detail data intact but omit the artwork from the scene.
         break;
       }
       case 'puddle': {
