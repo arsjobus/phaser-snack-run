@@ -164,7 +164,9 @@ export function button(scene: Phaser.Scene, layer: Layer, b: ButtonSpec): void {
   label(scene, layer, b.x, b.y + 1, b.text, 'display', b.size ?? 18, b.selected ? INK.dark : INK.soft, 0.5, 0, b.w - 24);
   if (b.onClick || b.onHover) {
     const zone = scene.add.zone(b.x, b.y, b.w, b.h).setScrollFactor(0).setInteractive({ useHandCursor: true });
-    if (b.onClick) zone.on('pointerdown', b.onClick);
+    // Activate on release so a scene transition cannot expose another scene's buttons
+    // underneath a still-held touch. This also matches the usual mobile button gesture.
+    if (b.onClick) zone.on('pointerup', b.onClick);
     if (b.onHover) zone.on('pointerover', b.onHover);
     layer.add(zone);
   }
