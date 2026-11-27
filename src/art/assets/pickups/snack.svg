@@ -24,448 +24,451 @@
      inkscape:deskcolor="#505050"
      inkscape:zoom="12.78941"
      inkscape:cx="12.158497"
-     inkscape:cy="25.450745"
+     inkscape:cy="25.450744"
      inkscape:window-width="1920"
-     inkscape:window-height="1050"
+     inkscape:window-height="1052"
      inkscape:window-x="0"
      inkscape:window-y="38"
      inkscape:window-maximized="1"
      inkscape:current-layer="svg75" />
   <polygon
-     points="0,7 8,-1 37,-1 37,37 29,45 0,45"
+     points="29,45 0,45 0,7 8,-1 37,-1 37,37 "
      fill="#111111"
-     id="polygon1" />
+     id="polygon1"
+     transform="translate(0,0.93827628)" />
   <polygon
-     points="1,8 8.5,1 35,1 28,8"
+     points="1,8 8.5,1 35,1 28,8 "
      fill="#f9b347"
-     id="polygon2" />
+     id="polygon2"
+     transform="translate(0,0.93827628)" />
   <polygon
-     points="28,8 35,1 35,36 28,43"
+     points="28,8 35,1 35,36 28,43 "
      fill="#b8501a"
-     id="polygon3" />
+     id="polygon3"
+     transform="translate(0,0.93827628)" />
   <rect
      x="1"
-     y="8"
+     y="8.9382782"
      width="27"
      height="35"
      fill="#e8742a"
      id="rect3" />
   <rect
      x="1"
-     y="8"
+     y="8.9382782"
      width="27"
      height="4"
      fill="#f9a23c"
      id="rect4" />
   <rect
      x="4"
-     y="14"
+     y="14.938277"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect5" />
   <rect
      x="5"
-     y="14"
+     y="14.938277"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect6" />
   <rect
      x="3"
-     y="15"
+     y="15.938277"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect7" />
   <rect
      x="3"
-     y="16"
+     y="16.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect8" />
   <rect
      x="3"
-     y="17"
+     y="17.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect9" />
   <rect
      x="4"
-     y="18"
+     y="18.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect10" />
   <rect
      x="5"
-     y="18"
+     y="18.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect11" />
   <rect
      x="7"
-     y="14"
+     y="14.938277"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect12" />
   <rect
      x="8"
-     y="14"
+     y="14.938277"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect13" />
   <rect
      x="7"
-     y="15"
+     y="15.938277"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect14" />
   <rect
      x="9"
-     y="15"
+     y="15.938277"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect15" />
   <rect
      x="7"
-     y="16"
+     y="16.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect16" />
   <rect
      x="8"
-     y="16"
+     y="16.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect17" />
   <rect
      x="7"
-     y="17"
+     y="17.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect18" />
   <rect
      x="9"
-     y="17"
+     y="17.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect19" />
   <rect
      x="7"
-     y="18"
+     y="18.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect20" />
   <rect
      x="9"
-     y="18"
+     y="18.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect21" />
   <rect
      x="11"
-     y="14"
+     y="14.938277"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect22" />
   <rect
      x="13"
-     y="14"
+     y="14.938277"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect23" />
   <rect
      x="11"
-     y="15"
+     y="15.938277"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect24" />
   <rect
      x="13"
-     y="15"
+     y="15.938277"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect25" />
   <rect
      x="11"
-     y="16"
+     y="16.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect26" />
   <rect
      x="13"
-     y="16"
+     y="16.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect27" />
   <rect
      x="11"
-     y="17"
+     y="17.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect28" />
   <rect
      x="13"
-     y="17"
+     y="17.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect29" />
   <rect
      x="11"
-     y="18"
+     y="18.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect30" />
   <rect
      x="12"
-     y="18"
+     y="18.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect31" />
   <rect
      x="13"
-     y="18"
+     y="18.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect32" />
   <rect
      x="15"
-     y="14"
+     y="14.938277"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect33" />
   <rect
      x="17"
-     y="14"
+     y="14.938277"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect34" />
   <rect
      x="15"
-     y="15"
+     y="15.938277"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect35" />
   <rect
      x="16"
-     y="15"
+     y="15.938277"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect36" />
   <rect
      x="17"
-     y="15"
+     y="15.938277"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect37" />
   <rect
      x="15"
-     y="16"
+     y="16.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect38" />
   <rect
      x="16"
-     y="16"
+     y="16.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect39" />
   <rect
      x="17"
-     y="16"
+     y="16.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect40" />
   <rect
      x="15"
-     y="17"
+     y="17.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect41" />
   <rect
      x="17"
-     y="17"
+     y="17.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect42" />
   <rect
      x="15"
-     y="18"
+     y="18.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect43" />
   <rect
      x="17"
-     y="18"
+     y="18.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect44" />
   <rect
      x="20"
-     y="14"
+     y="14.938277"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect45" />
   <rect
      x="21"
-     y="14"
+     y="14.938277"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect46" />
   <rect
      x="19"
-     y="15"
+     y="15.938277"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect47" />
   <rect
      x="19"
-     y="16"
+     y="16.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect48" />
   <rect
      x="19"
-     y="17"
+     y="17.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect49" />
   <rect
      x="20"
-     y="18"
+     y="18.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect50" />
   <rect
      x="21"
-     y="18"
+     y="18.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect51" />
   <rect
      x="23"
-     y="14"
+     y="14.938277"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect52" />
   <rect
      x="25"
-     y="14"
+     y="14.938277"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect53" />
   <rect
      x="23"
-     y="15"
+     y="15.938277"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect54" />
   <rect
      x="25"
-     y="15"
+     y="15.938277"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect55" />
   <rect
      x="23"
-     y="16"
+     y="16.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect56" />
   <rect
      x="24"
-     y="16"
+     y="16.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect57" />
   <rect
      x="25"
-     y="16"
+     y="16.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect58" />
   <rect
      x="23"
-     y="17"
+     y="17.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect59" />
   <rect
      x="25"
-     y="17"
+     y="17.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect60" />
   <rect
      x="23"
-     y="18"
+     y="18.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect61" />
   <rect
      x="25"
-     y="18"
+     y="18.938278"
      width="1"
      height="1"
      fill="#ffffff"
      id="rect62" />
   <rect
      x="4"
-     y="22"
+     y="22.938278"
      width="21"
      height="15"
      rx="2"
@@ -473,84 +476,84 @@
      id="rect63" />
   <rect
      x="8"
-     y="24"
+     y="24.938278"
      width="13"
      height="11"
      fill="#d9a441"
      id="rect64" />
   <rect
      x="10.139914"
-     y="25.748964"
+     y="26.687243"
      width="1.5"
      height="1.5"
      fill="#9a6b1f"
      id="rect65" />
   <rect
      x="10.139914"
-     y="28.748964"
+     y="29.687243"
      width="1.5"
      height="1.5"
      fill="#9a6b1f"
      id="rect66" />
   <rect
      x="10.139914"
-     y="31.748964"
+     y="32.687241"
      width="1.5"
      height="1.5"
      fill="#9a6b1f"
      id="rect67" />
   <rect
      x="13.639914"
-     y="25.748964"
+     y="26.687243"
      width="1.5"
      height="1.5"
      fill="#9a6b1f"
      id="rect68" />
   <rect
      x="13.639914"
-     y="28.748964"
+     y="29.687243"
      width="1.5"
      height="1.5"
      fill="#9a6b1f"
      id="rect69" />
   <rect
      x="13.639914"
-     y="31.748964"
+     y="32.687241"
      width="1.5"
      height="1.5"
      fill="#9a6b1f"
      id="rect70" />
   <rect
      x="17.139914"
-     y="25.748964"
+     y="26.687243"
      width="1.5"
      height="1.5"
      fill="#9a6b1f"
      id="rect71" />
   <rect
      x="17.139914"
-     y="28.748964"
+     y="29.687243"
      width="1.5"
      height="1.5"
      fill="#9a6b1f"
      id="rect72" />
   <rect
      x="17.139914"
-     y="31.748964"
+     y="32.687241"
      width="1.5"
      height="1.5"
      fill="#9a6b1f"
      id="rect73" />
   <rect
      x="1"
-     y="39"
+     y="39.938278"
      width="27"
      height="4"
      fill="#b83a1a"
      id="rect74" />
   <rect
      x="3"
-     y="9"
+     y="9.9382782"
      width="5"
      height="1.5"
      fill="#ffffff"
