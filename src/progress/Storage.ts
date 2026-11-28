@@ -22,6 +22,10 @@ export class MemoryStore implements KeyValueStore {
   }
 }
 
+// `defaultStore()` is called by several scenes. Keep one fallback instance so progress survives
+// scene changes for the lifetime of the page when browser storage is unavailable.
+const memoryStore = new MemoryStore();
+
 /**
  * `localStorage` when it works (it can throw in private windows or when blocked), otherwise an
  * in-memory store: progress then lasts for the session instead of crashing the game.
@@ -38,5 +42,5 @@ export function defaultStore(): KeyValueStore {
   } catch {
     // fall through to memory
   }
-  return new MemoryStore();
+  return memoryStore;
 }
